@@ -2156,6 +2156,7 @@ public class LogicalPlanConfiguration {
     }
     // inject external operator configuration
     setOperatorConfiguration(dag, appConfs, appName);
+    setModuleConfiguration(dag, appConfs, appName);
     setStreamConfiguration(dag, appConfs, appName);
   }
 
@@ -2421,11 +2422,7 @@ public class LogicalPlanConfiguration {
 
   private void setModuleConfiguration(final LogicalPlan dag, List<AppConf> appConfs, String appName) {
     for (final ModuleMeta mw : dag.getAllModules()) {
-      List<OperatorConf> opConfs = getMatchingChildConf(appConfs, mw.getName(), StramElement.OPERATOR);
-
-      // Set the operator attributes
-      setAttributes(opConfs, mw.getAttributes());
-      // Set the operator opProps
+      List<OperatorConf> opConfs = getMatchingChildConf(appConfs, mw.getName(), StramElement.MODULE);
       Map<String, String> opProps = getProperties(getPropertyArgs(mw), opConfs, appName);
       setObjectProperties(mw.getModule(), opProps);
 
