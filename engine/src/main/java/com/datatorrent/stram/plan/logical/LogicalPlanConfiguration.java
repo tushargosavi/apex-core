@@ -61,7 +61,6 @@ import com.datatorrent.api.Context.DAGContext;
 import com.datatorrent.api.Context.OperatorContext;
 import com.datatorrent.api.Context.PortContext;
 import com.datatorrent.api.annotation.ApplicationAnnotation;
-
 import com.datatorrent.stram.StramUtils;
 import com.datatorrent.stram.client.StramClientUtils;
 import com.datatorrent.stram.plan.logical.LogicalPlan.InputPortMeta;
@@ -2147,6 +2146,7 @@ public class LogicalPlanConfiguration {
     if (app != null) {
       app.populateDAG(dag, conf);
     }
+
     String appAlias = getAppAlias(name);
     String appName = appAlias == null ? name : appAlias;
     List<AppConf> appConfs = stramConf.getMatchingChildConf(appName, StramElement.APPLICATION);
@@ -2154,10 +2154,37 @@ public class LogicalPlanConfiguration {
     if (dag.getAttributes().get(Context.DAGContext.APPLICATION_NAME) == null) {
       dag.setAttribute(Context.DAGContext.APPLICATION_NAME, appName);
     }
+
+    expandModules(dag, conf, appName, 0, dag.getAllModules().size());
+
     // inject external operator configuration
     setOperatorConfiguration(dag, appConfs, appName);
     setModuleConfiguration(dag, appConfs, appName);
     setStreamConfiguration(dag, appConfs, appName);
+  }
+
+  private void expandModules(LogicalPlan dag, Configuration conf, String appName, int moduleStartIndex, int moduleEndIndex)
+  {
+    Collection<ModuleMeta> allModules = dag.getAllModules();
+    int i = 0;
+    for (ModuleMeta meta : allModules) {
+      if (i >= moduleStartIndex && i < moduleEndIndex) {
+        dag.moduleStack.push(meta);
+        
+        int beforeCount = dag.getAllModules().size();
+        // set module prop
+        setModuleProperties(dag, appName);
+        meta.getModule().populateDAG(dag, conf);
+        // change port mappings
+        int afterCount = dag.getAllModules().size();
+        
+        if (beforeCount != afterCount) {
+          expandModules(dag, conf, appName, beforeCount, afterCount);
+        }
+        dag.moduleStack.pop();
+      }
+      i++;
+    }
   }
 
   public static Properties readProperties(String filePath) throws IOException
