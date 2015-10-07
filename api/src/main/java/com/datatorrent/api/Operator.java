@@ -172,6 +172,29 @@ public interface Operator extends Component<OperatorContext>
 
   }
 
+  public class DefaultInputProxyPort<T> extends DefaultInputPort<T>
+  {
+    InputPort<T> inputPort;
+
+    @Override
+    public void process(T tuple)
+    {
+    }
+
+    public void setInputPort(InputPort<T> port)
+    {
+      inputPort = port;
+    }
+    public InputPort<T> getInputPort()
+    {
+      return inputPort;
+    }
+  }
+
+  public class DefaultOutputProxyPort<T> extends DefaultOutputPort<T>
+  {
+  }
+
   /**
    * The operator should throw the following exception if it wants to gracefully conclude its operation.
    * This exception is not treated as an error by the engine. It's considered a request by the operator

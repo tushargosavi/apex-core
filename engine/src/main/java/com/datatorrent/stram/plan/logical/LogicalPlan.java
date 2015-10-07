@@ -42,6 +42,8 @@ import com.google.common.collect.Maps;
 import com.google.common.collect.Sets;
 import com.datatorrent.api.*;
 import com.datatorrent.api.Attribute.AttributeMap.DefaultAttributeMap;
+import com.datatorrent.api.Operator.DefaultInputProxyPort;
+import com.datatorrent.api.Operator.DefaultOutputProxyPort;
 import com.datatorrent.api.Operator.InputPort;
 import com.datatorrent.api.Operator.OutputPort;
 import com.datatorrent.api.Operator.Unifier;
@@ -152,7 +154,8 @@ public class LogicalPlan implements Serializable, DAG
   private transient int nodeIndex = 0; // used for cycle validation
   private transient Stack<OperatorMeta> stack = new Stack<OperatorMeta>(); // used for cycle validation
   public transient Stack<ModuleMeta> moduleStack = new Stack<ModuleMeta>();
-  
+  private transient Map<String, HashMap<OutputPort<?>, InputPort<?>>> streamLinks = new HashMap<String, HashMap<Operator.OutputPort<?>, Operator.InputPort<?>>>();
+
   @Override
   public Attribute.AttributeMap getAttributes()
   {
@@ -1227,9 +1230,34 @@ public class LogicalPlan implements Serializable, DAG
     StreamMeta s = addStream(id);
     s.setSource(source);
     for (Operator.InputPort<?> sink: sinks) {
-      s.addSink(sink);
+      if(!(sink instanceof DefaultInputProxyPort)){
+        s.addSink(sink);
+      }
+      else{
+        if(streamLinks.containsKey(id)){
+          streamLinks.get(id).put(source, sink);
+        }
+        else{
+          HashMap<OutputPort<?>, InputPort<?>> streamLink = new HashMap<OutputPort<?>,InputPort<?>>();
+          streamLink.put(source, sink);
+          streamLinks.put(id, streamLink);
+        }
+      }
     }
     return s;
+  }
+
+  public void applyStreamLinks()
+  {
+    for(String id: streamLinks.keySet())
+    {
+      for(Entry<Operator.OutputPort<?>, Operator.InputPort<?>> e: streamLinks.get(id).entrySet())
+      {
+        StreamMeta s = getStream(id);
+        LOG.info("Source {}",s.getSource());
+        s.addSink(e.getValue());
+      }
+    }
   }
 
   @Override
@@ -1292,7 +1320,15 @@ public class LogicalPlan implements Serializable, DAG
   private InputPortMeta assertGetPortMeta(Operator.InputPort<?> port)
   {
     for (OperatorMeta o: getAllOperators()) {
-      InputPortMeta opm = o.getPortMapping().inPortMap.get(port);
+      InputPortMeta opm = null;
+      if(port instanceof DefaultInputProxyPort)
+      {
+        opm = o.getPortMapping().inPortMap.get(((DefaultInputProxyPort)port).getInputPort());
+      }
+      else
+      {
+        opm = o.getPortMapping().inPortMap.get(port);
+      }
       if (opm != null) {
         return opm;
       }
