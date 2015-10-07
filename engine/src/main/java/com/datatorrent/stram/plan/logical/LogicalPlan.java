@@ -146,11 +146,14 @@ public class LogicalPlan implements Serializable, DAG
 
   private final Map<String, StreamMeta> streams = new HashMap<String, StreamMeta>();
   private final Map<String, OperatorMeta> operators = new HashMap<String, OperatorMeta>();
+  public final Map<String, ModuleMeta> modules = new LinkedHashMap<String, ModuleMeta>();
+
   private final List<OperatorMeta> rootOperators = new ArrayList<OperatorMeta>();
   private final Attribute.AttributeMap attributes = new DefaultAttributeMap();
   private transient int nodeIndex = 0; // used for cycle validation
   private transient Stack<OperatorMeta> stack = new Stack<OperatorMeta>(); // used for cycle validation
-
+  public transient Stack<ModuleMeta> moduleStack = new Stack<ModuleMeta>();
+  
   @Override
   public Attribute.AttributeMap getAttributes()
   {
@@ -1049,6 +1052,16 @@ public class LogicalPlan implements Serializable, DAG
     @SuppressWarnings("FieldNameHidesFieldInSuperclass")
     private static final long serialVersionUID = 201401091635L;
   }
+  
+  public String getNameWithPrefix(String name)
+  {
+    String prefix = "";
+    for (ModuleMeta m : moduleStack) {
+      prefix += m.name + "_";
+    }
+    
+    return prefix + name;
+  }
 
   @Override
   public <T extends Operator> T addOperator(String name, Class<T> clazz)
@@ -1066,6 +1079,7 @@ public class LogicalPlan implements Serializable, DAG
   @Override
   public <T extends Operator> T addOperator(String name, T operator)
   {
+    name = moduleStack.empty() ? name : moduleStack.peek().getName() + "_" + name;
     if (operators.containsKey(name)) {
       if (operators.get(name).operator == operator) {
         return operator;
@@ -1091,6 +1105,7 @@ public class LogicalPlan implements Serializable, DAG
     private transient Integer nindex; // for cycle detection
     private transient Integer lowlink; // for cycle detection
     private transient Module module;
+    public transient boolean isExpanded = false;
 
     public ModuleMeta(String name, Module module)
     {
@@ -1147,16 +1162,16 @@ public class LogicalPlan implements Serializable, DAG
     }
   }
 
-  public transient Map<String, ModuleMeta> modules = Maps.newHashMap();
-
   @Override public <T extends Module> T addModule(String name, T module)
   {
+    name = getNameWithPrefix(name);
     if (modules.containsKey(name)) {
       if (modules.get(name).module == module) {
         return module;
       }
       throw new IllegalArgumentException("duplicate module is: " + modules.get(name));
     }
+    
     ModuleMeta meta = new ModuleMeta(name, module);
     modules.put(name, meta);
     return module;
@@ -1197,6 +1212,7 @@ public class LogicalPlan implements Serializable, DAG
   @Override
   public StreamMeta addStream(String id)
   {
+    id = moduleStack.empty() ? id : moduleStack.peek().getName() + "_" + id;
     StreamMeta s = new StreamMeta(id);
     StreamMeta o = streams.put(id, s);
     if (o == null) {
@@ -1303,7 +1319,7 @@ public class LogicalPlan implements Serializable, DAG
   {
     assertGetPortMeta(port).attributes.put(key, value);
   }
-
+  
   public List<OperatorMeta> getRootOperators()
   {
     return Collections.unmodifiableList(this.rootOperators);
