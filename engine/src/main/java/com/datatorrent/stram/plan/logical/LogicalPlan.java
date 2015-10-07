@@ -42,8 +42,8 @@ import com.google.common.collect.Maps;
 import com.google.common.collect.Sets;
 import com.datatorrent.api.*;
 import com.datatorrent.api.Attribute.AttributeMap.DefaultAttributeMap;
-import com.datatorrent.api.Operator.DefaultInputProxyPort;
-import com.datatorrent.api.Operator.DefaultOutputProxyPort;
+import com.datatorrent.api.Operator.ProxyInputPort;
+import com.datatorrent.api.Operator.ProxyOutputPort;
 import com.datatorrent.api.Operator.InputPort;
 import com.datatorrent.api.Operator.OutputPort;
 import com.datatorrent.api.Operator.Unifier;
@@ -1265,12 +1265,30 @@ public class LogicalPlan implements Serializable, DAG
   public <T> StreamMeta addStream(String id, Operator.OutputPort<? extends T> source, Operator.InputPort<? super T>... sinks)
   {
     StreamMeta s = addStream(id);
-    s.setSource(source);
-    for (Operator.InputPort<?> sink: sinks) {
-      if(!(sink instanceof DefaultInputProxyPort)){
-        s.addSink(sink);
+    id = s.id;
+    /*
+     * If a proxy output port, skip adding a source and add record it in streamLinks
+     */
+    if(source instanceof ProxyOutputPort){
+      if(streamLinks.containsKey(id)){
+        streamLinks.get(id).put(source, null);
       }
       else{
+        HashMap<OutputPort<?>, InputPort<?>> streamLink = new HashMap<OutputPort<?>,InputPort<?>>();
+        streamLink.put(source, null);
+        streamLinks.put(id, streamLink);
+      }
+    }
+    else // Otherwise, set the source as the output port
+    {
+      s.setSource(source);
+    }
+
+    for (Operator.InputPort<?> sink: sinks) {
+      /*
+       * If this is a proxy input port, then record it in streamlinks against the corresponding source
+       */
+      if(sink instanceof ProxyInputPort){
         if(streamLinks.containsKey(id)){
           streamLinks.get(id).put(source, sink);
         }
@@ -1280,10 +1298,28 @@ public class LogicalPlan implements Serializable, DAG
           streamLinks.put(id, streamLink);
         }
       }
+      else // Otherwise, add the input port as the sink
+      {
+        s.addSink(sink);
+        /*
+         * And fill in any missing sinks for any streams
+         */
+        for(Entry<Operator.OutputPort<?>, Operator.InputPort<?>> e: streamLinks.get(id).entrySet())
+        {
+          if(e.getValue() == null)
+          {
+            e.setValue(sink);
+          }
+        }
+      }
     }
     return s;
   }
 
+  /**
+   * This will be called once the Logical Dag is expanded, and the proxy input and proxt output ports are populated with the actual ports that they refer to
+   * This method adds sources and sinks for the StreamMeta objects which were left empty in the addStream call.
+   */
   public void applyStreamLinks()
   {
     for(String id: streamLinks.keySet())
@@ -1291,8 +1327,14 @@ public class LogicalPlan implements Serializable, DAG
       for(Entry<Operator.OutputPort<?>, Operator.InputPort<?>> e: streamLinks.get(id).entrySet())
       {
         StreamMeta s = getStream(id);
-        LOG.info("Source {}",s.getSource());
-        s.addSink(e.getValue());
+        if(e.getKey() instanceof ProxyOutputPort)
+        {
+          s.setSource(e.getKey());
+        }
+        if(e.getValue() instanceof ProxyInputPort)
+        {
+          s.addSink(e.getValue());
+        }
       }
     }
   }
@@ -1346,7 +1388,22 @@ public class LogicalPlan implements Serializable, DAG
   private OutputPortMeta assertGetPortMeta(Operator.OutputPort<?> port)
   {
     for (OperatorMeta o: getAllOperators()) {
-      OutputPortMeta opm = o.getPortMapping().outPortMap.get(port);
+      OutputPortMeta opm = null;
+      /*
+       * If ProxyOutputPort, then look recursively, for an instance where the port object is not a Proxy Port.
+       */
+      if(port instanceof ProxyOutputPort)
+      {
+        while(((ProxyOutputPort)port).get() instanceof ProxyOutputPort)
+        {
+          port = ((ProxyOutputPort)port).get();
+        }
+        opm = o.getPortMapping().outPortMap.get(((ProxyOutputPort)port).get());
+      }
+      else
+      {
+        opm = o.getPortMapping().outPortMap.get(port);
+      }
       if (opm != null) {
         return opm;
       }
@@ -1358,9 +1415,16 @@ public class LogicalPlan implements Serializable, DAG
   {
     for (OperatorMeta o: getAllOperators()) {
       InputPortMeta opm = null;
-      if(port instanceof DefaultInputProxyPort)
+      /*
+       * If ProxyInputPort, then look recursively, for an instance where the port object is not a Proxy Port.
+       */
+      if(port instanceof ProxyInputPort)
       {
-        opm = o.getPortMapping().inPortMap.get(((DefaultInputProxyPort)port).getInputPort());
+        while(((ProxyInputPort)port).get() instanceof ProxyInputPort)
+        {
+          port = ((ProxyInputPort)port).get();
+        }
+        opm = o.getPortMapping().inPortMap.get(((ProxyInputPort)port).get());
       }
       else
       {

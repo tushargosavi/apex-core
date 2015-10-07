@@ -172,7 +172,13 @@ public interface Operator extends Component<OperatorContext>
 
   }
 
-  public class DefaultInputProxyPort<T> extends DefaultInputPort<T>
+  public interface ProxyPort<T> extends Port
+  {
+    void set(T port);
+    T get();
+  }
+
+  public final class ProxyInputPort<T> extends DefaultInputPort<T> implements ProxyPort<InputPort<T>>
   {
     InputPort<T> inputPort;
 
@@ -181,19 +187,34 @@ public interface Operator extends Component<OperatorContext>
     {
     }
 
-    public void setInputPort(InputPort<T> port)
+    @Override
+    public void set(InputPort<T> port)
     {
       inputPort = port;
     }
-    public InputPort<T> getInputPort()
+
+    @Override
+    public InputPort<T> get()
     {
       return inputPort;
     }
+
   }
 
-  public class DefaultOutputProxyPort<T> extends DefaultOutputPort<T>
+  public final class ProxyOutputPort<T> extends DefaultOutputPort<T> implements ProxyPort<OutputPort<T>>
   {
-  }
+    OutputPort<T> outputPort;
+
+    public void set(OutputPort<T> port)
+    {
+      outputPort = port;
+    }
+
+    public OutputPort<T> get()
+    {
+      return outputPort;
+    }
+}
 
   /**
    * The operator should throw the following exception if it wants to gracefully conclude its operation.
