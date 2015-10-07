@@ -2155,7 +2155,7 @@ public class LogicalPlanConfiguration {
       dag.setAttribute(Context.DAGContext.APPLICATION_NAME, appName);
     }
 
-    expandModules(dag, conf, appName, 0, dag.getAllModules().size());
+    expandModules(dag, conf, appName);
 
     // inject external operator configuration
     setOperatorConfiguration(dag, appConfs, appName);
@@ -2163,27 +2163,27 @@ public class LogicalPlanConfiguration {
     setStreamConfiguration(dag, appConfs, appName);
   }
 
-  private void expandModules(LogicalPlan dag, Configuration conf, String appName, int moduleStartIndex, int moduleEndIndex)
+  private void expandModules(LogicalPlan dag, Configuration conf, String appName)
   {
-    Collection<ModuleMeta> allModules = dag.getAllModules();
-    int i = 0;
-    for (ModuleMeta meta : allModules) {
-      if (i >= moduleStartIndex && i < moduleEndIndex) {
-        dag.moduleStack.push(meta);
-        
-        int beforeCount = dag.getAllModules().size();
-        // set module prop
-        setModuleProperties(dag, appName);
-        meta.getModule().populateDAG(dag, conf);
-        // change port mappings
-        int afterCount = dag.getAllModules().size();
-        
-        if (beforeCount != afterCount) {
-          expandModules(dag, conf, appName, beforeCount, afterCount);
-        }
-        dag.moduleStack.pop();
+    Collection<ModuleMeta> modules = dag.getAllModules();
+    for (ModuleMeta moduleMeta : modules) {
+      if (moduleMeta.isExpanded) {
+        continue;
       }
-      i++;
+
+      dag.moduleStack.push(moduleMeta);
+      int beforeCount = dag.getAllModules().size();
+      // set module prop
+      setModuleProperties(dag, appName);
+      moduleMeta.getModule().populateDAG(dag, conf);
+      moduleMeta.isExpanded = true;
+      // change port mappings
+      int afterCount = dag.getAllModules().size();
+
+      if (beforeCount != afterCount) {
+        expandModules(dag, conf, appName);
+      }
+      dag.moduleStack.pop();
     }
   }
 

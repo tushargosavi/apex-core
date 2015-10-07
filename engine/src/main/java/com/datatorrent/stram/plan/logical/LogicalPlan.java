@@ -1079,7 +1079,7 @@ public class LogicalPlan implements Serializable, DAG
   @Override
   public <T extends Operator> T addOperator(String name, T operator)
   {
-    name = getNameWithPrefix(name);
+    name = moduleStack.empty() ? name : moduleStack.peek().getName() + "_" + name;
     if (operators.containsKey(name)) {
       if (operators.get(name).operator == operator) {
         return operator;
@@ -1105,6 +1105,7 @@ public class LogicalPlan implements Serializable, DAG
     private transient Integer nindex; // for cycle detection
     private transient Integer lowlink; // for cycle detection
     private transient Module module;
+    public transient boolean isExpanded = false;
 
     public ModuleMeta(String name, Module module)
     {
@@ -1211,7 +1212,7 @@ public class LogicalPlan implements Serializable, DAG
   @Override
   public StreamMeta addStream(String id)
   {
-    id = getNameWithPrefix(id);
+    id = moduleStack.empty() ? id : moduleStack.peek().getName() + "_" + id;
     StreamMeta s = new StreamMeta(id);
     StreamMeta o = streams.put(id, s);
     if (o == null) {

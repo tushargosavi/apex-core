@@ -1,6 +1,7 @@
 package com.datatorrent.stram.plan.logical;
 
 import com.datatorrent.api.*;
+import com.datatorrent.api.annotation.InputPortFieldAnnotation;
 import com.datatorrent.api.annotation.OutputPortFieldAnnotation;
 import com.datatorrent.common.util.BaseOperator;
 import com.datatorrent.stram.engine.GenericOperatorProperty;
@@ -198,6 +199,46 @@ public class TestModules
     public void setSize(int size)
     {
       this.size = size;
+    }
+  }
+
+  public static class WrapperModule implements Module
+  {
+    private int size;
+
+    @InputPortFieldAnnotation(optional = true)
+    public transient DefaultInputPort in = new DefaultInputPort<Integer>()
+    {
+      @Override public void process(Integer tuple)
+      {
+
+      }
+    };
+
+    @Override public void populateDAG(DAG dag, Configuration conf)
+    {
+      PiModule pi = dag.addModule("PiModule", PiModule.class);
+      pi.setSize(size);
+    }
+
+    public void setSize(int size)
+    {
+      this.size = size;
+    }
+
+    public int getSize()
+    {
+      return size;
+    }
+  }
+
+  public static class RandGenModule implements Module
+  {
+    @OutputPortFieldAnnotation(optional = true)
+    public transient DefaultOutputPort<Integer> out = new DefaultOutputPort<>();
+    @Override public void populateDAG(DAG dag, Configuration conf)
+    {
+      RandGen rand = dag.addOperator("RandGen", RandGen.class);
     }
   }
 }
