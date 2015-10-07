@@ -147,11 +147,14 @@ public class LogicalPlan implements Serializable, DAG
 
   private final Map<String, StreamMeta> streams = new HashMap<String, StreamMeta>();
   private final Map<String, OperatorMeta> operators = new HashMap<String, OperatorMeta>();
+  public final Map<String, ModuleMeta> modules = new LinkedHashMap<String, ModuleMeta>();
+
   private final List<OperatorMeta> rootOperators = new ArrayList<OperatorMeta>();
   private final Attribute.AttributeMap attributes = new DefaultAttributeMap();
   private transient int nodeIndex = 0; // used for cycle validation
   private transient Stack<OperatorMeta> stack = new Stack<OperatorMeta>(); // used for cycle validation
-
+  public transient Stack<ModuleMeta> moduleStack = new Stack<ModuleMeta>();
+  
   @Override
   public Attribute.AttributeMap getAttributes()
   {
@@ -406,6 +409,7 @@ public class LogicalPlan implements Serializable, DAG
     private String persistOperatorName;
     public Map<InputPortMeta, OperatorMeta> sinkSpecificPersistOperatorMap;
     public Map<InputPortMeta, InputPortMeta> sinkSpecificPersistInputPortMap;
+    private String parentModuleName;
 
     private StreamMeta(String id)
     {
@@ -432,6 +436,16 @@ public class LogicalPlan implements Serializable, DAG
     {
       this.locality = locality;
       return this;
+    }
+
+    public String getParentModuleName()
+    {
+      return parentModuleName;
+    }
+
+    public void setParentModuleName(String parentModuleName)
+    {
+      this.parentModuleName = parentModuleName;
     }
 
     public OutputPortMeta getSource()
@@ -734,6 +748,7 @@ public class LogicalPlan implements Serializable, DAG
     private transient Integer lowlink; // for cycle detection
     private transient Operator operator;
     private MetricAggregatorMeta metricAggregatorMeta;
+    private String parentModuleName;
 
     /*
      * Used for  OIO validation,
@@ -818,6 +833,16 @@ public class LogicalPlan implements Serializable, DAG
     public MetricAggregatorMeta getMetricAggregatorMeta()
     {
       return metricAggregatorMeta;
+    }
+
+    public String getParentModuleName()
+    {
+      return parentModuleName;
+    }
+
+    public void setParentModuleName(String parentModuleName)
+    {
+      this.parentModuleName = parentModuleName;
     }
 
     protected void populateAggregatorMeta()
@@ -1050,6 +1075,16 @@ public class LogicalPlan implements Serializable, DAG
     @SuppressWarnings("FieldNameHidesFieldInSuperclass")
     private static final long serialVersionUID = 201401091635L;
   }
+  
+  public String getNameWithPrefix(String name)
+  {
+    String prefix = "";
+    for (ModuleMeta m : moduleStack) {
+      prefix += m.name + "_";
+    }
+    
+    return prefix + name;
+  }
 
   @Override
   public <T extends Operator> T addOperator(String name, Class<T> clazz)
@@ -1067,6 +1102,7 @@ public class LogicalPlan implements Serializable, DAG
   @Override
   public <T extends Operator> T addOperator(String name, T operator)
   {
+    name = moduleStack.empty() ? name : moduleStack.peek().getName() + "_" + name;
     if (operators.containsKey(name)) {
       if (operators.get(name).operator == operator) {
         return operator;
@@ -1075,6 +1111,7 @@ public class LogicalPlan implements Serializable, DAG
     }
 
     OperatorMeta decl = new OperatorMeta(name, operator);
+    decl.setParentModuleName(moduleStack.empty() ? null : moduleStack.peek().getName());
     rootOperators.add(decl); // will be removed when a sink is added to an input port for this operator
     operators.put(name, decl);
     return operator;
@@ -1092,6 +1129,8 @@ public class LogicalPlan implements Serializable, DAG
     private transient Integer nindex; // for cycle detection
     private transient Integer lowlink; // for cycle detection
     private transient Module module;
+    private String parentModuleName;
+    public transient boolean isExpanded = false;
 
     public ModuleMeta(String name, Module module)
     {
@@ -1146,19 +1185,30 @@ public class LogicalPlan implements Serializable, DAG
     {
 
     }
-  }
 
-  public transient Map<String, ModuleMeta> modules = Maps.newHashMap();
+    public String getParentModuleName()
+    {
+      return parentModuleName;
+    }
+
+    public void setParentModuleName(String parentModuleName)
+    {
+      this.parentModuleName = parentModuleName;
+    }
+  }
 
   @Override public <T extends Module> T addModule(String name, T module)
   {
+    name = getNameWithPrefix(name);
     if (modules.containsKey(name)) {
       if (modules.get(name).module == module) {
         return module;
       }
       throw new IllegalArgumentException("duplicate module is: " + modules.get(name));
     }
+    
     ModuleMeta meta = new ModuleMeta(name, module);
+    meta.setParentModuleName(moduleStack.empty() ? null : moduleStack.peek().getName());
     modules.put(name, meta);
     return module;
   }
@@ -1198,7 +1248,9 @@ public class LogicalPlan implements Serializable, DAG
   @Override
   public StreamMeta addStream(String id)
   {
+    id = moduleStack.empty() ? id : moduleStack.peek().getName() + "_" + id;
     StreamMeta s = new StreamMeta(id);
+    s.setParentModuleName(moduleStack.empty() ? null : moduleStack.peek().getName());
     StreamMeta o = streams.put(id, s);
     if (o == null) {
       return s;
@@ -1304,7 +1356,7 @@ public class LogicalPlan implements Serializable, DAG
   {
     assertGetPortMeta(port).attributes.put(key, value);
   }
-
+  
   public List<OperatorMeta> getRootOperators()
   {
     return Collections.unmodifiableList(this.rootOperators);
