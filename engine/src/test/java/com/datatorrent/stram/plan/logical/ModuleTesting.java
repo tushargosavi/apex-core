@@ -189,5 +189,12 @@ public class ModuleTesting
       streamNames.add(streamMeta.getName());
     }
     Assert.assertTrue(streamNames.contains("WrapperModule_PiModule_s1"));
+
+    Assert.assertTrue(dag.getOperatorMeta("RandGenModule_RandGen").getParentModuleName().equals("RandGenModule"));
+    Assert.assertTrue(dag.getOperatorMeta("WrapperModule_PiModule_cal").getParentModuleName().equals("WrapperModule_PiModule"));
+    Assert.assertTrue(dag.getOperatorMeta("WrapperModule_PiModule_gen").getParentModuleName().equals("WrapperModule_PiModule"));
+    Assert.assertNull(dag.getOperatorMeta("Dummy").getParentModuleName());
+
+    Assert.assertTrue(dag.getStream("WrapperModule_PiModule_s1").getParentModuleName().equals("WrapperModule_PiModule"));
   }
 }
