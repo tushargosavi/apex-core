@@ -4,6 +4,7 @@ import java.util.Iterator;
 import java.util.Random;
 
 import org.apache.hadoop.conf.Configuration;
+import org.junit.Assert;
 import org.junit.Test;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
@@ -16,6 +17,7 @@ import com.datatorrent.api.InputOperator;
 import com.datatorrent.api.Module;
 import com.datatorrent.api.Operator;
 import com.datatorrent.api.Operator.DefaultInputProxyPort;
+import com.datatorrent.api.Operator.DefaultOutputProxyPort;
 import com.datatorrent.api.StreamingApplication;
 import com.datatorrent.common.util.BaseOperator;
 import com.datatorrent.stram.plan.logical.LogicalPlan;
@@ -62,6 +64,7 @@ public class ModuleTest
   public static class TestModule implements Module {
 
     public transient DefaultInputProxyPort<Integer> moduleInput = new Operator.DefaultInputProxyPort<Integer>();
+    public transient DefaultOutputProxyPort<Integer> moduleOutput = new Operator.DefaultOutputProxyPort<Integer>();
 
     @Override
     public void populateDAG(DAG dag, Configuration conf)
@@ -69,6 +72,7 @@ public class ModuleTest
       LOG.info("Module - PopulateDAG");
       DummyOperator dummyOperator = dag.addOperator("DummyOperator", new DummyOperator());
       moduleInput.setInputPort(dummyOperator.input);
+      moduleOutput.setOutputPort(dummyOperator.output);
     }
   }
 
@@ -84,8 +88,12 @@ public class ModuleTest
       {
         LOG.info("Application - PopulateDAG");
         DummyInputOperator dummyInputOperator = dag.addOperator("DummyInputOperator", new DummyInputOperator());
-        Module m = dag.addModule("TestModule", new TestModule());
-        dag.addStream("Operator To Module", dummyInputOperator.output, ((TestModule)m).moduleInput);
+        Module m1 = dag.addModule("TestModule1", new TestModule());
+        Module m2 = dag.addModule("TestModule2", new TestModule());
+        DummyOperator dummyOutputOperator = dag.addOperator("DummyOutputOperator", new DummyOperator());
+        dag.addStream("Operator To Module", dummyInputOperator.output, ((TestModule)m1).moduleInput);
+        dag.addStream("Module To Module", ((TestModule)m1).moduleOutput, ((TestModule)m2).moduleInput);
+        dag.addStream("Module To Operator", ((TestModule)m2).moduleOutput, dummyOutputOperator.input);
       }
     };
 
@@ -94,19 +102,10 @@ public class ModuleTest
     LogicalPlanConfiguration lpc = new LogicalPlanConfiguration(conf);
     LogicalPlan dag = new LogicalPlan();
     lpc.prepareDAG(dag, app, "TestApp");
-    System.out.println(dag);
-    System.out.println(dag.getAllOperators());
-    System.out.println(dag.getAllStreams());
-    LOG.info("Populating {} modules", dag.getAllModules().size());
-    Iterator<ModuleMeta> i = dag.getAllModules().iterator();
-    while(i.hasNext()){
-      Module m = i.next().getModule();
-      m.populateDAG(dag, conf);
-      System.out.println(dag);
-      System.out.println(dag.getAllOperators());
-      System.out.println(dag.getAllStreams().iterator().next());
-    }
-    dag.applyStreamLinks();
+
+    Assert.assertEquals(dag.getAllModules().size(), 2);
+    Assert.assertEquals(dag.getAllOperators().size(), 4);
+    Assert.assertEquals(dag.getAllStreams().size(), 3);
   }
 
   private static Logger LOG = LoggerFactory.getLogger(ModuleTest.class);

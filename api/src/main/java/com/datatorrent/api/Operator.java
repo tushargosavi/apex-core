@@ -193,6 +193,16 @@ public interface Operator extends Component<OperatorContext>
 
   public class DefaultOutputProxyPort<T> extends DefaultOutputPort<T>
   {
+    OutputPort<T> outputPort;
+
+    public void setOutputPort(OutputPort<T> port)
+    {
+      outputPort = port;
+    }
+    public OutputPort<T> getOutputPort()
+    {
+      return outputPort;
+    }
   }
 
   /**
