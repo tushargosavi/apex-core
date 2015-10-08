@@ -1265,12 +1265,23 @@ public class LogicalPlan implements Serializable, DAG
   public <T> StreamMeta addStream(String id, Operator.OutputPort<? extends T> source, Operator.InputPort<? super T>... sinks)
   {
     StreamMeta s = addStream(id);
-    s.setSource(source);
-    for (Operator.InputPort<?> sink: sinks) {
-      if(!(sink instanceof DefaultInputProxyPort)){
-        s.addSink(sink);
+    if(source instanceof DefaultOutputProxyPort){
+      if(streamLinks.containsKey(id)){
+        streamLinks.get(id).put(source, null);
       }
       else{
+        HashMap<OutputPort<?>, InputPort<?>> streamLink = new HashMap<OutputPort<?>,InputPort<?>>();
+        streamLink.put(source, null);
+        streamLinks.put(id, streamLink);
+      }
+    }
+    else
+    {
+      s.setSource(source);
+    }
+
+    for (Operator.InputPort<?> sink: sinks) {
+      if(sink instanceof DefaultInputProxyPort){
         if(streamLinks.containsKey(id)){
           streamLinks.get(id).put(source, sink);
         }
@@ -1278,6 +1289,17 @@ public class LogicalPlan implements Serializable, DAG
           HashMap<OutputPort<?>, InputPort<?>> streamLink = new HashMap<OutputPort<?>,InputPort<?>>();
           streamLink.put(source, sink);
           streamLinks.put(id, streamLink);
+        }
+      }
+      else
+      {
+        s.addSink(sink);
+        for(Entry<Operator.OutputPort<?>, Operator.InputPort<?>> e: streamLinks.get(id).entrySet())
+        {
+          if(e.getValue() == null)
+          {
+            e.setValue(sink);
+          }
         }
       }
     }
@@ -1291,8 +1313,14 @@ public class LogicalPlan implements Serializable, DAG
       for(Entry<Operator.OutputPort<?>, Operator.InputPort<?>> e: streamLinks.get(id).entrySet())
       {
         StreamMeta s = getStream(id);
-        LOG.info("Source {}",s.getSource());
-        s.addSink(e.getValue());
+        if(e.getKey() instanceof DefaultOutputProxyPort)
+        {
+          s.setSource(e.getKey());
+        }
+        if(e.getValue() instanceof DefaultInputProxyPort)
+        {
+          s.addSink(e.getValue());
+        }
       }
     }
   }
@@ -1346,7 +1374,15 @@ public class LogicalPlan implements Serializable, DAG
   private OutputPortMeta assertGetPortMeta(Operator.OutputPort<?> port)
   {
     for (OperatorMeta o: getAllOperators()) {
-      OutputPortMeta opm = o.getPortMapping().outPortMap.get(port);
+      OutputPortMeta opm = null;
+      if(port instanceof DefaultOutputProxyPort)
+      {
+        opm = o.getPortMapping().outPortMap.get(((DefaultOutputProxyPort)port).getOutputPort());
+      }
+      else
+      {
+        opm = o.getPortMapping().outPortMap.get(port);
+      }
       if (opm != null) {
         return opm;
       }

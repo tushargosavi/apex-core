@@ -2157,6 +2157,8 @@ public class LogicalPlanConfiguration {
 
     expandModules(dag, conf, appName);
 
+    dag.applyStreamLinks();
+
     // inject external operator configuration
     setOperatorConfiguration(dag, appConfs, appName);
     setModuleConfiguration(dag, appConfs, appName);
