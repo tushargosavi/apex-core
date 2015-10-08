@@ -3,6 +3,9 @@ package com.datatorrent.stram.plan.logical;
 import com.datatorrent.api.DAG;
 import com.datatorrent.api.Module;
 import com.datatorrent.api.StreamingApplication;
+import com.datatorrent.stram.plan.logical.TestModules.RandGen;
+import com.datatorrent.stram.plan.logical.TestModules.RandGenModule;
+import com.datatorrent.stram.plan.logical.TestModules.WrapperModule;
 import com.google.common.collect.Maps;
 import org.apache.hadoop.conf.Configuration;
 import org.junit.Assert;
@@ -13,6 +16,8 @@ import javax.validation.constraints.AssertTrue;
 import javax.validation.constraints.Min;
 import javax.validation.constraints.NotNull;
 import javax.validation.constraints.Pattern;
+import java.util.ArrayList;
+import java.util.List;
 import java.util.Map;
 
 public class ModuleTesting
@@ -142,5 +147,54 @@ public class ModuleTesting
     LogicalPlan dag = new LogicalPlan();
     pb.prepareDAG(dag, new AppWithModule(), "TestApp");
     System.out.println("This is test");
+  }
+
+  static class AppModuleExpansion implements StreamingApplication {
+    @Override public void populateDAG(DAG dag, Configuration conf)
+    {
+      RandGenModule randGenModule = dag.addModule("RandGenModule", RandGenModule.class);
+      WrapperModule wrapperModule = dag.addModule("WrapperModule", WrapperModule.class);
+      RandGen dummy = dag.addOperator("Dummy", RandGen.class);
+    }
+  }
+
+  @Test
+  public void dagExpansionTest() {
+    Configuration conf = new Configuration(false);
+    conf.set(StreamingApplication.DT_PREFIX + "module.WrapperModule.prop.size", "1000");
+
+    LogicalPlanConfiguration lpc = new LogicalPlanConfiguration(conf);
+    LogicalPlan dag = new LogicalPlan();
+    lpc.prepareDAG(dag, new AppModuleExpansion(), "AppModuleExpansion");
+
+    List<String> moduleNames = new ArrayList<>();
+    for (LogicalPlan.ModuleMeta moduleMeta : dag.getAllModules()) {
+      moduleNames.add(moduleMeta.getName());
+    }
+    Assert.assertTrue(moduleNames.contains("RandGenModule"));
+    Assert.assertTrue(moduleNames.contains("WrapperModule"));
+    Assert.assertTrue(moduleNames.contains("WrapperModule_PiModule"));
+
+    List<String> operatorNames = new ArrayList<>();
+    for (LogicalPlan.OperatorMeta operatorMeta : dag.getAllOperators()) {
+      operatorNames.add(operatorMeta.getName());
+    }
+    Assert.assertTrue(operatorNames.contains("RandGenModule_RandGen"));
+    Assert.assertTrue(operatorNames.contains("WrapperModule_PiModule_cal"));
+    Assert.assertTrue(operatorNames.contains("WrapperModule_PiModule_gen"));
+    Assert.assertTrue(operatorNames.contains("Dummy"));
+
+    List<String> streamNames = new ArrayList<>();
+    for (LogicalPlan.StreamMeta streamMeta : dag.getAllStreams()) {
+      streamNames.add(streamMeta.getName());
+    }
+    Assert.assertTrue(streamNames.contains("WrapperModule_PiModule_s1"));
+
+    Assert.assertTrue(dag.getOperatorMeta("RandGenModule_RandGen").getParentModuleName().equals("RandGenModule"));
+    Assert.assertTrue(dag.getOperatorMeta("WrapperModule_PiModule_cal").getParentModuleName().equals("WrapperModule_PiModule"));
+    Assert.assertTrue(dag.getOperatorMeta("WrapperModule_PiModule_gen").getParentModuleName().equals("WrapperModule_PiModule"));
+    Assert.assertNull(dag.getOperatorMeta("Dummy").getParentModuleName());
+
+    Assert.assertTrue(dag.getStream("WrapperModule_PiModule_s1").getParentModuleName().equals("WrapperModule_PiModule"));
   }
 }

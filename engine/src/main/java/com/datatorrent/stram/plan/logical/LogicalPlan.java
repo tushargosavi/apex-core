@@ -410,6 +410,7 @@ public class LogicalPlan implements Serializable, DAG
     private String persistOperatorName;
     public Map<InputPortMeta, OperatorMeta> sinkSpecificPersistOperatorMap;
     public Map<InputPortMeta, InputPortMeta> sinkSpecificPersistInputPortMap;
+    private String parentModuleName;
 
     private StreamMeta(String id)
     {
@@ -436,6 +437,16 @@ public class LogicalPlan implements Serializable, DAG
     {
       this.locality = locality;
       return this;
+    }
+
+    public String getParentModuleName()
+    {
+      return parentModuleName;
+    }
+
+    public void setParentModuleName(String parentModuleName)
+    {
+      this.parentModuleName = parentModuleName;
     }
 
     public OutputPortMeta getSource()
@@ -738,6 +749,7 @@ public class LogicalPlan implements Serializable, DAG
     private transient Integer lowlink; // for cycle detection
     private transient Operator operator;
     private MetricAggregatorMeta metricAggregatorMeta;
+    private String parentModuleName;
 
     /*
      * Used for  OIO validation,
@@ -822,6 +834,16 @@ public class LogicalPlan implements Serializable, DAG
     public MetricAggregatorMeta getMetricAggregatorMeta()
     {
       return metricAggregatorMeta;
+    }
+
+    public String getParentModuleName()
+    {
+      return parentModuleName;
+    }
+
+    public void setParentModuleName(String parentModuleName)
+    {
+      this.parentModuleName = parentModuleName;
     }
 
     protected void populateAggregatorMeta()
@@ -1081,7 +1103,7 @@ public class LogicalPlan implements Serializable, DAG
   @Override
   public <T extends Operator> T addOperator(String name, T operator)
   {
-    name = getNameWithPrefix(name);
+    name = moduleStack.empty() ? name : moduleStack.peek().getName() + "_" + name;
     if (operators.containsKey(name)) {
       if (operators.get(name).operator == operator) {
         return operator;
@@ -1090,6 +1112,7 @@ public class LogicalPlan implements Serializable, DAG
     }
 
     OperatorMeta decl = new OperatorMeta(name, operator);
+    decl.setParentModuleName(moduleStack.empty() ? null : moduleStack.peek().getName());
     rootOperators.add(decl); // will be removed when a sink is added to an input port for this operator
     operators.put(name, decl);
     return operator;
@@ -1107,6 +1130,8 @@ public class LogicalPlan implements Serializable, DAG
     private transient Integer nindex; // for cycle detection
     private transient Integer lowlink; // for cycle detection
     private transient Module module;
+    private String parentModuleName;
+    public transient boolean isExpanded = false;
 
     public ModuleMeta(String name, Module module)
     {
@@ -1161,6 +1186,16 @@ public class LogicalPlan implements Serializable, DAG
     {
 
     }
+
+    public String getParentModuleName()
+    {
+      return parentModuleName;
+    }
+
+    public void setParentModuleName(String parentModuleName)
+    {
+      this.parentModuleName = parentModuleName;
+    }
   }
 
   @Override public <T extends Module> T addModule(String name, T module)
@@ -1174,6 +1209,7 @@ public class LogicalPlan implements Serializable, DAG
     }
     
     ModuleMeta meta = new ModuleMeta(name, module);
+    meta.setParentModuleName(moduleStack.empty() ? null : moduleStack.peek().getName());
     modules.put(name, meta);
     return module;
   }
@@ -1213,8 +1249,9 @@ public class LogicalPlan implements Serializable, DAG
   @Override
   public StreamMeta addStream(String id)
   {
-    id = getNameWithPrefix(id);
+    id = moduleStack.empty() ? id : moduleStack.peek().getName() + "_" + id;
     StreamMeta s = new StreamMeta(id);
+    s.setParentModuleName(moduleStack.empty() ? null : moduleStack.peek().getName());
     StreamMeta o = streams.put(id, s);
     if (o == null) {
       return s;
