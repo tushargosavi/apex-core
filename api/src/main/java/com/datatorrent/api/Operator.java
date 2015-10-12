@@ -183,16 +183,6 @@ public interface Operator extends Component<OperatorContext>
     InputPort<T> inputPort;
 
     @Override
-    public void setup(PortContext context)
-    {
-    }
-
-    @Override
-    public void teardown()
-    {
-    }
-
-    @Override
     public void process(T tuple)
     {
     }
@@ -213,16 +203,6 @@ public interface Operator extends Component<OperatorContext>
   public class ProxyOutputPort<T> extends DefaultOutputPort<T> implements ProxyPort<OutputPort<T>>
   {
     OutputPort<T> outputPort;
-
-    @Override
-    public void setup(PortContext context)
-    {
-    }
-
-    @Override
-    public void teardown()
-    {
-    }
 
     public void set(Port port)
     {
