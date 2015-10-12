@@ -21,7 +21,7 @@ package com.datatorrent.stram.plan.logical;
 import com.datatorrent.common.experimental.AppData;
 import com.datatorrent.api.Context.PortContext;
 import com.datatorrent.api.Operator;
-import com.datatorrent.api.Operator.DefaultInputProxyPort;
+import com.datatorrent.api.Operator.ProxyInputPort;
 import com.datatorrent.api.Operator.InputPort;
 import com.datatorrent.api.Operator.OutputPort;
 import com.datatorrent.api.Operator.Port;

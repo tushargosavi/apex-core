@@ -66,7 +66,7 @@
     <jetty.version>8.1.10.v20130312</jetty.version>
     <maven.deploy.repo.classifier></maven.deploy.repo.classifier>
     <license.skip>true</license.skip>
-    <checkstyle.console>false</checkstyle.console>
+    <checkstyle.console>true</checkstyle.console>
   </properties>
 
   <dependencies>
@@ -312,7 +312,7 @@
                 <goal>check</goal>
               </goals>
               <configuration>
-                <failOnViolation>true</failOnViolation>
+                <failOnViolation>false</failOnViolation>
                 <logViolationsToConsole>${checkstyle.console}</logViolationsToConsole>
               </configuration>
             </execution>

@@ -172,38 +172,68 @@ public interface Operator extends Component<OperatorContext>
 
   }
 
-  public class DefaultInputProxyPort<T> extends DefaultInputPort<T>
+  public interface ProxyPort<T> extends Port
+  {
+    void set(Port port);
+    Port get();
+  }
+
+  public class ProxyInputPort<T> extends DefaultInputPort<T> implements ProxyPort<InputPort<T>>
   {
     InputPort<T> inputPort;
+
+    @Override
+    public void setup(PortContext context)
+    {
+    }
+
+    @Override
+    public void teardown()
+    {
+    }
 
     @Override
     public void process(T tuple)
     {
     }
 
-    public void setInputPort(InputPort<T> port)
+    @Override
+    public void set(Port port)
     {
-      inputPort = port;
+      inputPort = (InputPort<T>) port;
     }
-    public InputPort<T> getInputPort()
+
+    @Override
+    public Port get()
     {
       return inputPort;
     }
   }
 
-  public class DefaultOutputProxyPort<T> extends DefaultOutputPort<T>
+  public class ProxyOutputPort<T> extends DefaultOutputPort<T> implements ProxyPort<OutputPort<T>>
   {
     OutputPort<T> outputPort;
 
-    public void setOutputPort(OutputPort<T> port)
+    @Override
+    public void setup(PortContext context)
     {
-      outputPort = port;
     }
-    public OutputPort<T> getOutputPort()
+
+    @Override
+    public void teardown()
+    {
+    }
+
+    public void set(Port port)
+    {
+      outputPort = (OutputPort<T>) port;
+    }
+
+    public Port get()
     {
       return outputPort;
     }
-  }
+}
 
   /**
    * The operator should throw the following exception if it wants to gracefully conclude its operation.

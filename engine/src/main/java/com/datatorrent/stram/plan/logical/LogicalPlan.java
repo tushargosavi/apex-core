@@ -42,8 +42,8 @@ import com.google.common.collect.Maps;
 import com.google.common.collect.Sets;
 import com.datatorrent.api.*;
 import com.datatorrent.api.Attribute.AttributeMap.DefaultAttributeMap;
-import com.datatorrent.api.Operator.DefaultInputProxyPort;
-import com.datatorrent.api.Operator.DefaultOutputProxyPort;
+import com.datatorrent.api.Operator.ProxyInputPort;
+import com.datatorrent.api.Operator.ProxyOutputPort;
 import com.datatorrent.api.Operator.InputPort;
 import com.datatorrent.api.Operator.OutputPort;
 import com.datatorrent.api.Operator.Unifier;
@@ -1265,7 +1265,7 @@ public class LogicalPlan implements Serializable, DAG
   public <T> StreamMeta addStream(String id, Operator.OutputPort<? extends T> source, Operator.InputPort<? super T>... sinks)
   {
     StreamMeta s = addStream(id);
-    if(source instanceof DefaultOutputProxyPort){
+    if(source instanceof ProxyOutputPort){
       if(streamLinks.containsKey(id)){
         streamLinks.get(id).put(source, null);
       }
@@ -1281,7 +1281,7 @@ public class LogicalPlan implements Serializable, DAG
     }
 
     for (Operator.InputPort<?> sink: sinks) {
-      if(sink instanceof DefaultInputProxyPort){
+      if(sink instanceof ProxyInputPort){
         if(streamLinks.containsKey(id)){
           streamLinks.get(id).put(source, sink);
         }
@@ -1313,11 +1313,11 @@ public class LogicalPlan implements Serializable, DAG
       for(Entry<Operator.OutputPort<?>, Operator.InputPort<?>> e: streamLinks.get(id).entrySet())
       {
         StreamMeta s = getStream(id);
-        if(e.getKey() instanceof DefaultOutputProxyPort)
+        if(e.getKey() instanceof ProxyOutputPort)
         {
           s.setSource(e.getKey());
         }
-        if(e.getValue() instanceof DefaultInputProxyPort)
+        if(e.getValue() instanceof ProxyInputPort)
         {
           s.addSink(e.getValue());
         }
@@ -1375,9 +1375,9 @@ public class LogicalPlan implements Serializable, DAG
   {
     for (OperatorMeta o: getAllOperators()) {
       OutputPortMeta opm = null;
-      if(port instanceof DefaultOutputProxyPort)
+      if(port instanceof ProxyOutputPort)
       {
-        opm = o.getPortMapping().outPortMap.get(((DefaultOutputProxyPort)port).getOutputPort());
+        opm = o.getPortMapping().outPortMap.get(((ProxyOutputPort)port).get());
       }
       else
       {
@@ -1394,9 +1394,9 @@ public class LogicalPlan implements Serializable, DAG
   {
     for (OperatorMeta o: getAllOperators()) {
       InputPortMeta opm = null;
-      if(port instanceof DefaultInputProxyPort)
+      if(port instanceof ProxyInputPort)
       {
-        opm = o.getPortMapping().inPortMap.get(((DefaultInputProxyPort)port).getInputPort());
+        opm = o.getPortMapping().inPortMap.get(((ProxyInputPort)port).get());
       }
       else
       {
