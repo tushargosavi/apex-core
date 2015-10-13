@@ -1265,6 +1265,7 @@ public class LogicalPlan implements Serializable, DAG
   public <T> StreamMeta addStream(String id, Operator.OutputPort<? extends T> source, Operator.InputPort<? super T>... sinks)
   {
     StreamMeta s = addStream(id);
+    id = s.id;
     if(source instanceof ProxyOutputPort){
       if(streamLinks.containsKey(id)){
         streamLinks.get(id).put(source, null);
@@ -1377,6 +1378,10 @@ public class LogicalPlan implements Serializable, DAG
       OutputPortMeta opm = null;
       if(port instanceof ProxyOutputPort)
       {
+        while(((ProxyOutputPort)port).get() instanceof ProxyOutputPort)
+        {
+          port = ((ProxyOutputPort)port).get();
+        }
         opm = o.getPortMapping().outPortMap.get(((ProxyOutputPort)port).get());
       }
       else
@@ -1396,6 +1401,10 @@ public class LogicalPlan implements Serializable, DAG
       InputPortMeta opm = null;
       if(port instanceof ProxyInputPort)
       {
+        while(((ProxyInputPort)port).get() instanceof ProxyInputPort)
+        {
+          port = ((ProxyInputPort)port).get();
+        }
         opm = o.getPortMapping().inPortMap.get(((ProxyInputPort)port).get());
       }
       else
