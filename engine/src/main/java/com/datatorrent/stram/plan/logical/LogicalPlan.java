@@ -1197,6 +1197,51 @@ public class LogicalPlan implements Serializable, DAG
     {
       this.parentModuleName = parentModuleName;
     }
+
+    public LinkedHashMap<InputPortMeta, StreamMeta> getInputStreams()
+    {
+      return inputStreams;
+    }
+
+    public LinkedHashMap<OutputPortMeta, StreamMeta> getOutputStreams()
+    {
+      return outputStreams;
+    }
+
+    public int getId()
+    {
+      return id;
+    }
+
+    public Integer getNindex()
+    {
+      return nindex;
+    }
+
+    public Integer getLowlink()
+    {
+      return lowlink;
+    }
+
+    public boolean isExpanded()
+    {
+      return isExpanded;
+    }
+    
+    private void writeObject(ObjectOutputStream out) throws IOException
+    {
+      //getValue2(OperatorContext.STORAGE_AGENT).save(operator, id, Checkpoint.STATELESS_CHECKPOINT_WINDOW_ID);
+      out.defaultWriteObject();
+      FSStorageAgent.store(out, module);
+    }
+
+    private void readObject(ObjectInputStream input) throws IOException, ClassNotFoundException
+    {
+      input.defaultReadObject();
+      // TODO: not working because - we don't have the storage agent in parent attribuet map
+      //operator = (Operator)getValue2(OperatorContext.STORAGE_AGENT).load(id, Checkpoint.STATELESS_CHECKPOINT_WINDOW_ID);
+      module = (Module)FSStorageAgent.retrieve(input);
+    }
   }
 
   @Override public <T extends Module> T addModule(String name, T module)
@@ -1483,7 +1528,7 @@ public class LogicalPlan implements Serializable, DAG
 
   public ModuleMeta getModuleMeta(String moduleName)
   {
-    return null;
+    return this.modules.get(moduleName);
   }
 
   @Override
