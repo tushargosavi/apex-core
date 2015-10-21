@@ -536,16 +536,20 @@ public class StramWebServices
   @GET
   @Path(PATH_LOGICAL_PLAN_MODULES)
   @Produces(MediaType.APPLICATION_JSON)
-  public JSONObject getLogicalModules(@QueryParam("level") String level) throws Exception
+  public JSONObject getLogicalModules() throws Exception
   {
     LogicalModulesInfo nodeList = new LogicalModulesInfo();
-    
-    System.out.println(level);
-    if (level != null && level.contains("flatten")) {
-      nodeList.modules = dagManager.getLogicalModuleInfoList(true);
-    } else {
-      nodeList.modules = dagManager.getLogicalModuleInfoList(false);
-    }
+    nodeList.modules = dagManager.getLogicalModuleInfoList(false);
+    return new JSONObject(objectMapper.writeValueAsString(nodeList));
+  }
+
+  @GET
+  @Path(PATH_LOGICAL_PLAN_MODULES + "/flatten")
+  @Produces(MediaType.APPLICATION_JSON)
+  public JSONObject getLogicalModulesFlatten() throws Exception
+  {
+    LogicalModulesInfo nodeList = new LogicalModulesInfo();
+    nodeList.modules = dagManager.getLogicalModuleInfoList(true);
     return new JSONObject(objectMapper.writeValueAsString(nodeList));
   }
   
@@ -566,18 +570,28 @@ public class StramWebServices
   @GET
   @Path(PATH_LOGICAL_PLAN_MODULES + "/{moduleName}")
   @Produces(MediaType.APPLICATION_JSON)
-  public JSONObject getLogicalModule(@PathParam("moduleName") String moduleName,@QueryParam("level") String level) throws Exception
+  public JSONObject getLogicalModule(@PathParam("moduleName") String moduleName) throws Exception
   {
     ModuleMeta logicalModule = dagManager.getLogicalPlan().getModuleMeta(moduleName);
     if (logicalModule == null) {
       throw new NotFoundException();
     }
     LogicalModuleInfo logicalModuleInfo;
-    if(level != null && level.contains("flatten")){
-     logicalModuleInfo = dagManager.getLogicalModuleInfo(moduleName,true);
-    }else{
-      logicalModuleInfo = dagManager.getLogicalModuleInfo(moduleName,false);
+    logicalModuleInfo = dagManager.getLogicalModuleInfo(moduleName, false);
+    return new JSONObject(objectMapper.writeValueAsString(logicalModuleInfo));
+  }
+
+  @GET
+  @Path(PATH_LOGICAL_PLAN_MODULES + "/{moduleName}/flatten")
+  @Produces(MediaType.APPLICATION_JSON)
+  public JSONObject getLogicalModuleFlatten(@PathParam("moduleName") String moduleName) throws Exception
+  {
+    ModuleMeta logicalModule = dagManager.getLogicalPlan().getModuleMeta(moduleName);
+    if (logicalModule == null) {
+      throw new NotFoundException();
     }
+    LogicalModuleInfo logicalModuleInfo;
+    logicalModuleInfo = dagManager.getLogicalModuleInfo(moduleName, true);
     return new JSONObject(objectMapper.writeValueAsString(logicalModuleInfo));
   }
 
@@ -921,8 +935,15 @@ public class StramWebServices
   @Produces(MediaType.APPLICATION_JSON)
   public JSONObject getLogicalPlan() throws JSONException, IOException
   {
-    LogicalPlan lp = dagManager.getLogicalPlan();
-    return new JSONObject(objectMapper.writeValueAsString(LogicalPlanSerializer.convertToMap(lp)));
+    return new JSONObject(objectMapper.writeValueAsString(LogicalPlanSerializer.convertToMapV2(dagManager.getLogicalPlan(),false)));
+  }
+  
+  @GET
+  @Path(PATH_LOGICAL_PLAN+"/flatten")
+  @Produces(MediaType.APPLICATION_JSON)
+  public JSONObject getLogicalPlanFlatten() throws JSONException, IOException
+  {
+    return new JSONObject(objectMapper.writeValueAsString(LogicalPlanSerializer.convertToMapV2(dagManager.getLogicalPlan(),true)));
   }
 
   @POST // not supported by WebAppProxyServlet, can only be called directly

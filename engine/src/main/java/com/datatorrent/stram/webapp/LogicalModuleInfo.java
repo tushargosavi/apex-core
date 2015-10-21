@@ -15,5 +15,5 @@ public class LogicalModuleInfo
   public String className;
   public List<LogicalModuleInfo> modules = new ArrayList<LogicalModuleInfo>();
   public List<LogicalOperatorInfo> operators = new ArrayList<LogicalOperatorInfo>();
-
+  public List<StreamInfo> streams = new ArrayList<StreamInfo>();
 }

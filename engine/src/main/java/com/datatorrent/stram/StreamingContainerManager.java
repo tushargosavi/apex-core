@@ -59,8 +59,11 @@ import java.util.concurrent.atomic.AtomicLong;
 
 import javax.annotation.Nullable;
 
-import net.engio.mbassy.bus.MBassador;
-import net.engio.mbassy.bus.config.BusConfiguration;
+import org.codehaus.jettison.json.JSONArray;
+import org.codehaus.jettison.json.JSONException;
+import org.codehaus.jettison.json.JSONObject;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
 
 import org.apache.commons.io.IOUtils;
 import org.apache.commons.lang3.StringUtils;
@@ -81,11 +84,17 @@ import org.apache.hadoop.yarn.conf.YarnConfiguration;
 import org.apache.hadoop.yarn.util.Clock;
 import org.apache.hadoop.yarn.util.SystemClock;
 import org.apache.hadoop.yarn.webapp.NotFoundException;
-import org.codehaus.jettison.json.JSONArray;
-import org.codehaus.jettison.json.JSONException;
-import org.codehaus.jettison.json.JSONObject;
-import org.slf4j.Logger;
-import org.slf4j.LoggerFactory;
+
+import com.esotericsoftware.kryo.KryoException;
+import com.esotericsoftware.kryo.io.Input;
+import com.esotericsoftware.kryo.io.Output;
+import com.google.common.annotations.VisibleForTesting;
+import com.google.common.base.Predicate;
+import com.google.common.cache.Cache;
+import com.google.common.cache.CacheBuilder;
+import com.google.common.collect.Lists;
+import com.google.common.collect.Maps;
+import com.google.common.collect.Sets;
 
 import com.datatorrent.api.Attribute;
 import com.datatorrent.api.AutoMetric;
@@ -134,6 +143,7 @@ import com.datatorrent.stram.plan.logical.LogicalPlan.InputPortMeta;
 import com.datatorrent.stram.plan.logical.LogicalPlan.ModuleMeta;
 import com.datatorrent.stram.plan.logical.LogicalPlan.OperatorMeta;
 import com.datatorrent.stram.plan.logical.LogicalPlan.OutputPortMeta;
+import com.datatorrent.stram.plan.logical.LogicalPlan.StreamMeta;
 import com.datatorrent.stram.plan.logical.LogicalPlanConfiguration;
 import com.datatorrent.stram.plan.logical.Operators;
 import com.datatorrent.stram.plan.logical.Operators.PortContextPair;
@@ -160,16 +170,9 @@ import com.datatorrent.stram.webapp.OperatorAggregationInfo;
 import com.datatorrent.stram.webapp.OperatorInfo;
 import com.datatorrent.stram.webapp.PortInfo;
 import com.datatorrent.stram.webapp.StreamInfo;
-import com.esotericsoftware.kryo.KryoException;
-import com.esotericsoftware.kryo.io.Input;
-import com.esotericsoftware.kryo.io.Output;
-import com.google.common.annotations.VisibleForTesting;
-import com.google.common.base.Predicate;
-import com.google.common.cache.Cache;
-import com.google.common.cache.CacheBuilder;
-import com.google.common.collect.Lists;
-import com.google.common.collect.Maps;
-import com.google.common.collect.Sets;
+
+import net.engio.mbassy.bus.MBassador;
+import net.engio.mbassy.bus.config.BusConfiguration;
 
 /**
  * Tracks topology provisioning/allocation to containers<p>
@@ -2303,19 +2306,19 @@ public class StreamingContainerManager implements PlanContext
     return fillLogicalOperatorInfo(operatorMeta);
   }
   
-  public LogicalModuleInfo getLogicalModuleInfo(String moduleName,boolean recurse)
+  public LogicalModuleInfo getLogicalModuleInfo(String moduleName,boolean flatten)
   {
     ModuleMeta moduleMeta = getLogicalPlan().getModuleMeta(moduleName);
     if (moduleMeta == null) {
       return null;
     }
-    LogicalModuleInfo logicalModuleInfo = fillLogicalModuleInfo(moduleMeta);
+    LogicalModuleInfo logicalModuleInfo = fillLogicalModuleInfo(moduleMeta,flatten);
     for (ModuleMeta meta : getLogicalPlan().getAllModules()) {
       if (meta.getParentModuleName()!=null && meta.getParentModuleName().equals(moduleName)) {
-        if( !recurse ){
-        logicalModuleInfo.modules.add(fillLogicalModuleInfo(meta));
+        if( !flatten ){
+        logicalModuleInfo.modules.add(fillLogicalModuleInfo(meta,flatten));
         }else{
-          logicalModuleInfo.modules.add(getLogicalModuleInfo(fillLogicalModuleInfo(meta).name,true));
+          logicalModuleInfo.modules.add(getLogicalModuleInfo(fillLogicalModuleInfo(meta,flatten).name,flatten));
         }
       }
     }
@@ -2332,14 +2335,14 @@ public class StreamingContainerManager implements PlanContext
     return infoList;
   }
   
-  public List<LogicalModuleInfo> getLogicalModuleInfoList(boolean recurse)
+  public List<LogicalModuleInfo> getLogicalModuleInfoList(boolean flatten)
   {
     List<LogicalModuleInfo> infoList = new ArrayList<LogicalModuleInfo>();
     Collection<ModuleMeta> allModules = getLogicalPlan().getAllModules();
     for (ModuleMeta moduleMeta : allModules) {
       if (moduleMeta.getParentModuleName() == null) {
-        if (!recurse) {
-          infoList.add(fillLogicalModuleInfo(moduleMeta));
+        if (!flatten) {
+          infoList.add(fillLogicalModuleInfo(moduleMeta,flatten));
         } else {
           infoList.add(getLogicalModuleInfo(moduleMeta.getName(), true));
         }
@@ -2497,26 +2500,56 @@ public class StreamingContainerManager implements PlanContext
     return loi;
   }
   
-  private LogicalModuleInfo fillLogicalModuleInfo(ModuleMeta module)
+  private LogicalModuleInfo fillLogicalModuleInfo(ModuleMeta module,boolean flatten)
   {
     LogicalModuleInfo lmi = new LogicalModuleInfo();
     lmi.name = module.getName();
     lmi.className = module.getModule().getClass().getName();
-    
-    for (OperatorMeta operatorMeta : getLogicalPlan().getAllOperators()) {
-      if (module.getParentModuleName() == null) {
-        if (operatorMeta.getParentModuleName() == null) {
-          lmi.operators.add(fillLogicalOperatorInfo(operatorMeta));
+    if (flatten) {
+      for (OperatorMeta operatorMeta : getLogicalPlan().getAllOperators()) {
+        if (module.getParentModuleName() == null) {
+          if (operatorMeta.getParentModuleName() == null) {
+            lmi.operators.add(fillLogicalOperatorInfo(operatorMeta));
+          }
+        } else {
+          if (operatorMeta.getParentModuleName() != null
+              && module.getParentModuleName().equals(operatorMeta.getParentModuleName())) {
+            lmi.operators.add(fillLogicalOperatorInfo(operatorMeta));
+          }
         }
-      } else {
-        if (operatorMeta.getParentModuleName() != null
-            && module.getParentModuleName().equals(operatorMeta.getParentModuleName())) {
-          lmi.operators.add(fillLogicalOperatorInfo(operatorMeta));
+      }
+
+      for (StreamMeta streamMeta : getLogicalPlan().getAllStreams()) {
+        if (module.getParentModuleName() == null) {
+          if (streamMeta.getParentModuleName() == null) {
+            lmi.streams.add(fillLogicalStreamInfo(streamMeta));
+          }
+        } else {
+          if (streamMeta.getParentModuleName() != null
+              && module.getParentModuleName().equals(streamMeta.getParentModuleName())) {
+            lmi.streams.add(fillLogicalStreamInfo(streamMeta));
+          }
         }
       }
     }
 
     return lmi;
+  }
+  
+  private StreamInfo fillLogicalStreamInfo(StreamMeta streamMeta)
+  {
+    StreamInfo si = new StreamInfo();
+    si.logicalName = streamMeta.getName();
+    si.source.portName = streamMeta.getSource().getPortName();
+    si.locality = streamMeta.getLocality();
+    si.source.operatorId = streamMeta.getSource().getOperatorMeta().getName();
+    for(InputPortMeta sinks : streamMeta.getSinks() ){
+      StreamInfo.Port port = new StreamInfo.Port();
+      port.operatorId = sinks.getOperatorWrapper().getName();
+      port.portName = sinks.getPortName();
+      si.sinks.add(port);
+    }
+    return si;
   }
 
   private OperatorAggregationInfo fillOperatorAggregationInfo(OperatorMeta operator)
