@@ -3,6 +3,10 @@ package com.datatorrent.stram.moduleexperiment.testModule;
 import com.datatorrent.api.DefaultInputPort;
 import com.datatorrent.common.util.BaseOperator;
 
+/**
+ * Output Operator.
+ * Outputs the stream onto the console
+ */
 public class OutputOperator extends BaseOperator
 {
   String prefix;

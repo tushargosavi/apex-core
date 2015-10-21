@@ -21,6 +21,9 @@ import com.datatorrent.common.util.BaseOperator;
 import com.datatorrent.stram.plan.logical.LogicalPlan;
 import com.datatorrent.stram.plan.logical.LogicalPlanConfiguration;
 
+/**
+ * Unit tests for testing Dag expansion with modules and proxy port substitution
+ */
 public class ModuleTest
 {
 
@@ -110,7 +113,6 @@ public class ModuleTest
     };
 
     Configuration conf = new Configuration(false);
-//    conf.addResource(StramClientUtils.DT_SITE_XML_FILE);
     LogicalPlanConfiguration lpc = new LogicalPlanConfiguration(conf);
     LogicalPlan dag = new LogicalPlan();
     lpc.prepareDAG(dag, app, "TestApp");

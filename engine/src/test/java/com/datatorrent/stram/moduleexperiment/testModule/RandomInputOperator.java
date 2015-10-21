@@ -6,6 +6,10 @@ import com.datatorrent.api.Context.OperatorContext;
 import com.datatorrent.api.DefaultOutputPort;
 import com.datatorrent.api.InputOperator;
 
+/**
+ * Toy Random Input Operator.
+ * Generates random integers
+ */
 public class RandomInputOperator implements InputOperator
 {
 
