@@ -2155,8 +2155,11 @@ public class LogicalPlanConfiguration {
       dag.setAttribute(Context.DAGContext.APPLICATION_NAME, appName);
     }
 
+    // Expand the modules within the dag recursively
     expandModules(dag, conf, appName);
 
+    // Replace the proxy ports (belonging to modules) with actual input and output ports (belonging to operators)
+    // Also add the source and sinks for StreamMeta objects
     dag.applyStreamLinks();
 
     // inject external operator configuration
@@ -2165,6 +2168,19 @@ public class LogicalPlanConfiguration {
     setStreamConfiguration(dag, appConfs, appName);
   }
 
+  /**
+   * Expands modules into the application Dag.
+   * Specifically, calls the populateDag() methods for each module recursively for each top level module in the application Dag.
+   * For example, if the Dag is:
+   * O1 -> M1(M11(M111)) -> M2(M21) -> O4
+   * O1, O2 - Operators
+   * M1, M2 - Top level Modules 
+   * M11, M111, M21 - Hidden modules, until the top level modules are not expanded
+   * 
+   * @param dag
+   * @param conf
+   * @param appName
+   */
   private void expandModules(LogicalPlan dag, Configuration conf, String appName)
   {
     Collection<ModuleMeta> modules = dag.getAllModules();
@@ -2175,13 +2191,14 @@ public class LogicalPlanConfiguration {
 
       dag.moduleStack.push(moduleMeta);
       int beforeCount = dag.getAllModules().size();
-      // set module prop
+      // Set the module properties
       setModuleProperties(dag, appName);
+      // Expand the module
       moduleMeta.getModule().populateDAG(dag, conf);
       moduleMeta.isExpanded = true;
-      // change port mappings
       int afterCount = dag.getAllModules().size();
 
+      // Continue only if more modules need to be expanded
       if (beforeCount != afterCount) {
         expandModules(dag, conf, appName);
       }
@@ -2384,6 +2401,14 @@ public class LogicalPlanConfiguration {
     }
   }
 
+  /**
+   * Set any properties from configuration on the modules in the DAG. This
+   * method may throw unchecked exception if the configuration contains
+   * properties that are invalid for a module.
+   * 
+   * @param dag
+   * @param applicationName
+   */
   public void setModuleProperties(LogicalPlan dag, String applicationName) {
     List<AppConf> appConfs = stramConf.getMatchingChildConf(applicationName, StramElement.APPLICATION);
     for (ModuleMeta ow : dag.getAllModules()) {

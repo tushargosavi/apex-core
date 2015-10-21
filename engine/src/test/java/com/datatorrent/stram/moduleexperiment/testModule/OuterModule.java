@@ -7,6 +7,10 @@ import com.datatorrent.api.Module;
 import com.datatorrent.api.Operator.ProxyInputPort;
 import com.datatorrent.api.Operator.ProxyOutputPort;
 
+/**
+ * Outer module - Level 1
+ * Has an Operator - FilterOperator and a Module - OddEvenModule (Level 2)
+ */
 public class OuterModule implements Module
 {
 
@@ -20,7 +24,7 @@ public class OuterModule implements Module
     FilterOperator filter = dag.addOperator("FilterOperator", new FilterOperator());
     mInput.set(filter.input);
 
-    InnerModule innerModule = dag.addModule("OddEvenModule", new InnerModule());
+    InnerModule innerModule = dag.addModule("InnerModule", new InnerModule());
     mOutputEven.set(innerModule.mOutputEven);
     mOutputOdd.set(innerModule.mOutputOdd);
 
