@@ -2383,6 +2383,11 @@ public class LogicalPlanConfiguration {
   {
     return new BeanMap(operator);
   }
+  
+  public static BeanMap getModuleProperties(Module module)
+  {
+    return new BeanMap(module);
+  }
 
   /**
    * Set any opProps from configuration on the operators in the DAG. This
