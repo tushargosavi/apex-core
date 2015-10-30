@@ -16,16 +16,13 @@
  * specific language governing permissions and limitations
  * under the License.
  */
-package com.datatorrent.stram.moduleexperiment.testModule;
+package com.datatorrent.stram.plan.logical.module;
 
 import org.apache.hadoop.conf.Configuration;
 
-import com.datatorrent.api.annotation.ApplicationAnnotation;
-import com.datatorrent.api.StreamingApplication;
 import com.datatorrent.api.DAG;
-import com.datatorrent.stram.moduleexperiment.testModule.OutputOperator;
-import com.datatorrent.stram.moduleexperiment.testModule.RandomInputOperator;
-import com.datatorrent.stram.moduleexperiment.testModule.OuterModule;
+import com.datatorrent.api.StreamingApplication;
+import com.datatorrent.api.annotation.ApplicationAnnotation;
 
 @ApplicationAnnotation(name="ApplicationWithModules")
 public class Application implements StreamingApplication
