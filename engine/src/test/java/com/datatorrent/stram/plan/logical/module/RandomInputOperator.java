@@ -16,34 +16,52 @@
  * specific language governing permissions and limitations
  * under the License.
  */
-package com.datatorrent.stram.moduleexperiment.testModule;
+package com.datatorrent.stram.plan.logical.module;
 
-import com.datatorrent.api.DefaultInputPort;
+import java.util.Random;
+
+import com.datatorrent.api.Context.OperatorContext;
 import com.datatorrent.api.DefaultOutputPort;
-import com.datatorrent.common.util.BaseOperator;
+import com.datatorrent.api.InputOperator;
 
 /**
- * Toy OddEven Operator. Separates the stream into Odd and Even integers
+ * Toy Random Input Operator.
+ * Generates random integers
  */
-public class OddEvenOperator extends BaseOperator
+public class RandomInputOperator implements InputOperator
 {
-  public transient DefaultInputPort<Integer> input = new DefaultInputPort<Integer>() {
-    
-    @Override
-    public void process(Integer tuple)
-    {
-      if(tuple.intValue() % 2 == 0)
-      {
-        even.emit(tuple);
-      }
-      else
-      {
-        odd.emit(tuple);
-      }
+
+  Random r;
+  public transient DefaultOutputPort<Integer> output = new DefaultOutputPort<Integer>();
+  long sentAt = System.currentTimeMillis();
+
+  @Override
+  public void beginWindow(long windowId)
+  {
+  }
+
+  @Override
+  public void endWindow()
+  {
+  }
+
+  @Override
+  public void setup(OperatorContext context)
+  {
+    r = new Random();
+  }
+
+  @Override
+  public void teardown()
+  {
+  }
+
+  @Override
+  public void emitTuples()
+  {
+    if(System.currentTimeMillis() - sentAt > 100){
+      output.emit(r.nextInt());
+      sentAt = System.currentTimeMillis();
     }
-  };
-
-  public transient DefaultOutputPort<Integer> odd = new DefaultOutputPort<Integer>();
-  public transient DefaultOutputPort<Integer> even = new DefaultOutputPort<Integer>();
-
+  }
 }
