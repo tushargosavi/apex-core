@@ -153,7 +153,7 @@ public class LogicalPlan implements Serializable, DAG
   private final Attribute.AttributeMap attributes = new DefaultAttributeMap();
   private transient int nodeIndex = 0; // used for cycle validation
   private transient Stack<OperatorMeta> stack = new Stack<OperatorMeta>(); // used for cycle validation
-  public transient Stack<ModuleMeta> moduleStack = new Stack<ModuleMeta>();
+  public Stack<ModuleMeta> moduleStack = new Stack<ModuleMeta>();
   private transient Map<String, HashMap<OutputPort<?>, InputPort<?>>> streamLinks = new HashMap<String, HashMap<Operator.OutputPort<?>, Operator.InputPort<?>>>();
 
   @Override
