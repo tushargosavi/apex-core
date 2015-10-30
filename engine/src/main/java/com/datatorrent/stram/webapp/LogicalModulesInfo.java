@@ -38,7 +38,8 @@ import javax.xml.bind.annotation.XmlRootElement;
 
 @XmlRootElement(name = "modules")
 @XmlAccessorType(XmlAccessType.FIELD)
-public class LogicalModulesInfo {
+public class LogicalModulesInfo
+{
 
   protected List<LogicalModuleInfo> modules = new ArrayList<LogicalModuleInfo>();
 
@@ -46,7 +47,8 @@ public class LogicalModulesInfo {
    *
    * @param operatorInfo
    */
-  public void add(LogicalModuleInfo moduleInfo) {
+  public void add(LogicalModuleInfo moduleInfo)
+  {
     modules.add(moduleInfo);
   }
 
@@ -55,7 +57,8 @@ public class LogicalModulesInfo {
    * @return list of operator info
    *
    */
-  public List<LogicalModuleInfo> getModules() {
+  public List<LogicalModuleInfo> getModules()
+  {
     return Collections.unmodifiableList(modules);
   }
 
