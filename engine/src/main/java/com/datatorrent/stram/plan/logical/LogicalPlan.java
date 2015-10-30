@@ -1349,11 +1349,14 @@ public class LogicalPlan implements Serializable, DAG
         /*
          * And fill in any missing sinks for any streams
          */
-        for(Entry<Operator.OutputPort<?>, Operator.InputPort<?>> e: streamLinks.get(id).entrySet())
+        if(source instanceof ProxyOutputPort)
         {
-          if(e.getValue() == null)
+          for(Entry<Operator.OutputPort<?>, Operator.InputPort<?>> e: streamLinks.get(id).entrySet())
           {
-            e.setValue(sink);
+            if(e.getValue() == null)
+            {
+              e.setValue(sink);
+            }
           }
         }
       }

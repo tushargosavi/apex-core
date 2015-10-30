@@ -123,7 +123,7 @@ public class LogicalPlanConfiguration {
    */
   protected enum StramElement {
     APPLICATION("application"), GATEWAY("gateway"), TEMPLATE("template"), OPERATOR("operator"),STREAM("stream"), PORT("port"), INPUT_PORT("inputport"),OUTPUT_PORT("outputport"),
-    ATTR("attr"), PROP("prop"),CLASS("clas"),PATH("path"),UNIFIER("unifier"), MODULE("module");
+    ATTR("attr"), PROP("prop"),CLASS("class"),PATH("path"),UNIFIER("unifier"), MODULE("module");
     private final String value;
 
     /**
@@ -173,7 +173,7 @@ public class LogicalPlanConfiguration {
     STREAM(StramElement.STREAM, ConfElement.APPLICATION, null, null),
     PORT(StramElement.PORT, ConfElement.OPERATOR, EnumSet.of(StramElement.INPUT_PORT, StramElement.OUTPUT_PORT), PortContext.class),
     UNIFIER(StramElement.UNIFIER, ConfElement.PORT, null, null),
-    MODULE(StramElement.MODULE, ConfElement.APPLICATION, null, OperatorContext.class);
+    MODULE(StramElement.MODULE, ConfElement.APPLICATION, null, null);
 
     protected static final Map<StramElement, ConfElement> STRAM_ELEMENT_TO_CONF_ELEMENT = Maps.newHashMap();
     protected static final Map<Class<? extends Context>, ConfElement> CONTEXT_TO_CONF_ELEMENT = Maps.newHashMap();
