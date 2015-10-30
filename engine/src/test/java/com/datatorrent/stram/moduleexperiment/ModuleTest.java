@@ -43,6 +43,21 @@ public class ModuleTest
   }
 
   /*
+   * Input Operator - 1.1
+   */
+  public static class DummyOperatorAfterInput extends BaseOperator {
+
+    public transient DefaultInputPort<Integer> input = new DefaultInputPort<Integer>() {
+      @Override
+      public void process(Integer tuple)
+      {
+        output.emit(tuple);
+      }
+    };
+    public transient DefaultOutputPort<Integer> output = new DefaultOutputPort<Integer>();
+  }
+
+  /*
    * Operator - 2
    */
   public static class DummyOperator extends BaseOperator {
@@ -103,10 +118,12 @@ public class ModuleTest
       {
         LOG.info("Application - PopulateDAG");
         DummyInputOperator dummyInputOperator = dag.addOperator("DummyInputOperator", new DummyInputOperator());
+        DummyOperatorAfterInput dummyOperatorAfterInput = dag.addOperator("DummyOperatorAfterInput", new DummyOperatorAfterInput());
         Module m1 = dag.addModule("TestModule1", new TestModule());
         Module m2 = dag.addModule("TestModule2", new TestModule());
         DummyOutputOperator dummyOutputOperator = dag.addOperator("DummyOutputOperator", new DummyOutputOperator());
-        dag.addStream("Operator To Module", dummyInputOperator.output, ((TestModule)m1).moduleInput);
+        dag.addStream("Operator To Operator", dummyInputOperator.output, dummyOperatorAfterInput.input);
+        dag.addStream("Operator To Module", dummyOperatorAfterInput.output, ((TestModule)m1).moduleInput);
         dag.addStream("Module To Module", ((TestModule)m1).moduleOutput, ((TestModule)m2).moduleInput);
         dag.addStream("Module To Operator", ((TestModule)m2).moduleOutput, dummyOutputOperator.input);
       }
@@ -117,9 +134,9 @@ public class ModuleTest
     LogicalPlan dag = new LogicalPlan();
     lpc.prepareDAG(dag, app, "TestApp");
 
-    Assert.assertEquals(dag.getAllModules().size(), 2);
-    Assert.assertEquals(dag.getAllOperators().size(), 4);
-    Assert.assertEquals(dag.getAllStreams().size(), 3);
+    Assert.assertEquals(2, dag.getAllModules().size(), 2);
+    Assert.assertEquals(5, dag.getAllOperators().size());
+    Assert.assertEquals(4, dag.getAllStreams().size());
     dag.validate();
   }
 
