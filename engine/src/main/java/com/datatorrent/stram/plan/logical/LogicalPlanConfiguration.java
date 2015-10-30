@@ -1156,8 +1156,8 @@ public class LogicalPlanConfiguration {
   private static class AppConf extends Conf {
 
     private static final StramElement[] CHILD_ELEMENTS = new StramElement[]{StramElement.GATEWAY, StramElement.OPERATOR, StramElement.PORT,
-            StramElement.INPUT_PORT, StramElement.OUTPUT_PORT, StramElement.STREAM, StramElement.ATTR, StramElement.CLASS, StramElement.PATH,
-            StramElement.PROP, StramElement.UNIFIER, StramElement.MODULE};
+      StramElement.INPUT_PORT, StramElement.OUTPUT_PORT, StramElement.STREAM, StramElement.ATTR, StramElement.CLASS, StramElement.PATH,
+      StramElement.PROP, StramElement.UNIFIER, StramElement.MODULE};
 
     @SuppressWarnings("unused")
     AppConf() {
@@ -2142,7 +2142,7 @@ public class LogicalPlanConfiguration {
   {
     // EVENTUALLY to be replaced by variable enabled configuration in the demo where the attribute below is used
     String connectAddress = conf.get(StreamingApplication.DT_PREFIX + Context.DAGContext.GATEWAY_CONNECT_ADDRESS.getName());
-    dag.setAttribute(Context.DAGContext.GATEWAY_CONNECT_ADDRESS, connectAddress == null? conf.get(GATEWAY_LISTEN_ADDRESS): connectAddress);
+    dag.setAttribute(Context.DAGContext.GATEWAY_CONNECT_ADDRESS, connectAddress == null ? conf.get(GATEWAY_LISTEN_ADDRESS): connectAddress);
     if (app != null) {
       app.populateDAG(dag, conf);
     }
@@ -2284,7 +2284,8 @@ public class LogicalPlanConfiguration {
     return refTemplates;
   }
 
-  public static class PropertyArgs {
+  public static class PropertyArgs
+  {
     String name;
     String className;
 
@@ -2359,11 +2360,9 @@ public class LogicalPlanConfiguration {
     try {
       BeanUtils.populate(obj, properties);
       return obj;
-    }
-    catch (IllegalAccessException e) {
+    } catch (IllegalAccessException e) {
       throw new IllegalArgumentException("Error setting operator properties", e);
-    }
-    catch (InvocationTargetException e) {
+    } catch (InvocationTargetException e) {
       throw new IllegalArgumentException("Error setting operator properties", e);
     }
   }
@@ -2414,7 +2413,8 @@ public class LogicalPlanConfiguration {
    * @param dag
    * @param applicationName
    */
-  public void setModuleProperties(LogicalPlan dag, String applicationName) {
+  public void setModuleProperties(LogicalPlan dag, String applicationName)
+  {
     List<AppConf> appConfs = stramConf.getMatchingChildConf(applicationName, StramElement.APPLICATION);
     for (ModuleMeta ow : dag.getAllModules()) {
       List<OperatorConf> opConfs = getMatchingChildConf(appConfs, ow.getName(), StramElement.MODULE);
@@ -2479,7 +2479,8 @@ public class LogicalPlanConfiguration {
     }
   }
 
-  private void setModuleConfiguration(final LogicalPlan dag, List<AppConf> appConfs, String appName) {
+  private void setModuleConfiguration(final LogicalPlan dag, List<AppConf> appConfs, String appName)
+  {
     for (final ModuleMeta mw : dag.getAllModules()) {
       List<OperatorConf> opConfs = getMatchingChildConf(appConfs, mw.getName(), StramElement.MODULE);
       Map<String, String> opProps = getProperties(getPropertyArgs(mw), opConfs, appName);

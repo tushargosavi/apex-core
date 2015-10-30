@@ -175,6 +175,7 @@ public interface Operator extends Component<OperatorContext>
   public interface ProxyPort<T> extends Port
   {
     void set(T port);
+
     T get();
   }
 
@@ -214,7 +215,7 @@ public interface Operator extends Component<OperatorContext>
     {
       return outputPort;
     }
-}
+  }
 
   /**
    * The operator should throw the following exception if it wants to gracefully conclude its operation.
