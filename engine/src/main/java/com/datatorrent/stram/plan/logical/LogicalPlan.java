@@ -32,13 +32,11 @@ import javax.validation.constraints.NotNull;
 
 import org.apache.commons.lang.builder.ToStringBuilder;
 import org.apache.commons.lang.builder.ToStringStyle;
-import org.apache.hadoop.conf.Configuration;
 import org.apache.hadoop.util.ReflectionUtils;
 import org.apache.hadoop.yarn.conf.YarnConfiguration;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
-import com.google.common.collect.Maps;
 import com.google.common.collect.Sets;
 import com.datatorrent.api.*;
 import com.datatorrent.api.Attribute.AttributeMap.DefaultAttributeMap;
@@ -1076,14 +1074,14 @@ public class LogicalPlan implements Serializable, DAG
     @SuppressWarnings("FieldNameHidesFieldInSuperclass")
     private static final long serialVersionUID = 201401091635L;
   }
-  
+
   public String getNameWithPrefix(String name)
   {
     String prefix = "";
     for (ModuleMeta m : moduleStack) {
       prefix += m.name + "_";
     }
-    
+
     return prefix + name;
   }
 
@@ -1147,42 +1145,50 @@ public class LogicalPlan implements Serializable, DAG
       this.attributes = attributeMap;
     }
 
-    @Override public String getName()
+    @Override
+    public String getName()
     {
       return name;
     }
 
-    @Override public Module getModule()
+    @Override
+    public Module getModule()
     {
       return module;
     }
 
-    @Override public DAG.InputPortMeta getMeta(InputPort<?> port)
+    @Override
+    public DAG.InputPortMeta getMeta(InputPort<?> port)
     {
       return null;
     }
 
-    @Override public DAG.OutputPortMeta getMeta(OutputPort<?> port)
+    @Override
+    public DAG.OutputPortMeta getMeta(OutputPort<?> port)
     {
       return null;
     }
 
-    @Override public Attribute.AttributeMap getAttributes()
+    @Override
+    public Attribute.AttributeMap getAttributes()
     {
       return null;
     }
 
-    @Override public <T> T getValue(Attribute<T> key)
+    @Override
+    public <T> T getValue(Attribute<T> key)
     {
       return null;
     }
 
-    @Override public void setCounters(Object counters)
+    @Override
+    public void setCounters(Object counters)
     {
 
     }
 
-    @Override public void sendMetrics(Collection<String> metricNames)
+    @Override
+    public void sendMetrics(Collection<String> metricNames)
     {
 
     }
@@ -1226,7 +1232,7 @@ public class LogicalPlan implements Serializable, DAG
     {
       return isExpanded;
     }
-    
+
     private void writeObject(ObjectOutputStream out) throws IOException
     {
       //getValue2(OperatorContext.STORAGE_AGENT).save(operator, id, Checkpoint.STATELESS_CHECKPOINT_WINDOW_ID);
@@ -1243,7 +1249,8 @@ public class LogicalPlan implements Serializable, DAG
     }
   }
 
-  @Override public <T extends Module> T addModule(String name, T module)
+  @Override
+  public <T extends Module> T addModule(String name, T module)
   {
     name = getNameWithPrefix(name);
     if (modules.containsKey(name)) {
@@ -1252,14 +1259,15 @@ public class LogicalPlan implements Serializable, DAG
       }
       throw new IllegalArgumentException("duplicate module is: " + modules.get(name));
     }
-    
+
     ModuleMeta meta = new ModuleMeta(name, module);
     meta.setParentModuleName(moduleStack.empty() ? null : moduleStack.peek().getName());
     modules.put(name, meta);
     return module;
   }
 
-  @Override public <T extends Module> T addModule(String name, Class<T> clazz)
+  @Override
+  public <T extends Module> T addModule(String name, Class<T> clazz)
   {
     T instance;
     try {
@@ -1314,47 +1322,40 @@ public class LogicalPlan implements Serializable, DAG
     /*
      * If a proxy output port, skip adding a source and add record it in streamLinks
      */
-    if(source instanceof ProxyOutputPort){
-      if(streamLinks.containsKey(id)){
+    if (source instanceof ProxyOutputPort) {
+      if (streamLinks.containsKey(id)) {
         streamLinks.get(id).put(source, null);
-      }
-      else{
-        HashMap<OutputPort<?>, InputPort<?>> streamLink = new HashMap<OutputPort<?>,InputPort<?>>();
+      } else {
+        HashMap<OutputPort<?>, InputPort<?>> streamLink = new HashMap<OutputPort<?>, InputPort<?>>();
         streamLink.put(source, null);
         streamLinks.put(id, streamLink);
       }
-    }
-    else // Otherwise, set the source as the output port
+    } else // Otherwise, set the source as the output port
     {
       s.setSource(source);
     }
 
-    for (Operator.InputPort<?> sink: sinks) {
+    for (Operator.InputPort<?> sink : sinks) {
       /*
        * If this is a proxy input port, then record it in streamlinks against the corresponding source
        */
-      if(sink instanceof ProxyInputPort){
-        if(streamLinks.containsKey(id)){
+      if (sink instanceof ProxyInputPort) {
+        if (streamLinks.containsKey(id)) {
           streamLinks.get(id).put(source, sink);
-        }
-        else{
-          HashMap<OutputPort<?>, InputPort<?>> streamLink = new HashMap<OutputPort<?>,InputPort<?>>();
+        } else {
+          HashMap<OutputPort<?>, InputPort<?>> streamLink = new HashMap<OutputPort<?>, InputPort<?>>();
           streamLink.put(source, sink);
           streamLinks.put(id, streamLink);
         }
-      }
-      else // Otherwise, add the input port as the sink
+      } else // Otherwise, add the input port as the sink
       {
         s.addSink(sink);
         /*
          * And fill in any missing sinks for any streams
          */
-        if(source instanceof ProxyOutputPort)
-        {
-          for(Entry<Operator.OutputPort<?>, Operator.InputPort<?>> e: streamLinks.get(id).entrySet())
-          {
-            if(e.getValue() == null)
-            {
+        if (source instanceof ProxyOutputPort) {
+          for (Entry<Operator.OutputPort<?>, Operator.InputPort<?>> e : streamLinks.get(id).entrySet()) {
+            if (e.getValue() == null) {
               e.setValue(sink);
             }
           }
@@ -1370,17 +1371,13 @@ public class LogicalPlan implements Serializable, DAG
    */
   public void applyStreamLinks()
   {
-    for(String id: streamLinks.keySet())
-    {
-      for(Entry<Operator.OutputPort<?>, Operator.InputPort<?>> e: streamLinks.get(id).entrySet())
-      {
+    for (String id : streamLinks.keySet()) {
+      for (Entry<Operator.OutputPort<?>, Operator.InputPort<?>> e : streamLinks.get(id).entrySet()) {
         StreamMeta s = getStream(id);
-        if(e.getKey() instanceof ProxyOutputPort)
-        {
+        if (e.getKey() instanceof ProxyOutputPort) {
           s.setSource(e.getKey());
         }
-        if(e.getValue() instanceof ProxyInputPort)
-        {
+        if (e.getValue() instanceof ProxyInputPort) {
           s.addSink(e.getValue());
         }
       }
@@ -1435,21 +1432,17 @@ public class LogicalPlan implements Serializable, DAG
 
   private OutputPortMeta assertGetPortMeta(Operator.OutputPort<?> port)
   {
-    for (OperatorMeta o: getAllOperators()) {
+    for (OperatorMeta o : getAllOperators()) {
       OutputPortMeta opm = null;
       /*
        * If ProxyOutputPort, then look recursively, for an instance where the port object is not a Proxy Port.
        */
-      if(port instanceof ProxyOutputPort)
-      {
-        while(((ProxyOutputPort)port).get() instanceof ProxyOutputPort)
-        {
+      if (port instanceof ProxyOutputPort) {
+        while (((ProxyOutputPort)port).get() instanceof ProxyOutputPort) {
           port = ((ProxyOutputPort)port).get();
         }
         opm = o.getPortMapping().outPortMap.get(((ProxyOutputPort)port).get());
-      }
-      else
-      {
+      } else {
         opm = o.getPortMapping().outPortMap.get(port);
       }
       if (opm != null) {
@@ -1461,21 +1454,17 @@ public class LogicalPlan implements Serializable, DAG
 
   private InputPortMeta assertGetPortMeta(Operator.InputPort<?> port)
   {
-    for (OperatorMeta o: getAllOperators()) {
+    for (OperatorMeta o : getAllOperators()) {
       InputPortMeta opm = null;
       /*
        * If ProxyInputPort, then look recursively, for an instance where the port object is not a Proxy Port.
        */
-      if(port instanceof ProxyInputPort)
-      {
-        while(((ProxyInputPort)port).get() instanceof ProxyInputPort)
-        {
+      if (port instanceof ProxyInputPort) {
+        while (((ProxyInputPort)port).get() instanceof ProxyInputPort) {
           port = ((ProxyInputPort)port).get();
         }
         opm = o.getPortMapping().inPortMap.get(((ProxyInputPort)port).get());
-      }
-      else
-      {
+      } else {
         opm = o.getPortMapping().inPortMap.get(port);
       }
       if (opm != null) {
@@ -1502,7 +1491,7 @@ public class LogicalPlan implements Serializable, DAG
   {
     assertGetPortMeta(port).attributes.put(key, value);
   }
-  
+
   public List<OperatorMeta> getRootOperators()
   {
     return Collections.unmodifiableList(this.rootOperators);
@@ -1513,7 +1502,8 @@ public class LogicalPlan implements Serializable, DAG
     return Collections.unmodifiableCollection(this.operators.values());
   }
 
-  public Collection<ModuleMeta> getAllModules() {
+  public Collection<ModuleMeta> getAllModules()
+  {
     return Collections.unmodifiableCollection(this.modules.values());
   }
 
