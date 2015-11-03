@@ -16,29 +16,34 @@
  * specific language governing permissions and limitations
  * under the License.
  */
-package com.datatorrent.stram.moduleexperiment.testModule;
+package com.datatorrent.stram.plan.logical.module;
 
-import com.datatorrent.api.DefaultInputPort;
-import com.datatorrent.api.DefaultOutputPort;
-import com.datatorrent.common.util.BaseOperator;
+import java.io.IOException;
+
+import javax.validation.ConstraintViolationException;
+
+import org.junit.Assert;
+import org.junit.Test;
+
+import org.apache.hadoop.conf.Configuration;
+
+import com.datatorrent.api.LocalMode;
 
 /**
- * Toy Filter Operator. Removes negative values
+ * Test the DAG declaration in local mode.
  */
-public class FilterOperator extends BaseOperator
-{
-  public transient DefaultInputPort<Integer> input = new DefaultInputPort<Integer>() {
-    
-    @Override
-    public void process(Integer tuple)
-    {
-      if(tuple.intValue() >= 0)
-      {
-        output.emit(tuple);
-      }
+public class NestedModuleApplicationTest {
+
+  @Test
+  public void testApplication() throws IOException, Exception {
+    try {
+      LocalMode lma = LocalMode.newInstance();
+      Configuration conf = new Configuration(false);
+      lma.prepareDAG(new Application(), conf);
+      LocalMode.Controller lc = lma.getController();
+      lc.run(10000); // runs for 10 seconds and quits
+    } catch (ConstraintViolationException e) {
+      Assert.fail("constraint violations: " + e.getConstraintViolations());
     }
-  };
-
-  public transient DefaultOutputPort<Integer> output = new DefaultOutputPort<Integer>();
+  }
 }
-

@@ -21,8 +21,58 @@ package com.datatorrent.api;
 import org.apache.hadoop.classification.InterfaceStability;
 import org.apache.hadoop.conf.Configuration;
 
+import com.datatorrent.api.Operator.InputPort;
+import com.datatorrent.api.Operator.OutputPort;
+import com.datatorrent.api.Operator.Port;
+
 @InterfaceStability.Evolving
 public interface Module
 {
   void populateDAG(DAG dag, Configuration conf);
+
+  public interface ProxyPort<T> extends Port
+  {
+    void set(T port);
+
+    T get();
+  }
+
+  public final class ProxyInputPort<T> extends DefaultInputPort<T> implements ProxyPort<InputPort<T>>
+  {
+    InputPort<T> inputPort;
+
+    @Override
+    public void process(T tuple)
+    {
+    }
+
+    @Override
+    public void set(InputPort<T> port)
+    {
+      inputPort = port;
+    }
+
+    @Override
+    public InputPort<T> get()
+    {
+      return inputPort;
+    }
+
+  }
+
+  public final class ProxyOutputPort<T> extends DefaultOutputPort<T> implements ProxyPort<OutputPort<T>>
+  {
+    OutputPort<T> outputPort;
+
+    public void set(OutputPort<T> port)
+    {
+      outputPort = port;
+    }
+
+    public OutputPort<T> get()
+    {
+      return outputPort;
+    }
+  }
 }
+
