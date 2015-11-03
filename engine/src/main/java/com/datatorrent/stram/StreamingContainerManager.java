@@ -18,38 +18,49 @@
  */
 package com.datatorrent.stram;
 
-import java.io.*;
+import java.io.ByteArrayInputStream;
+import java.io.ByteArrayOutputStream;
+import java.io.DataInputStream;
+import java.io.DataOutputStream;
+import java.io.IOException;
+import java.io.Serializable;
 import java.lang.management.ManagementFactory;
 import java.lang.reflect.Field;
 import java.net.InetSocketAddress;
 import java.net.URI;
-import java.util.*;
-import java.util.concurrent.*;
+import java.util.ArrayList;
+import java.util.Collection;
+import java.util.Collections;
+import java.util.EnumSet;
+import java.util.HashMap;
+import java.util.HashSet;
+import java.util.Iterator;
+import java.util.LinkedHashMap;
+import java.util.LinkedHashSet;
+import java.util.LinkedList;
+import java.util.List;
+import java.util.ListIterator;
+import java.util.Map;
+import java.util.Queue;
+import java.util.Set;
+import java.util.TreeSet;
+import java.util.concurrent.Callable;
+import java.util.concurrent.ConcurrentHashMap;
+import java.util.concurrent.ConcurrentLinkedQueue;
+import java.util.concurrent.ConcurrentMap;
+import java.util.concurrent.ConcurrentSkipListMap;
+import java.util.concurrent.ExecutorService;
+import java.util.concurrent.Executors;
+import java.util.concurrent.FutureTask;
+import java.util.concurrent.LinkedBlockingQueue;
+import java.util.concurrent.TimeUnit;
 import java.util.concurrent.atomic.AtomicBoolean;
 import java.util.concurrent.atomic.AtomicLong;
 
 import javax.annotation.Nullable;
 
-import com.datatorrent.netlet.util.DTThrowable;
-import com.esotericsoftware.kryo.KryoException;
-import com.esotericsoftware.kryo.io.Input;
-import com.esotericsoftware.kryo.io.Output;
-import com.google.common.annotations.VisibleForTesting;
-import com.google.common.base.Predicate;
-import com.google.common.cache.Cache;
-import com.google.common.cache.CacheBuilder;
-import com.google.common.collect.Lists;
-import com.google.common.collect.Maps;
-import com.google.common.collect.Sets;
-
 import net.engio.mbassy.bus.MBassador;
 import net.engio.mbassy.bus.config.BusConfiguration;
-
-import org.codehaus.jettison.json.JSONArray;
-import org.codehaus.jettison.json.JSONException;
-import org.codehaus.jettison.json.JSONObject;
-import org.slf4j.Logger;
-import org.slf4j.LoggerFactory;
 
 import org.apache.commons.io.IOUtils;
 import org.apache.commons.lang3.StringUtils;
@@ -70,14 +81,25 @@ import org.apache.hadoop.yarn.conf.YarnConfiguration;
 import org.apache.hadoop.yarn.util.Clock;
 import org.apache.hadoop.yarn.util.SystemClock;
 import org.apache.hadoop.yarn.webapp.NotFoundException;
+import org.codehaus.jettison.json.JSONArray;
+import org.codehaus.jettison.json.JSONException;
+import org.codehaus.jettison.json.JSONObject;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
 
-import com.datatorrent.api.*;
+import com.datatorrent.api.Attribute;
+import com.datatorrent.api.AutoMetric;
+import com.datatorrent.api.Component;
+import com.datatorrent.api.Context;
 import com.datatorrent.api.Context.OperatorContext;
 import com.datatorrent.api.Operator.InputPort;
 import com.datatorrent.api.Operator.OutputPort;
 import com.datatorrent.api.Stats.OperatorStats;
+import com.datatorrent.api.StatsListener;
+import com.datatorrent.api.StorageAgent;
+import com.datatorrent.api.StreamCodec;
+import com.datatorrent.api.StringCodec;
 import com.datatorrent.api.annotation.Stateless;
-
 import com.datatorrent.bufferserver.auth.AuthManager;
 import com.datatorrent.bufferserver.util.Codec;
 import com.datatorrent.common.experimental.AppData;
@@ -85,34 +107,69 @@ import com.datatorrent.common.util.AsyncFSStorageAgent;
 import com.datatorrent.common.util.FSStorageAgent;
 import com.datatorrent.common.util.NumberAggregate;
 import com.datatorrent.common.util.Pair;
+import com.datatorrent.netlet.util.DTThrowable;
 import com.datatorrent.stram.Journal.Recoverable;
 import com.datatorrent.stram.StreamingContainerAgent.ContainerStartRequest;
-import com.datatorrent.stram.api.*;
-import com.datatorrent.stram.api.StreamingContainerUmbilicalProtocol.*;
+import com.datatorrent.stram.api.AppDataSource;
+import com.datatorrent.stram.api.Checkpoint;
+import com.datatorrent.stram.api.ContainerContext;
+import com.datatorrent.stram.api.OperatorDeployInfo;
+import com.datatorrent.stram.api.StramEvent;
+import com.datatorrent.stram.api.StramToNodeChangeLoggersRequest;
+import com.datatorrent.stram.api.StramToNodeGetPropertyRequest;
+import com.datatorrent.stram.api.StramToNodeSetPropertyRequest;
+import com.datatorrent.stram.api.StramToNodeStartRecordingRequest;
+import com.datatorrent.stram.api.StreamingContainerUmbilicalProtocol.ContainerHeartbeat;
+import com.datatorrent.stram.api.StreamingContainerUmbilicalProtocol.ContainerHeartbeatResponse;
+import com.datatorrent.stram.api.StreamingContainerUmbilicalProtocol.ContainerStats;
+import com.datatorrent.stram.api.StreamingContainerUmbilicalProtocol.OperatorHeartbeat;
+import com.datatorrent.stram.api.StreamingContainerUmbilicalProtocol.StramToNodeRequest;
+import com.datatorrent.stram.api.StreamingContainerUmbilicalProtocol.StreamingContainerContext;
 import com.datatorrent.stram.engine.OperatorResponse;
 import com.datatorrent.stram.engine.StreamingContainer;
 import com.datatorrent.stram.engine.WindowGenerator;
 import com.datatorrent.stram.plan.logical.LogicalOperatorStatus;
 import com.datatorrent.stram.plan.logical.LogicalPlan;
 import com.datatorrent.stram.plan.logical.LogicalPlan.InputPortMeta;
+import com.datatorrent.stram.plan.logical.LogicalPlan.ModuleMeta;
 import com.datatorrent.stram.plan.logical.LogicalPlan.OperatorMeta;
 import com.datatorrent.stram.plan.logical.LogicalPlan.OutputPortMeta;
 import com.datatorrent.stram.plan.logical.LogicalPlanConfiguration;
 import com.datatorrent.stram.plan.logical.Operators;
 import com.datatorrent.stram.plan.logical.Operators.PortContextPair;
 import com.datatorrent.stram.plan.logical.requests.LogicalPlanRequest;
-import com.datatorrent.stram.plan.physical.*;
+import com.datatorrent.stram.plan.physical.OperatorStatus;
 import com.datatorrent.stram.plan.physical.OperatorStatus.PortStatus;
+import com.datatorrent.stram.plan.physical.PTContainer;
+import com.datatorrent.stram.plan.physical.PTOperator;
 import com.datatorrent.stram.plan.physical.PTOperator.PTInput;
 import com.datatorrent.stram.plan.physical.PTOperator.PTOutput;
 import com.datatorrent.stram.plan.physical.PTOperator.State;
+import com.datatorrent.stram.plan.physical.PhysicalPlan;
 import com.datatorrent.stram.plan.physical.PhysicalPlan.PlanContext;
+import com.datatorrent.stram.plan.physical.PlanModifier;
 import com.datatorrent.stram.util.ConfigUtils;
 import com.datatorrent.stram.util.FSJsonLineFile;
 import com.datatorrent.stram.util.MovingAverage.MovingAverageLong;
 import com.datatorrent.stram.util.SharedPubSubWebSocketClient;
 import com.datatorrent.stram.util.WebServicesClient;
-import com.datatorrent.stram.webapp.*;
+import com.datatorrent.stram.webapp.ContainerInfo;
+import com.datatorrent.stram.webapp.LogicalModuleInfo;
+import com.datatorrent.stram.webapp.LogicalOperatorInfo;
+import com.datatorrent.stram.webapp.OperatorAggregationInfo;
+import com.datatorrent.stram.webapp.OperatorInfo;
+import com.datatorrent.stram.webapp.PortInfo;
+import com.datatorrent.stram.webapp.StreamInfo;
+import com.esotericsoftware.kryo.KryoException;
+import com.esotericsoftware.kryo.io.Input;
+import com.esotericsoftware.kryo.io.Output;
+import com.google.common.annotations.VisibleForTesting;
+import com.google.common.base.Predicate;
+import com.google.common.cache.Cache;
+import com.google.common.cache.CacheBuilder;
+import com.google.common.collect.Lists;
+import com.google.common.collect.Maps;
+import com.google.common.collect.Sets;
 
 /**
  * Tracks topology provisioning/allocation to containers<p>
@@ -1040,10 +1097,7 @@ public class StreamingContainerManager implements PlanContext
         Iterator<Map.Entry<Long, Set<PTOperator>>> it = shutdownOperators.entrySet().iterator();
         while (it.hasNext()) {
           Map.Entry<Long, Set<PTOperator>> windowAndOpers = it.next();
-          if (windowAndOpers.getKey().longValue() > this.committedWindowId) {
-            // wait until window is committed
-            continue;
-          } else {
+          if (windowAndOpers.getKey().longValue() <= this.committedWindowId || checkDownStreamOperators(windowAndOpers)) {
             LOG.info("Removing inactive operators at window {} {}", Codec.getStringWindowId(windowAndOpers.getKey()), windowAndOpers.getValue());
             for (PTOperator oper : windowAndOpers.getValue()) {
               plan.removeTerminatedPartition(oper);
@@ -1070,8 +1124,7 @@ public class StreamingContainerManager implements PlanContext
       try {
         command.run();
         count++;
-      }
-      catch (Exception e) {
+      } catch (Exception e) {
         // TODO: handle error
         LOG.error("Failed to execute {}", command, e);
       }
@@ -1081,13 +1134,25 @@ public class StreamingContainerManager implements PlanContext
     if (count > 0) {
       try {
         checkpoint();
-      }
-      catch (Exception e) {
+      } catch (Exception e) {
         throw new RuntimeException("Failed to checkpoint state.", e);
       }
     }
 
     return count;
+  }
+
+  private boolean checkDownStreamOperators(Map.Entry<Long, Set<PTOperator>> windowAndOpers)
+  {
+    // Check if all downStream operators are at higher window Ids, then operator can be removed from dag
+    Set<PTOperator> downStreamOperators = getPhysicalPlan().getDependents(windowAndOpers.getValue());
+    for (PTOperator oper : downStreamOperators) {
+      long windowId = oper.stats.currentWindowId.get();
+      if (windowId < windowAndOpers.getKey().longValue()) {
+        return false;
+      }
+    }
+    return true;
   }
 
   /**
@@ -1495,8 +1560,6 @@ public class StreamingContainerManager implements PlanContext
     }
     Set<Integer> reportedOperators = Sets.newHashSetWithExpectedSize(sca.container.getOperators().size());
 
-    boolean containerIdle = true;
-
     for (OperatorHeartbeat shb : heartbeat.getContainerStats().operators) {
 
       long maxEndWindowTimestamp = 0;
@@ -1533,9 +1596,7 @@ public class StreamingContainerManager implements PlanContext
 
       oper.stats.lastHeartbeat = shb;
       List<ContainerStats.OperatorStats> statsList = shb.getOperatorStatsContainer();
-      if (!oper.stats.isIdle()) {
-        containerIdle = false;
-      }
+
       if (!statsList.isEmpty()) {
         long tuplesProcessed = 0;
         long tuplesEmitted = 0;
@@ -1743,11 +1804,10 @@ public class StreamingContainerManager implements PlanContext
 
     ContainerHeartbeatResponse rsp = getHeartbeatResponse(sca);
 
-    if (containerIdle && isApplicationIdle()) {
+    if (heartbeat.getContainerStats().operators.isEmpty() && isApplicationIdle()) {
       LOG.info("requesting idle shutdown for container {}", heartbeat.getContainerId());
       rsp.shutdown = true;
-    }
-    else {
+    } else {
       if (sca.shutdownRequested) {
         LOG.info("requesting shutdown for container {}", heartbeat.getContainerId());
         rsp.shutdown = true;
@@ -2242,6 +2302,25 @@ public class StreamingContainerManager implements PlanContext
     }
     return fillLogicalOperatorInfo(operatorMeta);
   }
+  
+  public LogicalModuleInfo getLogicalModuleInfo(String moduleName,boolean recurse)
+  {
+    ModuleMeta moduleMeta = getLogicalPlan().getModuleMeta(moduleName);
+    if (moduleMeta == null) {
+      return null;
+    }
+    LogicalModuleInfo logicalModuleInfo = fillLogicalModuleInfo(moduleMeta);
+    for (ModuleMeta meta : getLogicalPlan().getAllModules()) {
+      if (meta.getParentModuleName()!=null && meta.getParentModuleName().equals(moduleName)) {
+        if( !recurse ){
+        logicalModuleInfo.modules.add(fillLogicalModuleInfo(meta));
+        }else{
+          logicalModuleInfo.modules.add(getLogicalModuleInfo(fillLogicalModuleInfo(meta).name,true));
+        }
+      }
+    }
+    return logicalModuleInfo;
+  }
 
   public List<LogicalOperatorInfo> getLogicalOperatorInfoList()
   {
@@ -2249,6 +2328,22 @@ public class StreamingContainerManager implements PlanContext
     Collection<OperatorMeta> allOperators = getLogicalPlan().getAllOperators();
     for (OperatorMeta operatorMeta : allOperators) {
       infoList.add(fillLogicalOperatorInfo(operatorMeta));
+    }
+    return infoList;
+  }
+  
+  public List<LogicalModuleInfo> getLogicalModuleInfoList(boolean recurse)
+  {
+    List<LogicalModuleInfo> infoList = new ArrayList<LogicalModuleInfo>();
+    Collection<ModuleMeta> allModules = getLogicalPlan().getAllModules();
+    for (ModuleMeta moduleMeta : allModules) {
+      if (moduleMeta.getParentModuleName() == null) {
+        if (!recurse) {
+          infoList.add(fillLogicalModuleInfo(moduleMeta));
+        } else {
+          infoList.add(getLogicalModuleInfo(moduleMeta.getName(), true));
+        }
+      }
     }
     return infoList;
   }
@@ -2393,10 +2488,35 @@ public class StreamingContainerManager implements PlanContext
         }
       }
     }
-    loi.checkpointTimeMA = checkpointTimeAggregate.getAvg().longValue();
-    loi.counters = latestLogicalCounters.get(operator.getName());
-    loi.autoMetrics = latestLogicalMetrics.get(operator.getName());
+    if (physicalOperators.size() > 0) {
+      loi.checkpointTimeMA = checkpointTimeAggregate.getAvg().longValue();
+      loi.counters = latestLogicalCounters.get(operator.getName());
+      loi.autoMetrics = latestLogicalMetrics.get(operator.getName());
+    }
+
     return loi;
+  }
+  
+  private LogicalModuleInfo fillLogicalModuleInfo(ModuleMeta module)
+  {
+    LogicalModuleInfo lmi = new LogicalModuleInfo();
+    lmi.name = module.getName();
+    lmi.className = module.getModule().getClass().getName();
+    
+    for (OperatorMeta operatorMeta : getLogicalPlan().getAllOperators()) {
+      if (module.getParentModuleName() == null) {
+        if (operatorMeta.getParentModuleName() == null) {
+          lmi.operators.add(fillLogicalOperatorInfo(operatorMeta));
+        }
+      } else {
+        if (operatorMeta.getParentModuleName() != null
+            && module.getParentModuleName().equals(operatorMeta.getParentModuleName())) {
+          lmi.operators.add(fillLogicalOperatorInfo(operatorMeta));
+        }
+      }
+    }
+
+    return lmi;
   }
 
   private OperatorAggregationInfo fillOperatorAggregationInfo(OperatorMeta operator)

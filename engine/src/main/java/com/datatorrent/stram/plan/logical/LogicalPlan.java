@@ -41,6 +41,7 @@ import org.slf4j.LoggerFactory;
 import com.google.common.collect.Maps;
 import com.google.common.collect.Sets;
 import com.datatorrent.api.*;
+import com.datatorrent.api.Attribute.AttributeMap;
 import com.datatorrent.api.Attribute.AttributeMap.DefaultAttributeMap;
 import com.datatorrent.api.Operator.ProxyInputPort;
 import com.datatorrent.api.Operator.ProxyOutputPort;
@@ -1196,6 +1197,51 @@ public class LogicalPlan implements Serializable, DAG
     {
       this.parentModuleName = parentModuleName;
     }
+
+    public LinkedHashMap<InputPortMeta, StreamMeta> getInputStreams()
+    {
+      return inputStreams;
+    }
+
+    public LinkedHashMap<OutputPortMeta, StreamMeta> getOutputStreams()
+    {
+      return outputStreams;
+    }
+
+    public int getId()
+    {
+      return id;
+    }
+
+    public Integer getNindex()
+    {
+      return nindex;
+    }
+
+    public Integer getLowlink()
+    {
+      return lowlink;
+    }
+
+    public boolean isExpanded()
+    {
+      return isExpanded;
+    }
+    
+    private void writeObject(ObjectOutputStream out) throws IOException
+    {
+      //getValue2(OperatorContext.STORAGE_AGENT).save(operator, id, Checkpoint.STATELESS_CHECKPOINT_WINDOW_ID);
+      out.defaultWriteObject();
+      FSStorageAgent.store(out, module);
+    }
+
+    private void readObject(ObjectInputStream input) throws IOException, ClassNotFoundException
+    {
+      input.defaultReadObject();
+      // TODO: not working because - we don't have the storage agent in parent attribuet map
+      //operator = (Operator)getValue2(OperatorContext.STORAGE_AGENT).load(id, Checkpoint.STATELESS_CHECKPOINT_WINDOW_ID);
+      module = (Module)FSStorageAgent.retrieve(input);
+    }
   }
 
   @Override public <T extends Module> T addModule(String name, T module)
@@ -1482,7 +1528,7 @@ public class LogicalPlan implements Serializable, DAG
 
   public ModuleMeta getModuleMeta(String moduleName)
   {
-    return null;
+    return this.modules.get(moduleName);
   }
 
   @Override
@@ -1578,6 +1624,8 @@ public class LogicalPlan implements Serializable, DAG
             Validation.buildDefaultValidatorFactory();
     Validator validator = factory.getValidator();
 
+    checkAttributeValueSerializable(this.getAttributes(), DAG.class.getName());
+
     // clear oioRoot values in all operators
     for (OperatorMeta n: operators.values()) {
       n.oioRoot = null;
@@ -1601,6 +1649,8 @@ public class LogicalPlan implements Serializable, DAG
       }
 
       OperatorMeta.PortMapping portMapping = n.getPortMapping();
+
+      checkAttributeValueSerializable(n.getAttributes(), n.getName());
 
       // Check operator annotation
       if (n.operatorAnnotation != null) {
@@ -1634,6 +1684,7 @@ public class LogicalPlan implements Serializable, DAG
 
       // check that non-optional ports are connected
       for (InputPortMeta pm: portMapping.inPortMap.values()) {
+        checkAttributeValueSerializable(pm.getAttributes(), n.getName() + "." + pm.getPortName());
         StreamMeta sm = n.inputStreams.get(pm);
         if (sm == null) {
           if ((pm.portAnnotation == null || !pm.portAnnotation.optional()) && pm.classDeclaringHiddenPort == null) {
@@ -1663,6 +1714,7 @@ public class LogicalPlan implements Serializable, DAG
 
       boolean allPortsOptional = true;
       for (OutputPortMeta pm: portMapping.outPortMap.values()) {
+        checkAttributeValueSerializable(pm.getAttributes(), n.getName() + "." + pm.getPortName());
         if (!n.outputStreams.containsKey(pm)) {
           if ((pm.portAnnotation != null && !pm.portAnnotation.optional()) && pm.classDeclaringHiddenPort == null) {
             throw new ValidationException("Output port connection required: " + n.name + "." + pm.getPortName());
@@ -1722,6 +1774,22 @@ public class LogicalPlan implements Serializable, DAG
       validateProcessingMode(om, visited);
     }
 
+  }
+
+  private void checkAttributeValueSerializable(AttributeMap attributes, String context)
+  {
+    StringBuilder sb = new StringBuilder();
+    String delim = "";
+    // Check all attributes got operator are serializable
+    for (Entry<Attribute<?>, Object> entry : attributes.entrySet()) {
+      if (entry.getValue() != null && !(entry.getValue() instanceof Serializable)) {
+        sb.append(delim).append(entry.getKey().getSimpleName());
+        delim = ", ";
+      }
+    }
+    if (sb.length() > 0) {
+      throw new ValidationException("Attribute value(s) for " + sb.toString() + " in " + context + " are not serializable");
+    }
   }
 
   /*
