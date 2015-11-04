@@ -49,7 +49,6 @@ import javax.ws.rs.Produces;
 import javax.ws.rs.QueryParam;
 import javax.ws.rs.core.Context;
 import javax.ws.rs.core.MediaType;
-import javax.ws.rs.core.UriInfo;
 
 import org.codehaus.jackson.JsonGenerator;
 import org.codehaus.jackson.JsonProcessingException;
@@ -566,7 +565,7 @@ public class StramWebServices
     LogicalOperatorInfo logicalOperatorInfo = dagManager.getLogicalOperatorInfo(operatorName);
     return new JSONObject(objectMapper.writeValueAsString(logicalOperatorInfo));
   }
-  
+
   @GET
   @Path(PATH_LOGICAL_PLAN_MODULES + "/{moduleName}")
   @Produces(MediaType.APPLICATION_JSON)
@@ -727,7 +726,7 @@ public class StramWebServices
     }
     return result;
   }
-  
+
   @GET
   @Path(PATH_LOGICAL_PLAN_MODULES + "/{moduleName}/ports")
   @Produces(MediaType.APPLICATION_JSON)
@@ -753,8 +752,7 @@ public class StramWebServices
         ports.put(port);
       }
       result.put("ports", ports);
-    }
-    catch (JSONException ex) {
+    } catch (JSONException ex) {
       throw new RuntimeException(ex);
     }
     return result;
@@ -792,7 +790,7 @@ public class StramWebServices
     }
     throw new NotFoundException();
   }
-  
+
   @GET
   @Path(PATH_LOGICAL_PLAN_MODULES + "/{moduleName}/ports/{portName}")
   @Produces(MediaType.APPLICATION_JSON)
@@ -819,8 +817,7 @@ public class StramWebServices
           return port;
         }
       }
-    }
-    catch (JSONException ex) {
+    } catch (JSONException ex) {
       throw new RuntimeException(ex);
     }
     throw new NotFoundException();
@@ -871,7 +868,7 @@ public class StramWebServices
     }
     return new JSONObject(objectMapper.writeValueAsString(m));
   }
-  
+
   @GET
   @Path(PATH_LOGICAL_PLAN_MODULES + "/{moduleName}/properties")
   @Produces(MediaType.APPLICATION_JSON)
@@ -893,13 +890,11 @@ public class StramWebServices
         Map.Entry<String, Object> entry = (Map.Entry<String, Object>)entryIterator.next();
         if (propertyName == null) {
           m.put(entry.getKey(), entry.getValue());
-        }
-        else if (propertyName.equals(entry.getKey())) {
+        } else if (propertyName.equals(entry.getKey())) {
           m.put(entry.getKey(), entry.getValue());
           break;
         }
-      }
-      catch (Exception ex) {
+      } catch (Exception ex) {
         LOG.warn("Caught exception", ex);
       }
     }
@@ -935,15 +930,15 @@ public class StramWebServices
   @Produces(MediaType.APPLICATION_JSON)
   public JSONObject getLogicalPlan() throws JSONException, IOException
   {
-    return new JSONObject(objectMapper.writeValueAsString(LogicalPlanSerializer.convertToMapV2(dagManager.getLogicalPlan(),false)));
+    return new JSONObject(objectMapper.writeValueAsString(LogicalPlanSerializer.convertToMapV2(dagManager.getLogicalPlan(), false)));
   }
-  
+
   @GET
-  @Path(PATH_LOGICAL_PLAN+"/flatten")
+  @Path(PATH_LOGICAL_PLAN + "/flatten")
   @Produces(MediaType.APPLICATION_JSON)
   public JSONObject getLogicalPlanFlatten() throws JSONException, IOException
   {
-    return new JSONObject(objectMapper.writeValueAsString(LogicalPlanSerializer.convertToMapV2(dagManager.getLogicalPlan(),true)));
+    return new JSONObject(objectMapper.writeValueAsString(LogicalPlanSerializer.convertToMapV2(dagManager.getLogicalPlan(), true)));
   }
 
   @POST // not supported by WebAppProxyServlet, can only be called directly

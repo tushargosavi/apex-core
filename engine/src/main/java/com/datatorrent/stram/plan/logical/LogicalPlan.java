@@ -32,6 +32,7 @@ import javax.validation.constraints.NotNull;
 
 import org.apache.commons.lang.builder.ToStringBuilder;
 import org.apache.commons.lang.builder.ToStringStyle;
+import org.apache.hadoop.conf.Configuration;
 import org.apache.hadoop.util.ReflectionUtils;
 import org.apache.hadoop.yarn.conf.YarnConfiguration;
 
@@ -39,7 +40,6 @@ import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
 import com.google.common.collect.ArrayListMultimap;
-import com.google.common.collect.Multimaps;
 import com.google.common.collect.Sets;
 
 import com.datatorrent.api.*;
@@ -47,7 +47,6 @@ import com.datatorrent.api.Attribute.AttributeMap;
 import com.datatorrent.api.Attribute.AttributeMap.DefaultAttributeMap;
 import com.datatorrent.api.Module.ProxyInputPort;
 import com.datatorrent.api.Module.ProxyOutputPort;
-import com.datatorrent.api.Module.ProxyPort;
 import com.datatorrent.api.Operator.InputPort;
 import com.datatorrent.api.Operator.OutputPort;
 import com.datatorrent.api.Operator.Unifier;
@@ -413,7 +412,7 @@ public class LogicalPlan implements Serializable, DAG
     private String persistOperatorName;
     public Map<InputPortMeta, OperatorMeta> sinkSpecificPersistOperatorMap;
     public Map<InputPortMeta, InputPortMeta> sinkSpecificPersistInputPortMap;
-    private String parentModuleName;
+    private String moduleName;  // Name of the module which has this stream. null if top level stream.
 
     private StreamMeta(String id)
     {
@@ -442,14 +441,14 @@ public class LogicalPlan implements Serializable, DAG
       return this;
     }
 
-    public String getParentModuleName()
+    public String getModuleName()
     {
-      return parentModuleName;
+      return moduleName;
     }
 
-    public void setParentModuleName(String parentModuleName)
+    public void setModuleName(String moduleName)
     {
-      this.parentModuleName = parentModuleName;
+      this.moduleName = moduleName;
     }
 
     public OutputPortMeta getSource()
@@ -752,7 +751,7 @@ public class LogicalPlan implements Serializable, DAG
     private transient Integer lowlink; // for cycle detection
     private transient Operator operator;
     private MetricAggregatorMeta metricAggregatorMeta;
-    private String parentModuleName;
+    private String moduleName;  // Name of the module which has this operator. null if this is a top level operator.
 
     /*
      * Used for  OIO validation,
@@ -839,14 +838,14 @@ public class LogicalPlan implements Serializable, DAG
       return metricAggregatorMeta;
     }
 
-    public String getParentModuleName()
+    public String getModuleName()
     {
-      return parentModuleName;
+      return moduleName;
     }
 
-    public void setParentModuleName(String parentModuleName)
+    public void setModuleName(String moduleName)
     {
-      this.parentModuleName = parentModuleName;
+      this.moduleName = moduleName;
     }
 
     protected void populateAggregatorMeta()
@@ -1080,16 +1079,6 @@ public class LogicalPlan implements Serializable, DAG
     private static final long serialVersionUID = 201401091635L;
   }
 
-  public String getNameWithPrefix(String name)
-  {
-    String prefix = "";
-    for (ModuleMeta m : moduleStack) {
-      prefix += m.name + "_";
-    }
-
-    return prefix + name;
-  }
-
   @Override
   public <T extends Operator> T addOperator(String name, Class<T> clazz)
   {
@@ -1106,7 +1095,6 @@ public class LogicalPlan implements Serializable, DAG
   @Override
   public <T extends Operator> T addOperator(String name, T operator)
   {
-    name = moduleStack.empty() ? name : moduleStack.peek().getName() + "_" + name;
     if (operators.containsKey(name)) {
       if (operators.get(name).operator == operator) {
         return operator;
@@ -1115,7 +1103,6 @@ public class LogicalPlan implements Serializable, DAG
     }
 
     OperatorMeta decl = new OperatorMeta(name, operator);
-    decl.setParentModuleName(moduleStack.empty() ? null : moduleStack.peek().getName());
     rootOperators.add(decl); // will be removed when a sink is added to an input port for this operator
     operators.put(name, decl);
     return operator;
@@ -1133,8 +1120,8 @@ public class LogicalPlan implements Serializable, DAG
     private transient Integer nindex; // for cycle detection
     private transient Integer lowlink; // for cycle detection
     private transient Module module;
-    private String parentModuleName;
-    public transient boolean isExpanded = false;
+    private String parentModuleName;  // Name of the module which has this module. null if this is a top level Module.
+    private LogicalPlan dag = null;
 
     public ModuleMeta(String name, Module module)
     {
@@ -1148,6 +1135,7 @@ public class LogicalPlan implements Serializable, DAG
       this.module = module;
       this.id = logicalOperatorSequencer.decrementAndGet();
       this.attributes = attributeMap;
+      this.dag = new LogicalPlan();
     }
 
     @Override
@@ -1233,9 +1221,9 @@ public class LogicalPlan implements Serializable, DAG
       return lowlink;
     }
 
-    public boolean isExpanded()
+    public LogicalPlan getDag()
     {
-      return isExpanded;
+      return dag;
     }
 
     private void writeObject(ObjectOutputStream out) throws IOException
@@ -1252,12 +1240,22 @@ public class LogicalPlan implements Serializable, DAG
       //operator = (Operator)getValue2(OperatorContext.STORAGE_AGENT).load(id, Checkpoint.STATELESS_CHECKPOINT_WINDOW_ID);
       module = (Module)FSStorageAgent.retrieve(input);
     }
+
+    public void flattenModule(LogicalPlan parentDAG, Configuration conf)
+    {
+      module.populateDAG(dag, conf);
+      for (ModuleMeta subModuleMeta : dag.getAllModules()) {
+        subModuleMeta.setParentModuleName(this.name);
+        subModuleMeta.flattenModule(dag, conf);
+      }
+      dag.applyStreamLinks();
+      parentDAG.addDAGToCurrentDAG(dag, this.name);
+    }
   }
 
   @Override
   public <T extends Module> T addModule(String name, T module)
   {
-    name = getNameWithPrefix(name);
     if (modules.containsKey(name)) {
       if (modules.get(name).module == module) {
         return module;
@@ -1266,7 +1264,6 @@ public class LogicalPlan implements Serializable, DAG
     }
 
     ModuleMeta meta = new ModuleMeta(name, module);
-    meta.setParentModuleName(moduleStack.empty() ? null : moduleStack.peek().getName());
     modules.put(name, meta);
     return module;
   }
@@ -1307,9 +1304,7 @@ public class LogicalPlan implements Serializable, DAG
   @Override
   public StreamMeta addStream(String id)
   {
-    id = moduleStack.empty() ? id : moduleStack.peek().getName() + "_" + id;
     StreamMeta s = new StreamMeta(id);
-    s.setParentModuleName(moduleStack.empty() ? null : moduleStack.peek().getName());
     StreamMeta o = streams.put(id, s);
     if (o == null) {
       return s;
@@ -1332,11 +1327,8 @@ public class LogicalPlan implements Serializable, DAG
       if (source instanceof ProxyOutputPort || sink instanceof ProxyInputPort) {
         streamMap.put(source, sink);
         streamLinks.put(id, streamMap);
-      }
-      else
-      {
-        if(s.getSource() == null)
-        {
+      } else {
+        if (s.getSource() == null) {
           s.setSource(source);
         }
         s.addSink(sink);
@@ -1353,23 +1345,45 @@ public class LogicalPlan implements Serializable, DAG
   {
     for (String id : streamLinks.keySet()) {
       StreamMeta s = getStream(id);
-      for(Map.Entry<Operator.OutputPort<?>, Operator.InputPort<?>> pair : streamLinks.get(id).entries())
-      {
-        if(s.getSource() == null)
-        {
+      for (Map.Entry<Operator.OutputPort<?>, Operator.InputPort<?>> pair : streamLinks.get(id).entries()) {
+        if (s.getSource() == null) {
           Operator.OutputPort<?> outputPort = pair.getKey();
-          while(outputPort instanceof ProxyOutputPort){
+          while (outputPort instanceof ProxyOutputPort) {
             outputPort = ((ProxyOutputPort)outputPort).get();
           }
           s.setSource(outputPort);
         }
 
         Operator.InputPort<?> inputPort = pair.getValue();
-        while(inputPort instanceof ProxyInputPort){
+        while (inputPort instanceof ProxyInputPort) {
           inputPort = ((ProxyInputPort)inputPort).get();
         }
         s.addSink(inputPort);
       }
+    }
+  }
+
+  private void addDAGToCurrentDAG(LogicalPlan subDag, String subDAGName)
+  {
+    String name;
+    for (OperatorMeta operatorMeta : subDag.getAllOperators()) {
+      name = subDAGName + "_" + operatorMeta.getName();
+      this.addOperator(name, operatorMeta.getOperator());
+      OperatorMeta operatorMetaNew = this.getOperatorMeta(name);
+      operatorMetaNew.setModuleName(operatorMeta.getModuleName() == null ? subDAGName : subDAGName + "_" + operatorMeta.getModuleName());
+    }
+
+    for (StreamMeta streamMeta : subDag.getAllStreams()) {
+      OutputPortMeta sourceMeta = streamMeta.getSource();
+      List<InputPort> ports = new LinkedList<>();
+      for (InputPortMeta inputPortMeta : streamMeta.getSinks()) {
+        ports.add(inputPortMeta.getPortObject());
+      }
+      InputPort[] inputPorts = ports.toArray(new InputPort[]{});
+
+      name = subDAGName + "_" + streamMeta.getName();
+      StreamMeta streamMetaNew = this.addStream(name, sourceMeta.getPortObject(), inputPorts);
+      streamMetaNew.setModuleName(streamMeta.getModuleName() == null ? subDAGName : subDAGName + "_" + streamMeta.getModuleName());
     }
   }
 
@@ -1757,7 +1771,8 @@ public class LogicalPlan implements Serializable, DAG
    *  1. all its input streams should be OIO
    *  2. all its input streams should have OIO from single source node
    */
-  private void validateThreadLocal(OperatorMeta om) {
+  private void validateThreadLocal(OperatorMeta om)
+  {
     Integer oioRoot = null;
 
     // already visited and validated
@@ -1765,11 +1780,11 @@ public class LogicalPlan implements Serializable, DAG
       return;
     }
 
-    for (StreamMeta sm: om.inputStreams.values()) {
+    for (StreamMeta sm : om.inputStreams.values()) {
       // validation fail as each input stream should be OIO
       if (sm.locality != Locality.THREAD_LOCAL) {
         String msg = String.format("Locality %s invalid for operator %s with multiple input streams as at least one of the input streams is not %s",
-                                   Locality.THREAD_LOCAL, om, Locality.THREAD_LOCAL);
+          Locality.THREAD_LOCAL, om, Locality.THREAD_LOCAL);
         throw new ValidationException(msg);
       }
 
@@ -1779,7 +1794,7 @@ public class LogicalPlan implements Serializable, DAG
       // validation fail as each input stream should have a common OIO root
       if (om.oioRoot != null && oioStreamRoot != om.oioRoot) {
         String msg = String.format("Locality %s invalid for operator %s with multiple input streams as at least one of the input streams is not originating from common OIO owner node",
-                                   Locality.THREAD_LOCAL, om, Locality.THREAD_LOCAL);
+          Locality.THREAD_LOCAL, om, Locality.THREAD_LOCAL);
         throw new ValidationException(msg);
       }
 

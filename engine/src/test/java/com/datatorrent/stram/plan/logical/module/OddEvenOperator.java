@@ -27,17 +27,15 @@ import com.datatorrent.common.util.BaseOperator;
  */
 public class OddEvenOperator extends BaseOperator
 {
-  public transient DefaultInputPort<Integer> input = new DefaultInputPort<Integer>() {
-    
+  public transient DefaultInputPort<Integer> input = new DefaultInputPort<Integer>()
+  {
+
     @Override
     public void process(Integer tuple)
     {
-      if(tuple.intValue() % 2 == 0)
-      {
+      if (tuple.intValue() % 2 == 0) {
         even.emit(tuple);
-      }
-      else
-      {
+      } else {
         odd.emit(tuple);
       }
     }

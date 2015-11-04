@@ -27,13 +27,13 @@ import com.datatorrent.common.util.BaseOperator;
  */
 public class FilterOperator extends BaseOperator
 {
-  public transient DefaultInputPort<Integer> input = new DefaultInputPort<Integer>() {
-    
+  public transient DefaultInputPort<Integer> input = new DefaultInputPort<Integer>()
+  {
+
     @Override
     public void process(Integer tuple)
     {
-      if(tuple.intValue() >= 0)
-      {
+      if (tuple.intValue() >= 0) {
         output.emit(tuple);
       }
     }

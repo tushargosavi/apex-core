@@ -58,8 +58,7 @@ public interface Module
     @Override
     public void setup(PortContext context)
     {
-      if(inputPort != null)
-      {
+      if (inputPort != null) {
         inputPort.setup(context);
       }
     }
@@ -67,8 +66,7 @@ public interface Module
     @Override
     public void teardown()
     {
-      if(inputPort != null)
-      {
+      if (inputPort != null) {
         inputPort.teardown();
       }
     }
@@ -76,12 +74,9 @@ public interface Module
     @Override
     public Sink<T> getSink()
     {
-      if(inputPort != null)
-      {
+      if (inputPort != null) {
         return inputPort.getSink();
-      }
-      else
-      {
+      } else {
         return null;
       }
     }
@@ -89,8 +84,7 @@ public interface Module
     @Override
     public void setConnected(boolean connected)
     {
-      if(inputPort != null)
-      {
+      if (inputPort != null) {
         inputPort.setConnected(connected);
       }
     }
@@ -98,12 +92,9 @@ public interface Module
     @Override
     public StreamCodec<T> getStreamCodec()
     {
-      if(inputPort != null)
-      {
+      if (inputPort != null) {
         return inputPort.getStreamCodec();
-      }
-      else
-      {
+      } else {
         return null;
       }
     }
@@ -126,8 +117,7 @@ public interface Module
     @Override
     public void setup(PortContext context)
     {
-      if(outputPort != null)
-      {
+      if (outputPort != null) {
         outputPort.setup(context);
       }
     }
@@ -135,8 +125,7 @@ public interface Module
     @Override
     public void teardown()
     {
-      if(outputPort != null)
-      {
+      if (outputPort != null) {
         outputPort.teardown();
       }
     }
@@ -144,8 +133,7 @@ public interface Module
     @Override
     public void setSink(Sink<Object> s)
     {
-      if(outputPort != null)
-      {
+      if (outputPort != null) {
         outputPort.setSink(s);
       }
     }
@@ -153,12 +141,9 @@ public interface Module
     @Override
     public Unifier<T> getUnifier()
     {
-      if(outputPort != null)
-      {
+      if (outputPort != null) {
         return outputPort.getUnifier();
-      }
-      else
-      {
+      } else {
         return null;
       }
     }
