@@ -32,6 +32,7 @@ import javax.validation.constraints.NotNull;
 
 import org.apache.commons.lang.builder.ToStringBuilder;
 import org.apache.commons.lang.builder.ToStringStyle;
+import org.apache.hadoop.conf.Configuration;
 import org.apache.hadoop.util.ReflectionUtils;
 import org.apache.hadoop.yarn.conf.YarnConfiguration;
 
@@ -154,7 +155,6 @@ public class LogicalPlan implements Serializable, DAG
   private final Attribute.AttributeMap attributes = new DefaultAttributeMap();
   private transient int nodeIndex = 0; // used for cycle validation
   private transient Stack<OperatorMeta> stack = new Stack<OperatorMeta>(); // used for cycle validation
-  public Stack<ModuleMeta> moduleStack = new Stack<ModuleMeta>();
   private transient Map<String, HashMap<OutputPort<?>, InputPort<?>>> streamLinks = new HashMap<String, HashMap<Operator.OutputPort<?>, Operator.InputPort<?>>>();
 
   @Override
@@ -1078,15 +1078,15 @@ public class LogicalPlan implements Serializable, DAG
     private static final long serialVersionUID = 201401091635L;
   }
 
-  public String getNameWithPrefix(String name)
-  {
-    String prefix = "";
-    for (ModuleMeta m : moduleStack) {
-      prefix += m.name + "_";
-    }
-
-    return prefix + name;
-  }
+//  public String getNameWithPrefix(String name)
+//  {
+//    String prefix = "";
+//    for (ModuleMeta m : moduleStack) {
+//      prefix += m.name + "_";
+//    }
+//
+//    return prefix + name;
+//  }
 
   @Override
   public <T extends Operator> T addOperator(String name, Class<T> clazz)
@@ -1104,7 +1104,6 @@ public class LogicalPlan implements Serializable, DAG
   @Override
   public <T extends Operator> T addOperator(String name, T operator)
   {
-    name = moduleStack.empty() ? name : moduleStack.peek().getName() + "_" + name;
     if (operators.containsKey(name)) {
       if (operators.get(name).operator == operator) {
         return operator;
@@ -1113,7 +1112,6 @@ public class LogicalPlan implements Serializable, DAG
     }
 
     OperatorMeta decl = new OperatorMeta(name, operator);
-    decl.setParentModuleName(moduleStack.empty() ? null : moduleStack.peek().getName());
     rootOperators.add(decl); // will be removed when a sink is added to an input port for this operator
     operators.put(name, decl);
     return operator;
@@ -1132,7 +1130,7 @@ public class LogicalPlan implements Serializable, DAG
     private transient Integer lowlink; // for cycle detection
     private transient Module module;
     private String parentModuleName;
-    public transient boolean isExpanded = false;
+    private LogicalPlan dag = null;
 
     public ModuleMeta(String name, Module module)
     {
@@ -1146,6 +1144,7 @@ public class LogicalPlan implements Serializable, DAG
       this.module = module;
       this.id = logicalOperatorSequencer.decrementAndGet();
       this.attributes = attributeMap;
+      this.dag = new LogicalPlan();
     }
 
     @Override
@@ -1231,11 +1230,6 @@ public class LogicalPlan implements Serializable, DAG
       return lowlink;
     }
 
-    public boolean isExpanded()
-    {
-      return isExpanded;
-    }
-
     private void writeObject(ObjectOutputStream out) throws IOException
     {
       //getValue2(OperatorContext.STORAGE_AGENT).save(operator, id, Checkpoint.STATELESS_CHECKPOINT_WINDOW_ID);
@@ -1250,12 +1244,45 @@ public class LogicalPlan implements Serializable, DAG
       //operator = (Operator)getValue2(OperatorContext.STORAGE_AGENT).load(id, Checkpoint.STATELESS_CHECKPOINT_WINDOW_ID);
       module = (Module)FSStorageAgent.retrieve(input);
     }
+
+    public void flattenModule(LogicalPlan parentDAG, Configuration conf)
+    {
+      module.populateDAG(dag, conf);
+      for (ModuleMeta subModuleMeta : dag.getAllModules()) {
+        subModuleMeta.setParentModuleName(this.name);
+        subModuleMeta.flattenModule(dag, conf);
+      }
+      dag.applyStreamLinks();
+      mergeWithParentDAG(parentDAG);
+    }
+
+    private void mergeWithParentDAG(LogicalPlan parentDAG)
+    {
+      for (OperatorMeta operatorMeta : dag.getAllOperators()) {
+        parentDAG.addOperator(getNameWithPrefix(operatorMeta.getName()), operatorMeta.getOperator());
+      }
+
+      for (StreamMeta streamMeta : dag.getAllStreams()) {
+        OutputPortMeta sourceMeta = streamMeta.getSource();
+        List<InputPort> ports = new LinkedList<>();
+        for (InputPortMeta inputPortMeta : streamMeta.getSinks()) {
+          ports.add(inputPortMeta.getPortObject());
+        }
+        InputPort[] inputPorts = ports.toArray(new InputPort[]{});
+
+        parentDAG.addStream(getNameWithPrefix(streamMeta.getName()), sourceMeta.getPortObject(), inputPorts);
+      }
+    }
+
+    private String getNameWithPrefix(String name)
+    {
+      return this.name + "_" + name;
+    }
   }
 
   @Override
   public <T extends Module> T addModule(String name, T module)
   {
-    name = getNameWithPrefix(name);
     if (modules.containsKey(name)) {
       if (modules.get(name).module == module) {
         return module;
@@ -1264,7 +1291,6 @@ public class LogicalPlan implements Serializable, DAG
     }
 
     ModuleMeta meta = new ModuleMeta(name, module);
-    meta.setParentModuleName(moduleStack.empty() ? null : moduleStack.peek().getName());
     modules.put(name, meta);
     return module;
   }
@@ -1305,9 +1331,7 @@ public class LogicalPlan implements Serializable, DAG
   @Override
   public StreamMeta addStream(String id)
   {
-    id = moduleStack.empty() ? id : moduleStack.peek().getName() + "_" + id;
     StreamMeta s = new StreamMeta(id);
-    s.setParentModuleName(moduleStack.empty() ? null : moduleStack.peek().getName());
     StreamMeta o = streams.put(id, s);
     if (o == null) {
       return s;

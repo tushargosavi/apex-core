@@ -2156,11 +2156,8 @@ public class LogicalPlanConfiguration {
     }
 
     // Expand the modules within the dag recursively
-    expandModules(dag, conf, appName);
-
-    // Replace the proxy ports (belonging to modules) with actual input and output ports (belonging to operators)
-    // Also add the source and sinks for StreamMeta objects
-    dag.applyStreamLinks();
+    setModuleProperties(dag, appName);
+    flattenModule(dag, conf);
 
     // inject external operator configuration
     setOperatorConfiguration(dag, appConfs, appName);
@@ -2168,42 +2165,13 @@ public class LogicalPlanConfiguration {
     setStreamConfiguration(dag, appConfs, appName);
   }
 
-  /**
-   * Expands modules into the application Dag.
-   * Specifically, calls the populateDag() methods for each module recursively for each top level module in the application Dag.
-   * For example, if the Dag is:
-   * O1 -> M1(M11(M111)) -> M2(M21) -> O4
-   * O1, O2 - Operators
-   * M1, M2 - Top level Modules 
-   * M11, M111, M21 - Hidden modules, until the top level modules are not expanded
-   * 
-   * @param dag
-   * @param conf
-   * @param appName
-   */
-  private void expandModules(LogicalPlan dag, Configuration conf, String appName)
+  private void flattenModule(LogicalPlan dag, Configuration conf)
   {
-    Collection<ModuleMeta> modules = dag.getAllModules();
-    for (ModuleMeta moduleMeta : modules) {
-      if (moduleMeta.isExpanded) {
-        continue;
-      }
-
-      dag.moduleStack.push(moduleMeta);
-      int beforeCount = dag.getAllModules().size();
-      // Set the module properties
-      setModuleProperties(dag, appName);
-      // Expand the module
-      moduleMeta.getModule().populateDAG(dag, conf);
-      moduleMeta.isExpanded = true;
-      int afterCount = dag.getAllModules().size();
-
-      // Continue only if more modules need to be expanded
-      if (beforeCount != afterCount) {
-        expandModules(dag, conf, appName);
-      }
-      dag.moduleStack.pop();
+    for (ModuleMeta moduleMeta : dag.getAllModules()) {
+      moduleMeta.setParentModuleName(null);
+      moduleMeta.flattenModule(dag, conf);
     }
+    dag.applyStreamLinks();
   }
 
   public static Properties readProperties(String filePath) throws IOException
