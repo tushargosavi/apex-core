@@ -84,8 +84,9 @@ public abstract class DefaultInputPort<T> implements InputPort<T>, Sink<T>
   public int getCount(boolean reset)
   {
     try {
-      return count; 
-    } finally {
+      return count;
+    }
+    finally {
       if (reset) {
         count = 0;
       }

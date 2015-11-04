@@ -38,12 +38,13 @@ public class OutputOperator extends BaseOperator
     this.prefix = prefix;
   }
 
-  public transient DefaultInputPort<Integer> input = new DefaultInputPort<Integer>() {
-    
+  public transient DefaultInputPort<Integer> input = new DefaultInputPort<Integer>()
+  {
+
     @Override
     public void process(Integer tuple)
     {
-      System.out.println(prefix+" : "+tuple.intValue());
+      System.out.println(prefix + " : " + tuple.intValue());
     }
   };
 }
