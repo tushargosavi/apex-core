@@ -32,10 +32,12 @@ import com.datatorrent.api.LocalMode;
 /**
  * Test the DAG declaration in local mode.
  */
-public class NestedModuleApplicationTest {
+public class NestedModuleApplicationTest
+{
 
   @Test
-  public void testApplication() throws IOException, Exception {
+  public void testApplication() throws IOException, Exception
+  {
     try {
       LocalMode lma = LocalMode.newInstance();
       Configuration conf = new Configuration(false);

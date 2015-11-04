@@ -23,7 +23,9 @@ import com.datatorrent.api.annotation.InputPortFieldAnnotation;
 import com.datatorrent.api.annotation.OutputPortFieldAnnotation;
 import com.datatorrent.common.util.BaseOperator;
 import com.datatorrent.stram.engine.GenericOperatorProperty;
+
 import org.apache.hadoop.conf.Configuration;
+
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
@@ -38,9 +40,11 @@ public class TestModules
 
     public volatile Object inport1Tuple = null;
 
-    @OutputPortFieldAnnotation(optional = true) final public transient DefaultOutputPort<Object> outport1 = new DefaultOutputPort<Object>();
+    @OutputPortFieldAnnotation(optional = true)
+    final public transient DefaultOutputPort<Object> outport1 = new DefaultOutputPort<Object>();
 
-    @OutputPortFieldAnnotation(optional = true) final public transient DefaultOutputPort<Object> outport2 = new DefaultOutputPort<Object>();
+    @OutputPortFieldAnnotation(optional = true)
+    final public transient DefaultOutputPort<Object> outport2 = new DefaultOutputPort<Object>();
 
     private String emitFormat;
 
@@ -113,7 +117,8 @@ public class TestModules
       }
     }
 
-    @Override public void populateDAG(DAG dag, Configuration conf)
+    @Override
+    public void populateDAG(DAG dag, Configuration conf)
     {
       LOG.info("populateDAG of module called");
     }
@@ -128,14 +133,16 @@ public class TestModules
     private int tupleBlast;
     private transient int count;
 
-    @Override public void emitTuples()
+    @Override
+    public void emitTuples()
     {
-      for(; count < tupleBlast ; count++) {
+      for (; count < tupleBlast; count++) {
         out.emit(rand.nextInt(max));
       }
     }
 
-    @Override public void beginWindow(long windowId)
+    @Override
+    public void beginWindow(long windowId)
     {
       count = 0;
     }
@@ -171,12 +178,14 @@ public class TestModules
     }
   }
 
-  public static class PiCalculator extends BaseOperator {
+  public static class PiCalculator extends BaseOperator
+  {
     private int size;
 
     public transient DefaultInputPort<Integer> in = new DefaultInputPort<Integer>()
     {
-      @Override public void process(Integer tuple)
+      @Override
+      public void process(Integer tuple)
       {
         //LOG.debug("processing tuple ", tuple);
         out.emit(tuple);
@@ -196,11 +205,13 @@ public class TestModules
     }
   }
 
-  public static class PiModule implements Module {
+  public static class PiModule implements Module
+  {
 
     private int size;
 
-    @Override public void populateDAG(DAG dag, Configuration conf)
+    @Override
+    public void populateDAG(DAG dag, Configuration conf)
     {
       RandGen gen = dag.addOperator("gen", new RandGen());
       gen.setMax(size);
@@ -227,13 +238,15 @@ public class TestModules
     @InputPortFieldAnnotation(optional = true)
     public transient DefaultInputPort in = new DefaultInputPort<Integer>()
     {
-      @Override public void process(Integer tuple)
+      @Override
+      public void process(Integer tuple)
       {
 
       }
     };
 
-    @Override public void populateDAG(DAG dag, Configuration conf)
+    @Override
+    public void populateDAG(DAG dag, Configuration conf)
     {
       PiModule pi = dag.addModule("PiModule", PiModule.class);
       pi.setSize(size);
@@ -254,7 +267,9 @@ public class TestModules
   {
     @OutputPortFieldAnnotation(optional = true)
     public transient DefaultOutputPort<Integer> out = new DefaultOutputPort<>();
-    @Override public void populateDAG(DAG dag, Configuration conf)
+
+    @Override
+    public void populateDAG(DAG dag, Configuration conf)
     {
       RandGen rand = dag.addOperator("RandGen", RandGen.class);
     }

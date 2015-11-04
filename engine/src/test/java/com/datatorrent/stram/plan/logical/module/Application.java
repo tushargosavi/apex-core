@@ -24,7 +24,7 @@ import com.datatorrent.api.DAG;
 import com.datatorrent.api.StreamingApplication;
 import com.datatorrent.api.annotation.ApplicationAnnotation;
 
-@ApplicationAnnotation(name="ApplicationWithModules")
+@ApplicationAnnotation(name = "ApplicationWithModules")
 public class Application implements StreamingApplication
 {
 

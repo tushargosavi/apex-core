@@ -21,6 +21,7 @@ package com.datatorrent.stram.plan.logical;
 import java.util.Random;
 
 import org.apache.hadoop.conf.Configuration;
+
 import org.junit.Assert;
 import org.junit.Test;
 import org.slf4j.Logger;
@@ -31,11 +32,8 @@ import com.datatorrent.api.DefaultInputPort;
 import com.datatorrent.api.DefaultOutputPort;
 import com.datatorrent.api.InputOperator;
 import com.datatorrent.api.Module;
-import com.datatorrent.api.Operator;
 import com.datatorrent.api.StreamingApplication;
 import com.datatorrent.common.util.BaseOperator;
-import com.datatorrent.stram.plan.logical.LogicalPlan;
-import com.datatorrent.stram.plan.logical.LogicalPlanConfiguration;
 
 /**
  * Unit tests for testing Dag expansion with modules and proxy port substitution
@@ -46,7 +44,8 @@ public class ModuleAppTest
   /*
    * Input Operator - 1
    */
-  public static class DummyInputOperator extends BaseOperator implements InputOperator {
+  public static class DummyInputOperator extends BaseOperator implements InputOperator
+  {
 
     Random r = new Random();
     public transient DefaultOutputPort<Integer> output = new DefaultOutputPort<Integer>();
@@ -61,9 +60,11 @@ public class ModuleAppTest
   /*
    * Input Operator - 1.1
    */
-  public static class DummyOperatorAfterInput extends BaseOperator {
+  public static class DummyOperatorAfterInput extends BaseOperator
+  {
 
-    public transient DefaultInputPort<Integer> input = new DefaultInputPort<Integer>() {
+    public transient DefaultInputPort<Integer> input = new DefaultInputPort<Integer>()
+    {
       @Override
       public void process(Integer tuple)
       {
@@ -76,14 +77,16 @@ public class ModuleAppTest
   /*
    * Operator - 2
    */
-  public static class DummyOperator extends BaseOperator {
+  public static class DummyOperator extends BaseOperator
+  {
     int prop;
 
-    public transient DefaultInputPort<Integer> input = new DefaultInputPort<Integer>() {
+    public transient DefaultInputPort<Integer> input = new DefaultInputPort<Integer>()
+    {
       @Override
       public void process(Integer tuple)
       {
-        LOG.debug(tuple.intValue()+" processed");
+        LOG.debug(tuple.intValue() + " processed");
       }
     };
     public transient DefaultOutputPort<Integer> output = new DefaultOutputPort<Integer>();
@@ -92,14 +95,16 @@ public class ModuleAppTest
   /*
    * Output Operator - 3
    */
-  public static class DummyOutputOperator extends BaseOperator {
+  public static class DummyOutputOperator extends BaseOperator
+  {
     int prop;
 
-    public transient DefaultInputPort<Integer> input = new DefaultInputPort<Integer>() {
+    public transient DefaultInputPort<Integer> input = new DefaultInputPort<Integer>()
+    {
       @Override
       public void process(Integer tuple)
       {
-        LOG.debug(tuple.intValue()+" processed");
+        LOG.debug(tuple.intValue() + " processed");
       }
     };
   }
@@ -107,7 +112,8 @@ public class ModuleAppTest
   /*
    * Module Definition
    */
-  public static class TestModule implements Module {
+  public static class TestModule implements Module
+  {
 
     public transient ProxyInputPort<Integer> moduleInput = new Module.ProxyInputPort<Integer>();
     public transient ProxyOutputPort<Integer> moduleOutput = new Module.ProxyOutputPort<Integer>();
@@ -123,12 +129,14 @@ public class ModuleAppTest
   }
 
   @Test
-  public void moduleTest(){
+  public void moduleTest()
+  {
 
     /*
      * Streaming App
      */
-    StreamingApplication app = new StreamingApplication() {
+    StreamingApplication app = new StreamingApplication()
+    {
       @Override
       public void populateDAG(DAG dag, Configuration conf)
       {

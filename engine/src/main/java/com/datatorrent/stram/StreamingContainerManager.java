@@ -2305,20 +2305,20 @@ public class StreamingContainerManager implements PlanContext
     }
     return fillLogicalOperatorInfo(operatorMeta);
   }
-  
-  public LogicalModuleInfo getLogicalModuleInfo(String moduleName,boolean flatten)
+
+  public LogicalModuleInfo getLogicalModuleInfo(String moduleName, boolean flatten)
   {
     ModuleMeta moduleMeta = getLogicalPlan().getModuleMeta(moduleName);
     if (moduleMeta == null) {
       return null;
     }
-    LogicalModuleInfo logicalModuleInfo = fillLogicalModuleInfo(moduleMeta,flatten);
+    LogicalModuleInfo logicalModuleInfo = fillLogicalModuleInfo(moduleMeta, flatten);
     for (ModuleMeta meta : getLogicalPlan().getAllModules()) {
-      if (meta.getParentModuleName()!=null && meta.getParentModuleName().equals(moduleName)) {
-        if( !flatten ){
-        logicalModuleInfo.modules.add(fillLogicalModuleInfo(meta,flatten));
-        }else{
-          logicalModuleInfo.modules.add(getLogicalModuleInfo(fillLogicalModuleInfo(meta,flatten).name,flatten));
+      if (meta.getParentModuleName() != null && meta.getParentModuleName().equals(moduleName)) {
+        if (!flatten) {
+          logicalModuleInfo.modules.add(fillLogicalModuleInfo(meta, flatten));
+        } else {
+          logicalModuleInfo.modules.add(getLogicalModuleInfo(fillLogicalModuleInfo(meta, flatten).name, flatten));
         }
       }
     }
@@ -2334,7 +2334,7 @@ public class StreamingContainerManager implements PlanContext
     }
     return infoList;
   }
-  
+
   public List<LogicalModuleInfo> getLogicalModuleInfoList(boolean flatten)
   {
     List<LogicalModuleInfo> infoList = new ArrayList<LogicalModuleInfo>();
@@ -2342,7 +2342,7 @@ public class StreamingContainerManager implements PlanContext
     for (ModuleMeta moduleMeta : allModules) {
       if (moduleMeta.getParentModuleName() == null) {
         if (!flatten) {
-          infoList.add(fillLogicalModuleInfo(moduleMeta,flatten));
+          infoList.add(fillLogicalModuleInfo(moduleMeta, flatten));
         } else {
           infoList.add(getLogicalModuleInfo(moduleMeta.getName(), true));
         }
@@ -2499,8 +2499,8 @@ public class StreamingContainerManager implements PlanContext
 
     return loi;
   }
-  
-  private LogicalModuleInfo fillLogicalModuleInfo(ModuleMeta module,boolean flatten)
+
+  private LogicalModuleInfo fillLogicalModuleInfo(ModuleMeta module, boolean flatten)
   {
     LogicalModuleInfo lmi = new LogicalModuleInfo();
     lmi.name = module.getName();
@@ -2508,12 +2508,12 @@ public class StreamingContainerManager implements PlanContext
     if (flatten) {
       for (OperatorMeta operatorMeta : getLogicalPlan().getAllOperators()) {
         if (module.getParentModuleName() == null) {
-          if (operatorMeta.getParentModuleName() == null) {
+          if (operatorMeta.getModuleName() == null) {
             lmi.operators.add(fillLogicalOperatorInfo(operatorMeta));
           }
         } else {
-          if (operatorMeta.getParentModuleName() != null
-              && module.getParentModuleName().equals(operatorMeta.getParentModuleName())) {
+          if (operatorMeta.getModuleName() != null
+            && module.getParentModuleName().equals(operatorMeta.getModuleName())) {
             lmi.operators.add(fillLogicalOperatorInfo(operatorMeta));
           }
         }
@@ -2521,12 +2521,12 @@ public class StreamingContainerManager implements PlanContext
 
       for (StreamMeta streamMeta : getLogicalPlan().getAllStreams()) {
         if (module.getParentModuleName() == null) {
-          if (streamMeta.getParentModuleName() == null) {
+          if (streamMeta.getModuleName() == null) {
             lmi.streams.add(fillLogicalStreamInfo(streamMeta));
           }
         } else {
-          if (streamMeta.getParentModuleName() != null
-              && module.getParentModuleName().equals(streamMeta.getParentModuleName())) {
+          if (streamMeta.getModuleName() != null
+            && module.getParentModuleName().equals(streamMeta.getModuleName())) {
             lmi.streams.add(fillLogicalStreamInfo(streamMeta));
           }
         }
@@ -2535,7 +2535,7 @@ public class StreamingContainerManager implements PlanContext
 
     return lmi;
   }
-  
+
   private StreamInfo fillLogicalStreamInfo(StreamMeta streamMeta)
   {
     StreamInfo si = new StreamInfo();
@@ -2543,7 +2543,7 @@ public class StreamingContainerManager implements PlanContext
     si.source.portName = streamMeta.getSource().getPortName();
     si.locality = streamMeta.getLocality();
     si.source.operatorId = streamMeta.getSource().getOperatorMeta().getName();
-    for(InputPortMeta sinks : streamMeta.getSinks() ){
+    for (InputPortMeta sinks : streamMeta.getSinks()) {
       StreamInfo.Port port = new StreamInfo.Port();
       port.operatorId = sinks.getOperatorWrapper().getName();
       port.portName = sinks.getPortName();

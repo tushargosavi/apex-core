@@ -59,7 +59,7 @@ public class RandomInputOperator implements InputOperator
   @Override
   public void emitTuples()
   {
-    if(System.currentTimeMillis() - sentAt > 100){
+    if (System.currentTimeMillis() - sentAt > 100) {
       output.emit(r.nextInt());
       sentAt = System.currentTimeMillis();
     }
