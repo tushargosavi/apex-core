@@ -21,9 +21,11 @@ package com.datatorrent.api;
 import org.apache.hadoop.classification.InterfaceStability;
 import org.apache.hadoop.conf.Configuration;
 
+import com.datatorrent.api.Context.PortContext;
 import com.datatorrent.api.Operator.InputPort;
 import com.datatorrent.api.Operator.OutputPort;
 import com.datatorrent.api.Operator.Port;
+import com.datatorrent.api.Operator.Unifier;
 
 @InterfaceStability.Evolving
 public interface Module
@@ -37,14 +39,9 @@ public interface Module
     T get();
   }
 
-  public final class ProxyInputPort<T> extends DefaultInputPort<T> implements ProxyPort<InputPort<T>>
+  public final class ProxyInputPort<T> implements ProxyPort<InputPort<T>>, InputPort<T>
   {
     InputPort<T> inputPort;
-
-    @Override
-    public void process(T tuple)
-    {
-    }
 
     @Override
     public void set(InputPort<T> port)
@@ -58,9 +55,61 @@ public interface Module
       return inputPort;
     }
 
+    @Override
+    public void setup(PortContext context)
+    {
+      if(inputPort != null)
+      {
+        inputPort.setup(context);
+      }
+    }
+
+    @Override
+    public void teardown()
+    {
+      if(inputPort != null)
+      {
+        inputPort.teardown();
+      }
+    }
+
+    @Override
+    public Sink<T> getSink()
+    {
+      if(inputPort != null)
+      {
+        return inputPort.getSink();
+      }
+      else
+      {
+        return null;
+      }
+    }
+
+    @Override
+    public void setConnected(boolean connected)
+    {
+      if(inputPort != null)
+      {
+        inputPort.setConnected(connected);
+      }
+    }
+
+    @Override
+    public StreamCodec<T> getStreamCodec()
+    {
+      if(inputPort != null)
+      {
+        return inputPort.getStreamCodec();
+      }
+      else
+      {
+        return null;
+      }
+    }
   }
 
-  public final class ProxyOutputPort<T> extends DefaultOutputPort<T> implements ProxyPort<OutputPort<T>>
+  public final class ProxyOutputPort<T> implements ProxyPort<OutputPort<T>>, OutputPort<T>
   {
     OutputPort<T> outputPort;
 
@@ -72,6 +121,46 @@ public interface Module
     public OutputPort<T> get()
     {
       return outputPort;
+    }
+
+    @Override
+    public void setup(PortContext context)
+    {
+      if(outputPort != null)
+      {
+        outputPort.setup(context);
+      }
+    }
+
+    @Override
+    public void teardown()
+    {
+      if(outputPort != null)
+      {
+        outputPort.teardown();
+      }
+    }
+
+    @Override
+    public void setSink(Sink<Object> s)
+    {
+      if(outputPort != null)
+      {
+        outputPort.setSink(s);
+      }
+    }
+
+    @Override
+    public Unifier<T> getUnifier()
+    {
+      if(outputPort != null)
+      {
+        return outputPort.getUnifier();
+      }
+      else
+      {
+        return null;
+      }
     }
   }
 }
