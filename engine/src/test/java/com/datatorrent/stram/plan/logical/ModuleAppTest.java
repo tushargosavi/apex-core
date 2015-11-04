@@ -16,7 +16,7 @@
  * specific language governing permissions and limitations
  * under the License.
  */
-package com.datatorrent.stram.moduleexperiment;
+package com.datatorrent.stram.plan.logical;
 
 import java.util.Random;
 
@@ -32,8 +32,6 @@ import com.datatorrent.api.DefaultOutputPort;
 import com.datatorrent.api.InputOperator;
 import com.datatorrent.api.Module;
 import com.datatorrent.api.Operator;
-import com.datatorrent.api.Operator.ProxyInputPort;
-import com.datatorrent.api.Operator.ProxyOutputPort;
 import com.datatorrent.api.StreamingApplication;
 import com.datatorrent.common.util.BaseOperator;
 import com.datatorrent.stram.plan.logical.LogicalPlan;
@@ -42,7 +40,7 @@ import com.datatorrent.stram.plan.logical.LogicalPlanConfiguration;
 /**
  * Unit tests for testing Dag expansion with modules and proxy port substitution
  */
-public class ModuleTest
+public class ModuleAppTest
 {
 
   /*
@@ -85,7 +83,7 @@ public class ModuleTest
       @Override
       public void process(Integer tuple)
       {
-        LOG.info(tuple.intValue()+" processed");
+        LOG.debug(tuple.intValue()+" processed");
       }
     };
     public transient DefaultOutputPort<Integer> output = new DefaultOutputPort<Integer>();
@@ -101,7 +99,7 @@ public class ModuleTest
       @Override
       public void process(Integer tuple)
       {
-        LOG.info(tuple.intValue()+" processed");
+        LOG.debug(tuple.intValue()+" processed");
       }
     };
   }
@@ -111,8 +109,8 @@ public class ModuleTest
    */
   public static class TestModule implements Module {
 
-    public transient ProxyInputPort<Integer> moduleInput = new Operator.ProxyInputPort<Integer>();
-    public transient ProxyOutputPort<Integer> moduleOutput = new Operator.ProxyOutputPort<Integer>();
+    public transient ProxyInputPort<Integer> moduleInput = new Module.ProxyInputPort<Integer>();
+    public transient ProxyOutputPort<Integer> moduleOutput = new Module.ProxyOutputPort<Integer>();
 
     @Override
     public void populateDAG(DAG dag, Configuration conf)
@@ -158,5 +156,5 @@ public class ModuleTest
     dag.validate();
   }
 
-  private static Logger LOG = LoggerFactory.getLogger(ModuleTest.class);
+  private static Logger LOG = LoggerFactory.getLogger(ModuleAppTest.class);
 }
