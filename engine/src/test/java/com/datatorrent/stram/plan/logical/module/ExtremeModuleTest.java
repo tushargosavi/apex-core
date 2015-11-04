@@ -150,8 +150,8 @@ public class ExtremeModuleTest
       DummyOperator o1 = dag.addOperator("O1", new DummyOperator());
       o1.setOperatorProp(level2ModuleAProp3);
 
-      dag.addStream("M1_M2", m1.mOut, m2.mIn);
-      dag.addStream("M1_O1", m1.mOut, o1.in);
+      dag.addStream("M1_M2", m1.mOut, m2.mIn, o1.in);
+//      dag.addStream("M1_O1", m1.mOut, o1.in);
 
       mIn.set(m1.mIn);
       mOut1.set(m2.mOut);
