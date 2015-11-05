@@ -417,9 +417,9 @@ public class ExtremeModuleTest
   {
     LogicalPlan.OperatorMeta operatorMeta = dag.getOperatorMeta(operatorName);
     if (parentModuleName == null) {
-      Assert.assertNull(operatorMeta.getParentModuleName());
+      Assert.assertNull(operatorMeta.getModuleName());
     } else {
-      Assert.assertTrue(parentModuleName.equals(operatorMeta.getParentModuleName()));
+      Assert.assertTrue(parentModuleName.equals(operatorMeta.getModuleName()));
     }
   }
 

@@ -2508,12 +2508,12 @@ public class StreamingContainerManager implements PlanContext
     if (flatten) {
       for (OperatorMeta operatorMeta : getLogicalPlan().getAllOperators()) {
         if (module.getParentModuleName() == null) {
-          if (operatorMeta.getParentModuleName() == null) {
+          if (operatorMeta.getModuleName() == null) {
             lmi.operators.add(fillLogicalOperatorInfo(operatorMeta));
           }
         } else {
-          if (operatorMeta.getParentModuleName() != null
-              && module.getParentModuleName().equals(operatorMeta.getParentModuleName())) {
+          if (operatorMeta.getModuleName() != null
+              && module.getParentModuleName().equals(operatorMeta.getModuleName())) {
             lmi.operators.add(fillLogicalOperatorInfo(operatorMeta));
           }
         }
@@ -2521,12 +2521,12 @@ public class StreamingContainerManager implements PlanContext
 
       for (StreamMeta streamMeta : getLogicalPlan().getAllStreams()) {
         if (module.getParentModuleName() == null) {
-          if (streamMeta.getParentModuleName() == null) {
+          if (streamMeta.getModuleName() == null) {
             lmi.streams.add(fillLogicalStreamInfo(streamMeta));
           }
         } else {
-          if (streamMeta.getParentModuleName() != null
-              && module.getParentModuleName().equals(streamMeta.getParentModuleName())) {
+          if (streamMeta.getModuleName() != null
+              && module.getParentModuleName().equals(streamMeta.getModuleName())) {
             lmi.streams.add(fillLogicalStreamInfo(streamMeta));
           }
         }

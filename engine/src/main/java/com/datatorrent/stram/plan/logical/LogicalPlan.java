@@ -412,7 +412,7 @@ public class LogicalPlan implements Serializable, DAG
     private String persistOperatorName;
     public Map<InputPortMeta, OperatorMeta> sinkSpecificPersistOperatorMap;
     public Map<InputPortMeta, InputPortMeta> sinkSpecificPersistInputPortMap;
-    private String parentModuleName;
+    private String moduleName;  // Name of the module which has this stream. null if top level stream.
 
     private StreamMeta(String id)
     {
@@ -441,14 +441,14 @@ public class LogicalPlan implements Serializable, DAG
       return this;
     }
 
-    public String getParentModuleName()
+    public String getModuleName()
     {
-      return parentModuleName;
+      return moduleName;
     }
 
-    public void setParentModuleName(String parentModuleName)
+    public void setModuleName(String moduleName)
     {
-      this.parentModuleName = parentModuleName;
+      this.moduleName = moduleName;
     }
 
     public OutputPortMeta getSource()
@@ -751,7 +751,7 @@ public class LogicalPlan implements Serializable, DAG
     private transient Integer lowlink; // for cycle detection
     private transient Operator operator;
     private MetricAggregatorMeta metricAggregatorMeta;
-    private String parentModuleName;
+    private String moduleName;  // Name of the module which has this operator. null if this is a top level operator.
 
     /*
      * Used for  OIO validation,
@@ -838,14 +838,14 @@ public class LogicalPlan implements Serializable, DAG
       return metricAggregatorMeta;
     }
 
-    public String getParentModuleName()
+    public String getModuleName()
     {
-      return parentModuleName;
+      return moduleName;
     }
 
-    public void setParentModuleName(String parentModuleName)
+    public void setModuleName(String moduleName)
     {
-      this.parentModuleName = parentModuleName;
+      this.moduleName = moduleName;
     }
 
     protected void populateAggregatorMeta()
@@ -1120,7 +1120,7 @@ public class LogicalPlan implements Serializable, DAG
     private transient Integer nindex; // for cycle detection
     private transient Integer lowlink; // for cycle detection
     private transient Module module;
-    private String parentModuleName;
+    private String parentModuleName;  // Name of the module which has this module. null if this is a top level Module.
     private LogicalPlan dag = null;
 
     public ModuleMeta(String name, Module module)
@@ -1361,14 +1361,14 @@ public class LogicalPlan implements Serializable, DAG
     }
   }
 
-  public void addDAGToCurrentDAG(LogicalPlan subDag, String subDAGName)
+  private void addDAGToCurrentDAG(LogicalPlan subDag, String subDAGName)
   {
     String name;
     for (OperatorMeta operatorMeta : subDag.getAllOperators()) {
       name = subDAGName + "_" + operatorMeta.getName();
       this.addOperator(name, operatorMeta.getOperator());
       OperatorMeta operatorMetaNew = this.getOperatorMeta(name);
-      operatorMetaNew.setParentModuleName(operatorMeta.getParentModuleName() == null ? subDAGName : subDAGName + "_" + operatorMeta.getParentModuleName());
+      operatorMetaNew.setModuleName(operatorMeta.getModuleName() == null ? subDAGName : subDAGName + "_" + operatorMeta.getModuleName());
     }
 
     for (StreamMeta streamMeta : subDag.getAllStreams()) {
@@ -1381,7 +1381,7 @@ public class LogicalPlan implements Serializable, DAG
 
       name = subDAGName + "_" + streamMeta.getName();
       StreamMeta streamMetaNew = this.addStream(name, sourceMeta.getPortObject(), inputPorts);
-      streamMetaNew.setParentModuleName(streamMeta.getParentModuleName() == null ? subDAGName : subDAGName + "_" + streamMeta.getParentModuleName());
+      streamMetaNew.setModuleName(streamMeta.getModuleName() == null ? subDAGName : subDAGName + "_" + streamMeta.getModuleName());
     }
   }
 

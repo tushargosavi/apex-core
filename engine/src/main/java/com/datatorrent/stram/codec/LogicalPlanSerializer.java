@@ -65,7 +65,6 @@ import com.datatorrent.stram.plan.logical.LogicalPlan.StreamMeta;
 import com.datatorrent.stram.plan.logical.LogicalPlanConfiguration;
 import com.datatorrent.stram.plan.logical.Operators;
 import com.datatorrent.stram.plan.logical.Operators.PortContextPair;
-import com.datatorrent.stram.webapp.LogicalModuleInfo;
 
 /**
  * <p>LogicalPlanSerializer class.</p>
@@ -243,14 +242,14 @@ public class LogicalPlanSerializer extends JsonSerializer<LogicalPlan>
 
    Collection<OperatorMeta> allOperators = dag.getAllOperators();
    for (OperatorMeta operatorMeta : allOperators) {
-     if(operatorMeta.getParentModuleName() == null){
+     if(operatorMeta.getModuleName() == null){
      operatorArray.add(getLogicalOperatorDetails(operatorMeta));
      }
    }
    Collection<StreamMeta> allStreams = dag.getAllStreams();
    
    for (StreamMeta streamMeta : allStreams) {
-     if(streamMeta.getParentModuleName() == null){
+     if(streamMeta.getModuleName() == null){
      streamsArray.add(getLogicalStreamDetails(streamMeta));
      }
    }
@@ -403,24 +402,24 @@ private static Object getLogicalOperatorDetails(OperatorMeta operatorMeta){
     if( flatten ){
       for (OperatorMeta operatorMeta : dag.getAllOperators()) {
         if (moduleMeta.getParentModuleName() == null) {
-          if (operatorMeta.getParentModuleName() == null) {
+          if (operatorMeta.getModuleName() == null) {
             operatorArray.add(getLogicalOperatorDetails(operatorMeta));
           }
         } else {
-          if (operatorMeta.getParentModuleName() != null
-              && moduleMeta.getParentModuleName().equals(operatorMeta.getParentModuleName())) {
+          if (operatorMeta.getModuleName() != null
+              && moduleMeta.getParentModuleName().equals(operatorMeta.getModuleName())) {
             operatorArray.add(getLogicalOperatorDetails(operatorMeta));
           }
         }
       }
       for (StreamMeta streamMeta : dag.getAllStreams()) {
         if (moduleMeta.getParentModuleName() == null) {
-          if (streamMeta.getParentModuleName() == null) {
+          if (streamMeta.getModuleName() == null) {
             streamArray.add(getLogicalStreamDetails(streamMeta));
           }
         } else {
-          if (streamMeta.getParentModuleName() != null
-              && moduleMeta.getParentModuleName().equals(streamMeta.getParentModuleName())) {
+          if (streamMeta.getModuleName() != null
+              && moduleMeta.getParentModuleName().equals(streamMeta.getModuleName())) {
             streamArray.add(getLogicalStreamDetails(streamMeta));
           }
         }
