@@ -18,7 +18,6 @@
  */
 package com.datatorrent.stram.plan.logical;
 
-
 import java.io.FileInputStream;
 import java.io.IOException;
 import java.io.InputStream;
@@ -31,7 +30,6 @@ import java.lang.reflect.Type;
 
 import java.util.*;
 import java.util.Map.Entry;
-
 
 import javax.validation.ValidationException;
 
@@ -47,6 +45,7 @@ import org.codehaus.jettison.json.JSONException;
 import org.codehaus.jettison.json.JSONObject;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
+
 import org.apache.commons.beanutils.BeanMap;
 import org.apache.commons.beanutils.BeanUtils;
 import org.apache.commons.collections.CollectionUtils;
@@ -122,8 +121,8 @@ public class LogicalPlanConfiguration {
    * This represents an element that can be referenced in a DT property.
    */
   protected enum StramElement {
-    APPLICATION("application"), GATEWAY("gateway"), TEMPLATE("template"), OPERATOR("operator"),STREAM("stream"), PORT("port"), INPUT_PORT("inputport"),OUTPUT_PORT("outputport"),
-    ATTR("attr"), PROP("prop"),CLASS("class"),PATH("path"),UNIFIER("unifier"), MODULE("module");
+    APPLICATION("application"), GATEWAY("gateway"), TEMPLATE("template"), OPERATOR("operator"), STREAM("stream"), PORT("port"), INPUT_PORT("inputport"), OUTPUT_PORT("outputport"),
+    ATTR("attr"), PROP("prop"), CLASS("class"), PATH("path"), UNIFIER("unifier"), MODULE("module");
     private final String value;
 
     /**
@@ -1132,7 +1131,7 @@ public class LogicalPlanConfiguration {
     private final Map<String, String> appAliases = Maps.newHashMap();
 
     private static final StramElement[] CHILD_ELEMENTS = new StramElement[]{StramElement.APPLICATION, StramElement.GATEWAY, StramElement.TEMPLATE, StramElement.OPERATOR,
-        StramElement.PORT, StramElement.INPUT_PORT, StramElement.OUTPUT_PORT, StramElement.STREAM, StramElement.TEMPLATE, StramElement.ATTR, StramElement.UNIFIER, StramElement.MODULE};
+      StramElement.PORT, StramElement.INPUT_PORT, StramElement.OUTPUT_PORT, StramElement.STREAM, StramElement.TEMPLATE, StramElement.ATTR, StramElement.UNIFIER, StramElement.MODULE};
 
     StramConf() {
     }
@@ -2134,15 +2133,16 @@ public class LogicalPlanConfiguration {
   /**
    * Populate the logical plan from the streaming application definition and configuration.
    * Configuration is resolved based on application alias, if any.
-   * @param app The {@lin StreamingApplication} to be run.
-   * @param dag This will hold the {@link LogicalPlan} representation of the given {@link StreamingApplication}.
+   *
+   * @param app  The {@lin StreamingApplication} to be run.
+   * @param dag  This will hold the {@link LogicalPlan} representation of the given {@link StreamingApplication}.
    * @param name The path of the application class in the jar.
    */
   public void prepareDAG(LogicalPlan dag, StreamingApplication app, String name)
   {
     // EVENTUALLY to be replaced by variable enabled configuration in the demo where the attribute below is used
     String connectAddress = conf.get(StreamingApplication.DT_PREFIX + Context.DAGContext.GATEWAY_CONNECT_ADDRESS.getName());
-    dag.setAttribute(Context.DAGContext.GATEWAY_CONNECT_ADDRESS, connectAddress == null ? conf.get(GATEWAY_LISTEN_ADDRESS): connectAddress);
+    dag.setAttribute(Context.DAGContext.GATEWAY_CONNECT_ADDRESS, connectAddress == null ? conf.get(GATEWAY_LISTEN_ADDRESS) : connectAddress);
     if (app != null) {
       app.populateDAG(dag, conf);
     }
@@ -2157,7 +2157,7 @@ public class LogicalPlanConfiguration {
 
     // Expand the modules within the dag recursively
     setModuleProperties(dag, appName);
-    flattenModule(dag, conf);
+    flattenDAG(dag, conf);
 
     // inject external operator configuration
     setOperatorConfiguration(dag, appConfs, appName);
@@ -2165,7 +2165,7 @@ public class LogicalPlanConfiguration {
     setStreamConfiguration(dag, appConfs, appName);
   }
 
-  private void flattenModule(LogicalPlan dag, Configuration conf)
+  private void flattenDAG(LogicalPlan dag, Configuration conf)
   {
     for (ModuleMeta moduleMeta : dag.getAllModules()) {
       moduleMeta.setParentModuleName(null);
@@ -2350,7 +2350,7 @@ public class LogicalPlanConfiguration {
   {
     return new BeanMap(operator);
   }
-  
+
   public static BeanMap getModuleProperties(Module module)
   {
     return new BeanMap(module);
@@ -2377,7 +2377,7 @@ public class LogicalPlanConfiguration {
    * Set any properties from configuration on the modules in the DAG. This
    * method may throw unchecked exception if the configuration contains
    * properties that are invalid for a module.
-   * 
+   *
    * @param dag
    * @param applicationName
    */

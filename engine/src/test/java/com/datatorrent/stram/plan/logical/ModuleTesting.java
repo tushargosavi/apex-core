@@ -7,7 +7,7 @@
  * "License"); you may not use this file except in compliance
  * with the License.  You may obtain a copy of the License at
  *
- *   http://www.apache.org/licenses/LICENSE-2.0
+ * http://www.apache.org/licenses/LICENSE-2.0
  *
  * Unless required by applicable law or agreed to in writing,
  * software distributed under the License is distributed on an
@@ -24,8 +24,11 @@ import com.datatorrent.api.StreamingApplication;
 import com.datatorrent.stram.plan.logical.TestModules.RandGen;
 import com.datatorrent.stram.plan.logical.TestModules.RandGenModule;
 import com.datatorrent.stram.plan.logical.TestModules.WrapperModule;
+
 import com.google.common.collect.Maps;
+
 import org.apache.hadoop.conf.Configuration;
+
 import org.junit.Assert;
 import org.junit.Test;
 
@@ -34,6 +37,7 @@ import javax.validation.constraints.AssertTrue;
 import javax.validation.constraints.Min;
 import javax.validation.constraints.NotNull;
 import javax.validation.constraints.Pattern;
+
 import java.util.ArrayList;
 import java.util.List;
 import java.util.Map;
@@ -41,8 +45,8 @@ import java.util.Map;
 public class ModuleTesting
 {
   @Test
-  public void testModuleProperties() {
-
+  public void testModuleProperties()
+  {
     Configuration conf = new Configuration(false);
     conf.set(StreamingApplication.DT_PREFIX + "module.o1.prop.myStringProperty", "myStringPropertyValue");
     conf.set(StreamingApplication.DT_PREFIX + "module.o2.prop.stringArrayField", "a,b,c");
@@ -60,7 +64,7 @@ public class ModuleTesting
     pb.setModuleProperties(dag, "testSetOperatorProperties");
     System.out.println("setted module properties");
     Assert.assertEquals("o1.myStringProperty", "myStringPropertyValue", o1.getMyStringProperty());
-    Assert.assertArrayEquals("o2.stringArrayField", new String[] {"a", "b", "c"}, o2.getStringArrayField());
+    Assert.assertArrayEquals("o2.stringArrayField", new String[]{"a", "b", "c"}, o2.getStringArrayField());
 
     Assert.assertEquals("o2.mapProperty.key1", "key1Val", o2.getMapProperty().get("key1"));
     Assert.assertEquals("o2.mapProperty(key1.dot)", "key1dotVal", o2.getMapProperty().get("key1.dot"));
@@ -71,48 +75,56 @@ public class ModuleTesting
   public static class ValidationTestModule implements Module
   {
     @NotNull
-    @Pattern(regexp=".*malhar.*", message="Value has to contain 'malhar'!")
+    @Pattern(regexp = ".*malhar.*", message = "Value has to contain 'malhar'!")
     private String stringField1;
 
     @Min(2)
     private int intField1;
 
-    @AssertTrue(message="stringField1 should end with intField1")
-    private boolean isValidConfiguration() {
+    @AssertTrue(message = "stringField1 should end with intField1")
+    private boolean isValidConfiguration()
+    {
       return stringField1.endsWith(String.valueOf(intField1));
     }
 
     private String getterProperty2 = "";
 
     @NotNull
-    public String getProperty2() {
+    public String getProperty2()
+    {
       return getterProperty2;
     }
 
-    public void setProperty2(String s) {
+    public void setProperty2(String s)
+    {
       // annotations need to be on the getter
       getterProperty2 = s;
     }
 
     private String[] stringArrayField;
 
-    public String[] getStringArrayField() {
+    public String[] getStringArrayField()
+    {
       return stringArrayField;
     }
 
-    public void setStringArrayField(String[] stringArrayField) {
+    public void setStringArrayField(String[] stringArrayField)
+    {
       this.stringArrayField = stringArrayField;
     }
 
-    public class Nested {
+    public class Nested
+    {
       @NotNull
       private String property = "";
 
-      public String getProperty() {
+      public String getProperty()
+      {
         return property;
       }
 
-      public void setProperty(String property) {
+      public void setProperty(String property)
+      {
         this.property = property;
       }
 
@@ -123,11 +135,13 @@ public class ModuleTesting
 
     private String stringProperty2;
 
-    public String getStringProperty2() {
+    public String getStringProperty2()
+    {
       return stringProperty2;
     }
 
-    public void setStringProperty2(String stringProperty2) {
+    public void setStringProperty2(String stringProperty2)
+    {
       this.stringProperty2 = stringProperty2;
     }
 
@@ -143,21 +157,25 @@ public class ModuleTesting
       this.mapProperty = mapProperty;
     }
 
-    @Override public void populateDAG(DAG dag, Configuration conf)
+    @Override
+    public void populateDAG(DAG dag, Configuration conf)
     {
 
     }
   }
 
-  static class AppWithModule implements StreamingApplication {
-    @Override public void populateDAG(DAG dag, Configuration conf)
+  static class AppWithModule implements StreamingApplication
+  {
+    @Override
+    public void populateDAG(DAG dag, Configuration conf)
     {
       dag.addModule("m1", new TestModules.PiModule());
     }
   }
 
   @Test
-  public void moduleAppTest() {
+  public void moduleAppTest()
+  {
     Configuration conf = new Configuration(false);
     conf.set(StreamingApplication.DT_PREFIX + "module.m1.prop.size", "1000");
     LogicalPlanConfiguration pb = new LogicalPlanConfiguration(conf);
@@ -167,8 +185,10 @@ public class ModuleTesting
     System.out.println("This is test");
   }
 
-  static class AppModuleExpansion implements StreamingApplication {
-    @Override public void populateDAG(DAG dag, Configuration conf)
+  static class AppModuleExpansion implements StreamingApplication
+  {
+    @Override
+    public void populateDAG(DAG dag, Configuration conf)
     {
       RandGenModule randGenModule = dag.addModule("RandGenModule", RandGenModule.class);
       WrapperModule wrapperModule = dag.addModule("WrapperModule", WrapperModule.class);
@@ -177,21 +197,14 @@ public class ModuleTesting
   }
 
   @Test
-  public void dagExpansionTest() {
+  public void dagExpansionTest()
+  {
     Configuration conf = new Configuration(false);
     conf.set(StreamingApplication.DT_PREFIX + "module.WrapperModule.prop.size", "1000");
 
     LogicalPlanConfiguration lpc = new LogicalPlanConfiguration(conf);
     LogicalPlan dag = new LogicalPlan();
     lpc.prepareDAG(dag, new AppModuleExpansion(), "AppModuleExpansion");
-
-    List<String> moduleNames = new ArrayList<>();
-    for (LogicalPlan.ModuleMeta moduleMeta : dag.getAllModules()) {
-      moduleNames.add(moduleMeta.getName());
-    }
-    Assert.assertTrue(moduleNames.contains("RandGenModule"));
-    Assert.assertTrue(moduleNames.contains("WrapperModule"));
-    Assert.assertTrue(moduleNames.contains("WrapperModule_PiModule"));
 
     List<String> operatorNames = new ArrayList<>();
     for (LogicalPlan.OperatorMeta operatorMeta : dag.getAllOperators()) {

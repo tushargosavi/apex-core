@@ -40,7 +40,6 @@ import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
 import com.google.common.collect.ArrayListMultimap;
-import com.google.common.collect.Multimaps;
 import com.google.common.collect.Sets;
 
 import com.datatorrent.api.*;
@@ -48,7 +47,6 @@ import com.datatorrent.api.Attribute.AttributeMap;
 import com.datatorrent.api.Attribute.AttributeMap.DefaultAttributeMap;
 import com.datatorrent.api.Module.ProxyInputPort;
 import com.datatorrent.api.Module.ProxyOutputPort;
-import com.datatorrent.api.Module.ProxyPort;
 import com.datatorrent.api.Operator.InputPort;
 import com.datatorrent.api.Operator.OutputPort;
 import com.datatorrent.api.Operator.Unifier;
@@ -1081,16 +1079,6 @@ public class LogicalPlan implements Serializable, DAG
     private static final long serialVersionUID = 201401091635L;
   }
 
-//  public String getNameWithPrefix(String name)
-//  {
-//    String prefix = "";
-//    for (ModuleMeta m : moduleStack) {
-//      prefix += m.name + "_";
-//    }
-//
-//    return prefix + name;
-//  }
-
   @Override
   public <T extends Operator> T addOperator(String name, Class<T> clazz)
   {
@@ -1233,6 +1221,11 @@ public class LogicalPlan implements Serializable, DAG
       return lowlink;
     }
 
+    public LogicalPlan getDag()
+    {
+      return dag;
+    }
+
     private void writeObject(ObjectOutputStream out) throws IOException
     {
       //getValue2(OperatorContext.STORAGE_AGENT).save(operator, id, Checkpoint.STATELESS_CHECKPOINT_WINDOW_ID);
@@ -1256,30 +1249,7 @@ public class LogicalPlan implements Serializable, DAG
         subModuleMeta.flattenModule(dag, conf);
       }
       dag.applyStreamLinks();
-      mergeWithParentDAG(parentDAG);
-    }
-
-    private void mergeWithParentDAG(LogicalPlan parentDAG)
-    {
-      for (OperatorMeta operatorMeta : dag.getAllOperators()) {
-        parentDAG.addOperator(getNameWithPrefix(operatorMeta.getName()), operatorMeta.getOperator());
-      }
-
-      for (StreamMeta streamMeta : dag.getAllStreams()) {
-        OutputPortMeta sourceMeta = streamMeta.getSource();
-        List<InputPort> ports = new LinkedList<>();
-        for (InputPortMeta inputPortMeta : streamMeta.getSinks()) {
-          ports.add(inputPortMeta.getPortObject());
-        }
-        InputPort[] inputPorts = ports.toArray(new InputPort[]{});
-
-        parentDAG.addStream(getNameWithPrefix(streamMeta.getName()), sourceMeta.getPortObject(), inputPorts);
-      }
-    }
-
-    private String getNameWithPrefix(String name)
-    {
-      return this.name + "_" + name;
+      parentDAG.addDAGToCurrentDAG(dag, this.name);
     }
   }
 
@@ -1351,17 +1321,12 @@ public class LogicalPlan implements Serializable, DAG
     id = s.id;
     ArrayListMultimap<Operator.OutputPort<?>, Operator.InputPort<?>> streamMap = ArrayListMultimap.create();
 
-    for(Operator.InputPort<?> sink : sinks)
-    {
-      if(source instanceof ProxyOutputPort || sink instanceof ProxyInputPort)
-      {
+    for (Operator.InputPort<?> sink : sinks) {
+      if (source instanceof ProxyOutputPort || sink instanceof ProxyInputPort) {
         streamMap.put(source, sink);
         streamLinks.put(id, streamMap);
-      }
-      else
-      {
-        if(s.getSource() == null)
-        {
+      } else {
+        if (s.getSource() == null) {
           s.setSource(source);
         }
         s.addSink(sink);
@@ -1378,23 +1343,45 @@ public class LogicalPlan implements Serializable, DAG
   {
     for (String id : streamLinks.keySet()) {
       StreamMeta s = getStream(id);
-      for(Map.Entry<Operator.OutputPort<?>, Operator.InputPort<?>> pair : streamLinks.get(id).entries())
-      {
-        if(s.getSource() == null)
-        {
+      for (Map.Entry<Operator.OutputPort<?>, Operator.InputPort<?>> pair : streamLinks.get(id).entries()) {
+        if (s.getSource() == null) {
           Operator.OutputPort<?> outputPort = pair.getKey();
-          while(outputPort instanceof ProxyOutputPort){
+          while (outputPort instanceof ProxyOutputPort) {
             outputPort = ((ProxyOutputPort)outputPort).get();
           }
           s.setSource(outputPort);
         }
 
         Operator.InputPort<?> inputPort = pair.getValue();
-        while(inputPort instanceof ProxyInputPort){
+        while (inputPort instanceof ProxyInputPort) {
           inputPort = ((ProxyInputPort)inputPort).get();
         }
         s.addSink(inputPort);
       }
+    }
+  }
+
+  public void addDAGToCurrentDAG(LogicalPlan subDag, String subDAGName)
+  {
+    String name;
+    for (OperatorMeta operatorMeta : subDag.getAllOperators()) {
+      name = subDAGName + "_" + operatorMeta.getName();
+      this.addOperator(name, operatorMeta.getOperator());
+      OperatorMeta operatorMetaNew = this.getOperatorMeta(name);
+      operatorMetaNew.setParentModuleName(operatorMeta.getParentModuleName() == null ? subDAGName : subDAGName + "_" + operatorMeta.getParentModuleName());
+    }
+
+    for (StreamMeta streamMeta : subDag.getAllStreams()) {
+      OutputPortMeta sourceMeta = streamMeta.getSource();
+      List<InputPort> ports = new LinkedList<>();
+      for (InputPortMeta inputPortMeta : streamMeta.getSinks()) {
+        ports.add(inputPortMeta.getPortObject());
+      }
+      InputPort[] inputPorts = ports.toArray(new InputPort[]{});
+
+      name = subDAGName + "_" + streamMeta.getName();
+      StreamMeta streamMetaNew = this.addStream(name, sourceMeta.getPortObject(), inputPorts);
+      streamMetaNew.setParentModuleName(streamMeta.getParentModuleName() == null ? subDAGName : subDAGName + "_" + streamMeta.getParentModuleName());
     }
   }
 

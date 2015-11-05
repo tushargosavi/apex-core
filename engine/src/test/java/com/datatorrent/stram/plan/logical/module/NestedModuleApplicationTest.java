@@ -7,7 +7,7 @@
  * "License"); you may not use this file except in compliance
  * with the License.  You may obtain a copy of the License at
  *
- *   http://www.apache.org/licenses/LICENSE-2.0
+ * http://www.apache.org/licenses/LICENSE-2.0
  *
  * Unless required by applicable law or agreed to in writing,
  * software distributed under the License is distributed on an
@@ -32,10 +32,12 @@ import com.datatorrent.api.LocalMode;
 /**
  * Test the DAG declaration in local mode.
  */
-public class NestedModuleApplicationTest {
+public class NestedModuleApplicationTest
+{
 
   @Test
-  public void testApplication() throws IOException, Exception {
+  public void testApplication() throws IOException, Exception
+  {
     try {
       LocalMode lma = LocalMode.newInstance();
       Configuration conf = new Configuration(false);

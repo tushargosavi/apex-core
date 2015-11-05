@@ -7,7 +7,7 @@
  * "License"); you may not use this file except in compliance
  * with the License.  You may obtain a copy of the License at
  *
- *   http://www.apache.org/licenses/LICENSE-2.0
+ * http://www.apache.org/licenses/LICENSE-2.0
  *
  * Unless required by applicable law or agreed to in writing,
  * software distributed under the License is distributed on an
@@ -27,17 +27,15 @@ import com.datatorrent.common.util.BaseOperator;
  */
 public class OddEvenOperator extends BaseOperator
 {
-  public transient DefaultInputPort<Integer> input = new DefaultInputPort<Integer>() {
-    
+  public transient DefaultInputPort<Integer> input = new DefaultInputPort<Integer>()
+  {
+
     @Override
     public void process(Integer tuple)
     {
-      if(tuple.intValue() % 2 == 0)
-      {
+      if (tuple.intValue() % 2 == 0) {
         even.emit(tuple);
-      }
-      else
-      {
+      } else {
         odd.emit(tuple);
       }
     }
