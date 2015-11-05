@@ -2331,7 +2331,6 @@ public class DTCli
 
       printJson(json);
     }
-
   }
 
   private class ShowPhysicalPlanCommand implements Command

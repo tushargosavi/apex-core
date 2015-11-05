@@ -1748,8 +1748,8 @@ public class LogicalPlanConfiguration {
         return;
       }
       if ((element == StramElement.APPLICATION) || (element == StramElement.OPERATOR) || (element == StramElement.STREAM)
-              || (element == StramElement.PORT) || (element == StramElement.INPUT_PORT) || (element == StramElement.OUTPUT_PORT)
-              || (element == StramElement.TEMPLATE) || (element == StramElement.MODULE)) {
+        || (element == StramElement.PORT) || (element == StramElement.INPUT_PORT) || (element == StramElement.OUTPUT_PORT)
+        || (element == StramElement.TEMPLATE) || (element == StramElement.MODULE)) {
         parseAppElement(index, keys, element, conf, propertyName, propertyValue);
       } else if (element == StramElement.GATEWAY) {
         parseGatewayElement(element, conf, keys, index, propertyName, propertyValue);
@@ -2318,6 +2318,7 @@ public class LogicalPlanConfiguration {
 
   /**
    * Generic helper function to inject properties on the object.
+   *
    * @param obj
    * @param properties
    * @param <T>

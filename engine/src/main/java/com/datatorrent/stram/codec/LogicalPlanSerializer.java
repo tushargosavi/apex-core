@@ -220,81 +220,83 @@ public class LogicalPlanSerializer extends JsonSerializer<LogicalPlan>
     }
     return result;
   }
-  
+
   /**
-  *
-  * @param dag
-  * @return
-  */
- public static Map<String, Object> convertToMapV2(LogicalPlan dag,boolean flatten)
- {
-   HashMap<String, Object> result = new HashMap<String, Object>();
-   ArrayList<Object> operatorArray = new ArrayList< Object>();
-   ArrayList<Object> streamsArray = new ArrayList<Object>();
-   result.put("operators", operatorArray);
-   result.put("streams", streamsArray);
-  
-   Map<String, Object> dagAttrs = new HashMap<String, Object>();
-   for (Map.Entry<Attribute<Object>, Object> e : Attribute.AttributeMap.AttributeInitializer.getAllAttributes(dag, Context.DAGContext.class).entrySet()){
-     dagAttrs.put(e.getKey().getSimpleName(), e.getValue());
-   }
-   result.put("attributes", dagAttrs);
-
-   Collection<OperatorMeta> allOperators = dag.getAllOperators();
-   for (OperatorMeta operatorMeta : allOperators) {
-     if(operatorMeta.getModuleName() == null){
-     operatorArray.add(getLogicalOperatorDetails(operatorMeta));
-     }
-   }
-   Collection<StreamMeta> allStreams = dag.getAllStreams();
-   
-   for (StreamMeta streamMeta : allStreams) {
-     if(streamMeta.getModuleName() == null){
-     streamsArray.add(getLogicalStreamDetails(streamMeta));
-     }
-   }
-   result.put("modules", getLogicalModulesInfo(dag,flatten));
-   
-   return result;
- }
- private static ArrayList<Object> getLogicalModulesInfo(LogicalPlan dag,boolean flatten)
+   * @param flatten
+   * @param dag
+   * @return
+   */
+  public static Map<String, Object> convertToMapV2(LogicalPlan dag, boolean flatten)
   {
-   ArrayList<Object> modulesArray = new ArrayList<Object>();
-   Collection<ModuleMeta> allModules = dag.getAllModules();
-   for (ModuleMeta moduleMeta : allModules) {
-     if (moduleMeta.getParentModuleName() == null) {
-       if (!flatten) {
-         modulesArray.add(fillLogicalModuleDetails(moduleMeta, dag,flatten));
-       } else {
-         modulesArray.add(getLogicalModuleInfo(dag,moduleMeta.getName(), flatten));
-       }
-     }
-   }
-   return modulesArray;
-  }
+    HashMap<String, Object> result = new HashMap<String, Object>();
+    ArrayList<Object> operatorArray = new ArrayList<Object>();
+    ArrayList<Object> streamsArray = new ArrayList<Object>();
+    result.put("operators", operatorArray);
+    result.put("streams", streamsArray);
 
-private static Object getLogicalModuleInfo(LogicalPlan dag,String moduleName, boolean flatten)
-{
- ModuleMeta moduleMeta = dag.getModuleMeta(moduleName);
-  if (moduleMeta == null) {
-    return null;
-  }
-  Map<String, Object> obj = fillLogicalModuleDetails(moduleMeta,dag,flatten);
-  List<Object> modList = new ArrayList<Object>();
-  obj.put("modules", modList);
-  for (ModuleMeta meta : dag.getAllModules()) {
-    if (meta.getParentModuleName()!=null && meta.getParentModuleName().equals(moduleName)) {
-      if( !flatten ){
-        modList.add(fillLogicalModuleDetails(moduleMeta, dag,flatten));
-      }else{
-        modList.add(getLogicalModuleInfo(dag,fillLogicalModuleDetails(meta,dag,flatten).get("name").toString(),flatten));
+    Map<String, Object> dagAttrs = new HashMap<String, Object>();
+    for (Map.Entry<Attribute<Object>, Object> e : Attribute.AttributeMap.AttributeInitializer.getAllAttributes(dag, Context.DAGContext.class).entrySet()) {
+      dagAttrs.put(e.getKey().getSimpleName(), e.getValue());
+    }
+    result.put("attributes", dagAttrs);
+
+    Collection<OperatorMeta> allOperators = dag.getAllOperators();
+    for (OperatorMeta operatorMeta : allOperators) {
+      if (operatorMeta.getModuleName() == null) {
+        operatorArray.add(getLogicalOperatorDetails(operatorMeta));
       }
     }
-  }
-  return obj;
-}
+    Collection<StreamMeta> allStreams = dag.getAllStreams();
 
-private static Object getLogicalOperatorDetails(OperatorMeta operatorMeta){
+    for (StreamMeta streamMeta : allStreams) {
+      if (streamMeta.getModuleName() == null) {
+        streamsArray.add(getLogicalStreamDetails(streamMeta));
+      }
+    }
+    result.put("modules", getLogicalModulesInfo(dag, flatten));
+
+    return result;
+  }
+
+  private static ArrayList<Object> getLogicalModulesInfo(LogicalPlan dag, boolean flatten)
+  {
+    ArrayList<Object> modulesArray = new ArrayList<Object>();
+    Collection<ModuleMeta> allModules = dag.getAllModules();
+    for (ModuleMeta moduleMeta : allModules) {
+      if (moduleMeta.getParentModuleName() == null) {
+        if (!flatten) {
+          modulesArray.add(fillLogicalModuleDetails(moduleMeta, dag, flatten));
+        } else {
+          modulesArray.add(getLogicalModuleInfo(dag, moduleMeta.getName(), flatten));
+        }
+      }
+    }
+    return modulesArray;
+  }
+
+  private static Object getLogicalModuleInfo(LogicalPlan dag, String moduleName, boolean flatten)
+  {
+    ModuleMeta moduleMeta = dag.getModuleMeta(moduleName);
+    if (moduleMeta == null) {
+      return null;
+    }
+    Map<String, Object> obj = fillLogicalModuleDetails(moduleMeta, dag, flatten);
+    List<Object> modList = new ArrayList<Object>();
+    obj.put("modules", modList);
+    for (ModuleMeta meta : dag.getAllModules()) {
+      if (meta.getParentModuleName() != null && meta.getParentModuleName().equals(moduleName)) {
+        if (!flatten) {
+          modList.add(fillLogicalModuleDetails(moduleMeta, dag, flatten));
+        } else {
+          modList.add(getLogicalModuleInfo(dag, fillLogicalModuleDetails(meta, dag, flatten).get("name").toString(), flatten));
+        }
+      }
+    }
+    return obj;
+  }
+
+  private static Object getLogicalOperatorDetails(OperatorMeta operatorMeta)
+  {
 
     HashMap<String, Object> operatorDetailMap = new HashMap<String, Object>();
     ArrayList<Map<String, Object>> portList = new ArrayList<Map<String, Object>>();
@@ -306,7 +308,7 @@ private static Object getLogicalOperatorDetails(OperatorMeta operatorMeta){
     operatorDetailMap.put("class", operatorMeta.getOperator().getClass().getName());
     operatorDetailMap.put("attributes", attributeMap);
     Map<Attribute<Object>, Object> rawAttributes = Attribute.AttributeMap.AttributeInitializer.getAllAttributes(
-        operatorMeta, Context.OperatorContext.class);
+      operatorMeta, Context.OperatorContext.class);
     for (Map.Entry<Attribute<Object>, Object> entry : rawAttributes.entrySet()) {
       attributeMap.put(entry.getKey().getSimpleName(), entry.getValue());
     }
@@ -321,14 +323,13 @@ private static Object getLogicalOperatorDetails(OperatorMeta operatorMeta){
     typer.init(JsonTypeInfo.Id.CLASS, null);
     typer = typer.inclusion(JsonTypeInfo.As.PROPERTY);
     propertyObjectMapper.setDefaultTyping(typer);
-    
+
     try {
-       str = new ObjectMapperString(propertyObjectMapper.writeValueAsString(operatorMeta.getOperator()));
-     }
-     catch (Throwable ex) {
-       LOG.error("Got exception when trying to get properties for operator {}", operatorMeta.getName(), ex);
-       str = null;
-     }
+      str = new ObjectMapperString(propertyObjectMapper.writeValueAsString(operatorMeta.getOperator()));
+    } catch (Throwable ex) {
+      LOG.error("Got exception when trying to get properties for operator {}", operatorMeta.getName(), ex);
+      str = null;
+    }
     operatorDetailMap.put("properties", str);
 
     Operators.PortMappingDescriptor pmd = new Operators.PortMappingDescriptor();
@@ -363,8 +364,9 @@ private static Object getLogicalOperatorDetails(OperatorMeta operatorMeta){
     }
     return operatorDetailMap;
   }
-  
- private static Object getLogicalStreamDetails(StreamMeta streamMeta){
+
+  private static Object getLogicalStreamDetails(StreamMeta streamMeta)
+  {
 
     HashMap<String, Object> streamDetailMap = new HashMap<String, Object>();
     String streamName = streamMeta.getName();
@@ -389,8 +391,8 @@ private static Object getLogicalOperatorDetails(OperatorMeta operatorMeta){
     }
     return streamDetailMap;
   }
-  
-  private static Map<String, Object> fillLogicalModuleDetails(ModuleMeta moduleMeta, LogicalPlan dag,boolean flatten)
+
+  private static Map<String, Object> fillLogicalModuleDetails(ModuleMeta moduleMeta, LogicalPlan dag, boolean flatten)
   {
     Map<String, Object> moduleDetailMap = new HashMap<String, Object>();
     ArrayList<Object> operatorArray = new ArrayList<Object>();
@@ -399,7 +401,7 @@ private static Object getLogicalOperatorDetails(OperatorMeta operatorMeta){
     moduleDetailMap.put("className", moduleMeta.getModule().getClass().getName());
     moduleDetailMap.put("operators", operatorArray);
     moduleDetailMap.put("streams", streamArray);
-    if( flatten ){
+    if (flatten) {
       for (OperatorMeta operatorMeta : dag.getAllOperators()) {
         if (moduleMeta.getParentModuleName() == null) {
           if (operatorMeta.getModuleName() == null) {
@@ -407,7 +409,7 @@ private static Object getLogicalOperatorDetails(OperatorMeta operatorMeta){
           }
         } else {
           if (operatorMeta.getModuleName() != null
-              && moduleMeta.getParentModuleName().equals(operatorMeta.getModuleName())) {
+            && moduleMeta.getParentModuleName().equals(operatorMeta.getModuleName())) {
             operatorArray.add(getLogicalOperatorDetails(operatorMeta));
           }
         }
@@ -419,7 +421,7 @@ private static Object getLogicalOperatorDetails(OperatorMeta operatorMeta){
           }
         } else {
           if (streamMeta.getModuleName() != null
-              && moduleMeta.getParentModuleName().equals(streamMeta.getModuleName())) {
+            && moduleMeta.getParentModuleName().equals(streamMeta.getModuleName())) {
             streamArray.add(getLogicalStreamDetails(streamMeta));
           }
         }

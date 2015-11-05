@@ -7,7 +7,7 @@
  * "License"); you may not use this file except in compliance
  * with the License.  You may obtain a copy of the License at
  *
- *   http://www.apache.org/licenses/LICENSE-2.0
+ * http://www.apache.org/licenses/LICENSE-2.0
  *
  * Unless required by applicable law or agreed to in writing,
  * software distributed under the License is distributed on an
@@ -27,7 +27,6 @@ import javax.xml.bind.annotation.XmlAccessorType;
 import javax.xml.bind.annotation.XmlRootElement;
 
 /**
- *
  * Provides plan level operator data<p>
  * <br>
  * This call provides restful access to individual operator instance data<br>
@@ -35,7 +34,6 @@ import javax.xml.bind.annotation.XmlRootElement;
  *
  * @since 0.3.2
  */
-
 @XmlRootElement(name = "modules")
 @XmlAccessorType(XmlAccessType.FIELD)
 public class LogicalModulesInfo
@@ -44,8 +42,7 @@ public class LogicalModulesInfo
   protected List<LogicalModuleInfo> modules = new ArrayList<LogicalModuleInfo>();
 
   /**
-   *
-   * @param operatorInfo
+   * @param moduleInfo
    */
   public void add(LogicalModuleInfo moduleInfo)
   {
@@ -53,9 +50,7 @@ public class LogicalModulesInfo
   }
 
   /**
-   *
    * @return list of operator info
-   *
    */
   public List<LogicalModuleInfo> getModules()
   {

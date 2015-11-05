@@ -7,7 +7,7 @@
  * "License"); you may not use this file except in compliance
  * with the License.  You may obtain a copy of the License at
  *
- *   http://www.apache.org/licenses/LICENSE-2.0
+ * http://www.apache.org/licenses/LICENSE-2.0
  *
  * Unless required by applicable law or agreed to in writing,
  * software distributed under the License is distributed on an
@@ -1769,7 +1769,8 @@ public class LogicalPlan implements Serializable, DAG
    *  1. all its input streams should be OIO
    *  2. all its input streams should have OIO from single source node
    */
-  private void validateThreadLocal(OperatorMeta om) {
+  private void validateThreadLocal(OperatorMeta om)
+  {
     Integer oioRoot = null;
 
     // already visited and validated
@@ -1777,11 +1778,11 @@ public class LogicalPlan implements Serializable, DAG
       return;
     }
 
-    for (StreamMeta sm: om.inputStreams.values()) {
+    for (StreamMeta sm : om.inputStreams.values()) {
       // validation fail as each input stream should be OIO
       if (sm.locality != Locality.THREAD_LOCAL) {
         String msg = String.format("Locality %s invalid for operator %s with multiple input streams as at least one of the input streams is not %s",
-                                   Locality.THREAD_LOCAL, om, Locality.THREAD_LOCAL);
+          Locality.THREAD_LOCAL, om, Locality.THREAD_LOCAL);
         throw new ValidationException(msg);
       }
 
@@ -1791,7 +1792,7 @@ public class LogicalPlan implements Serializable, DAG
       // validation fail as each input stream should have a common OIO root
       if (om.oioRoot != null && oioStreamRoot != om.oioRoot) {
         String msg = String.format("Locality %s invalid for operator %s with multiple input streams as at least one of the input streams is not originating from common OIO owner node",
-                                   Locality.THREAD_LOCAL, om, Locality.THREAD_LOCAL);
+          Locality.THREAD_LOCAL, om, Locality.THREAD_LOCAL);
         throw new ValidationException(msg);
       }
 

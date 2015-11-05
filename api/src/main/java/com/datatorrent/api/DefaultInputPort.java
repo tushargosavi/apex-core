@@ -79,12 +79,14 @@ public abstract class DefaultInputPort<T> implements InputPort<T>, Sink<T>
     process(tuple);
   }
 
-  /** {@inheritDoc} */
+  /**
+   * {@inheritDoc}
+   */
   @Override
   public int getCount(boolean reset)
   {
     try {
-      return count; 
+      return count;
     } finally {
       if (reset) {
         count = 0;
