@@ -1320,7 +1320,9 @@ public class LogicalPlan implements Serializable, DAG
     StreamMeta s = addStream(id);
     id = s.id;
     ArrayListMultimap<Operator.OutputPort<?>, Operator.InputPort<?>> streamMap = ArrayListMultimap.create();
-
+    if (!(source instanceof ProxyOutputPort)) {
+      s.setSource(source);
+    }
     for (Operator.InputPort<?> sink : sinks) {
       if (source instanceof ProxyOutputPort || sink instanceof ProxyInputPort) {
         streamMap.put(source, sink);
