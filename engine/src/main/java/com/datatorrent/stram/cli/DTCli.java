@@ -2748,7 +2748,7 @@ public class DTCli
               }
               LogicalPlan logicalPlan = appFactory.createApp(submitApp.getLogicalPlanConfiguration());
               map.put("applicationName", appFactory.getName());
-              map.put("logicalPlan", LogicalPlanSerializer.convertToMapV2(logicalPlan, commandLineInfo.flatten));
+              map.put("logicalPlan", LogicalPlanSerializer.convertToMap(logicalPlan, commandLineInfo.flatten));
             } finally {
               if (raw) {
                 System.setOut(originalStream);
@@ -2764,7 +2764,7 @@ public class DTCli
             LogicalPlan logicalPlan = appFactory.createApp(submitApp.getLogicalPlanConfiguration());
             Map<String, Object> map = new HashMap<String, Object>();
             map.put("applicationName", appFactory.getName());
-            map.put("logicalPlan", LogicalPlanSerializer.convertToMapV2(logicalPlan, commandLineInfo.flatten));
+            map.put("logicalPlan", LogicalPlanSerializer.convertToMap(logicalPlan, commandLineInfo.flatten));
             printJson(map);
           } else if (filename.endsWith(".properties")) {
             File file = new File(filename);
@@ -2773,7 +2773,7 @@ public class DTCli
             LogicalPlan logicalPlan = appFactory.createApp(submitApp.getLogicalPlanConfiguration());
             Map<String, Object> map = new HashMap<String, Object>();
             map.put("applicationName", appFactory.getName());
-            map.put("logicalPlan", LogicalPlanSerializer.convertToMapV2(logicalPlan, commandLineInfo.flatten));
+            map.put("logicalPlan", LogicalPlanSerializer.convertToMap(logicalPlan, commandLineInfo.flatten));
             printJson(map);
           } else {
             StramAppLauncher submitApp = getStramAppLauncher(filename, config, commandLineInfo.ignorePom);
@@ -2824,7 +2824,7 @@ public class DTCli
               Map<String, Object> map = new HashMap<String, Object>();
               map.put("applicationName", appInfo.name);
               if (appInfo.dag != null) {
-                map.put("logicalPlan", LogicalPlanSerializer.convertToMapV2(appInfo.dag, commandLineInfo.flatten));
+                map.put("logicalPlan", LogicalPlanSerializer.convertToMap(appInfo.dag, commandLineInfo.flatten));
               }
               if (appInfo.error != null) {
                 map.put("error", appInfo.error);
