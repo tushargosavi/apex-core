@@ -1090,9 +1090,9 @@ public class LogicalPlan implements Serializable, DAG
     }
 
     // Avoid name conflict with module.
-    if (modules.containsKey(name))
+    if (modules.containsKey(name)) {
       throw new IllegalArgumentException("duplicate operator id: " + operators.get(name));
-
+    }
     OperatorMeta decl = new OperatorMeta(name, operator);
     rootOperators.add(decl); // will be removed when a sink is added to an input port for this operator
     operators.put(name, decl);
