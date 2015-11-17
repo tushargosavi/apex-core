@@ -571,12 +571,12 @@ public class StramWebServices
   @Produces(MediaType.APPLICATION_JSON)
   public JSONObject getLogicalModule(@PathParam("moduleName") String moduleName) throws Exception
   {
-    ModuleMeta logicalModule = dagManager.getLogicalPlan().getModuleMeta(moduleName);
+    ModuleMeta logicalModule = dagManager.getModuleMeta(moduleName);
     if (logicalModule == null) {
       throw new NotFoundException();
     }
     LogicalModuleInfo logicalModuleInfo;
-    logicalModuleInfo = dagManager.getLogicalModuleInfo(moduleName, false);
+    logicalModuleInfo = dagManager.getLogicalModuleInfo(moduleName, false, dagManager.getLogicalPlan());
     return new JSONObject(objectMapper.writeValueAsString(logicalModuleInfo));
   }
 
@@ -585,12 +585,12 @@ public class StramWebServices
   @Produces(MediaType.APPLICATION_JSON)
   public JSONObject getLogicalModuleFlatten(@PathParam("moduleName") String moduleName) throws Exception
   {
-    ModuleMeta logicalModule = dagManager.getLogicalPlan().getModuleMeta(moduleName);
+    ModuleMeta logicalModule = dagManager.getModuleMeta(moduleName);
     if (logicalModule == null) {
       throw new NotFoundException();
     }
     LogicalModuleInfo logicalModuleInfo;
-    logicalModuleInfo = dagManager.getLogicalModuleInfo(moduleName, true);
+    logicalModuleInfo = dagManager.getLogicalModuleInfo(moduleName, true, dagManager.getLogicalPlan());
     return new JSONObject(objectMapper.writeValueAsString(logicalModuleInfo));
   }
 
@@ -732,7 +732,7 @@ public class StramWebServices
   @Produces(MediaType.APPLICATION_JSON)
   public JSONObject getProxyPorts(@PathParam("moduleName") String moduleName)
   {
-    ModuleMeta logicalModule = dagManager.getLogicalPlan().getModuleMeta(moduleName);
+    ModuleMeta logicalModule = dagManager.getModuleMeta(moduleName);
     if (logicalModule == null) {
       throw new NotFoundException();
     }
@@ -796,7 +796,7 @@ public class StramWebServices
   @Produces(MediaType.APPLICATION_JSON)
   public JSONObject getProxyPort(@PathParam("moduleName") String moduleName, @PathParam("portName") String portName)
   {
-    ModuleMeta logicalModule = dagManager.getLogicalPlan().getModuleMeta(moduleName);
+    ModuleMeta logicalModule = dagManager.getModuleMeta(moduleName);
     if (logicalModule == null) {
       throw new NotFoundException();
     }
@@ -872,10 +872,11 @@ public class StramWebServices
   @GET
   @Path(PATH_LOGICAL_PLAN_MODULES + "/{moduleName}/properties")
   @Produces(MediaType.APPLICATION_JSON)
-  public JSONObject getModuleProperties(@PathParam("moduleName") String moduleName, @QueryParam("propertyName") String propertyName) throws IOException, JSONException
+  public JSONObject getModuleProperties(@PathParam("moduleName") String moduleName,
+      @QueryParam("propertyName") String propertyName) throws IOException, JSONException
   {
     init();
-    ModuleMeta logicalModule = dagManager.getLogicalPlan().getModuleMeta(moduleName);
+    ModuleMeta logicalModule = dagManager.getModuleMeta(moduleName);
     if (logicalModule == null) {
       throw new NotFoundException();
     }
@@ -930,7 +931,8 @@ public class StramWebServices
   @Produces(MediaType.APPLICATION_JSON)
   public JSONObject getLogicalPlan() throws JSONException, IOException
   {
-    return new JSONObject(objectMapper.writeValueAsString(LogicalPlanSerializer.convertToMapV2(dagManager.getLogicalPlan(), false)));
+    return new JSONObject(objectMapper.writeValueAsString(LogicalPlanSerializer.convertToMap(
+        dagManager.getLogicalPlan(), false)));
   }
 
   @GET
@@ -938,7 +940,8 @@ public class StramWebServices
   @Produces(MediaType.APPLICATION_JSON)
   public JSONObject getLogicalPlanFlatten() throws JSONException, IOException
   {
-    return new JSONObject(objectMapper.writeValueAsString(LogicalPlanSerializer.convertToMapV2(dagManager.getLogicalPlan(), true)));
+    return new JSONObject(objectMapper.writeValueAsString(LogicalPlanSerializer.convertToMap(
+        dagManager.getLogicalPlan(), true)));
   }
 
   @POST // not supported by WebAppProxyServlet, can only be called directly
