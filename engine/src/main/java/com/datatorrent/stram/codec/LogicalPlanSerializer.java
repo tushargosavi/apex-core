@@ -226,7 +226,7 @@ public class LogicalPlanSerializer extends JsonSerializer<LogicalPlan>
    * @param dag
    * @return
    */
-  public static Map<String, Object> convertToMapV2(LogicalPlan dag, boolean flatten)
+  public static Map<String, Object> convertToMap(LogicalPlan dag, boolean flatten)
   {
     HashMap<String, Object> result = new HashMap<String, Object>();
     ArrayList<Object> operatorArray = new ArrayList<Object>();
@@ -235,7 +235,8 @@ public class LogicalPlanSerializer extends JsonSerializer<LogicalPlan>
     result.put("streams", streamsArray);
 
     Map<String, Object> dagAttrs = new HashMap<String, Object>();
-    for (Map.Entry<Attribute<Object>, Object> e : Attribute.AttributeMap.AttributeInitializer.getAllAttributes(dag, Context.DAGContext.class).entrySet()) {
+    for (Map.Entry<Attribute<Object>, Object> e : Attribute.AttributeMap.AttributeInitializer.getAllAttributes(dag,
+        Context.DAGContext.class).entrySet()) {
       dagAttrs.put(e.getKey().getSimpleName(), e.getValue());
     }
     result.put("attributes", dagAttrs);
@@ -246,8 +247,8 @@ public class LogicalPlanSerializer extends JsonSerializer<LogicalPlan>
         operatorArray.add(getLogicalOperatorDetails(operatorMeta));
       }
     }
-    Collection<StreamMeta> allStreams = dag.getAllStreams();
 
+    Collection<StreamMeta> allStreams = dag.getAllStreams();
     for (StreamMeta streamMeta : allStreams) {
       if (streamMeta.getModuleName() == null) {
         streamsArray.add(getLogicalStreamDetails(streamMeta));
@@ -281,14 +282,13 @@ public class LogicalPlanSerializer extends JsonSerializer<LogicalPlan>
       return null;
     }
     Map<String, Object> obj = fillLogicalModuleDetails(moduleMeta, dag, flatten);
-    List<Object> modList = new ArrayList<Object>();
-    obj.put("modules", modList);
-    for (ModuleMeta meta : dag.getAllModules()) {
-      if (meta.getParentModuleName() != null && meta.getParentModuleName().equals(moduleName)) {
-        if (!flatten) {
-          modList.add(fillLogicalModuleDetails(moduleMeta, dag, flatten));
-        } else {
-          modList.add(getLogicalModuleInfo(dag, fillLogicalModuleDetails(meta, dag, flatten).get("name").toString(), flatten));
+    if (flatten) {
+      List<Object> modList = new ArrayList<Object>();
+      obj.put("modules", modList);
+      for (ModuleMeta meta : moduleMeta.getDag().getAllModules()) {
+        if (meta.getParentModuleName() != null && meta.getParentModuleName().equals(moduleName)) {
+          modList.add(getLogicalModuleInfo(moduleMeta.getDag(),
+              fillLogicalModuleDetails(meta, moduleMeta.getDag(), flatten).get("name").toString(), flatten));
         }
       }
     }
@@ -403,27 +403,13 @@ public class LogicalPlanSerializer extends JsonSerializer<LogicalPlan>
     moduleDetailMap.put("streams", streamArray);
     if (flatten) {
       for (OperatorMeta operatorMeta : dag.getAllOperators()) {
-        if (moduleMeta.getParentModuleName() == null) {
-          if (operatorMeta.getModuleName() == null) {
-            operatorArray.add(getLogicalOperatorDetails(operatorMeta));
-          }
-        } else {
-          if (operatorMeta.getModuleName() != null
-            && moduleMeta.getParentModuleName().equals(operatorMeta.getModuleName())) {
-            operatorArray.add(getLogicalOperatorDetails(operatorMeta));
-          }
+        if (operatorMeta.getModuleName() != null && operatorMeta.getModuleName() == moduleMeta.getName()) {
+          operatorArray.add(getLogicalOperatorDetails(operatorMeta));
         }
       }
       for (StreamMeta streamMeta : dag.getAllStreams()) {
-        if (moduleMeta.getParentModuleName() == null) {
-          if (streamMeta.getModuleName() == null) {
-            streamArray.add(getLogicalStreamDetails(streamMeta));
-          }
-        } else {
-          if (streamMeta.getModuleName() != null
-            && moduleMeta.getParentModuleName().equals(streamMeta.getModuleName())) {
-            streamArray.add(getLogicalStreamDetails(streamMeta));
-          }
+        if (streamMeta.getModuleName() != null && streamMeta.getModuleName() == moduleMeta.getName()) {
+          streamArray.add(getLogicalStreamDetails(streamMeta));
         }
       }
     }
