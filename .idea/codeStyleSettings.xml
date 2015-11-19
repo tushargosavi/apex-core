@@ -36,6 +36,7 @@
             <package name="" withSubpackages="true" static="true" />
           </value>
         </option>
+        <option name="WRAP_WHEN_TYPING_REACHES_RIGHT_MARGIN" value="true" />
         <option name="JD_P_AT_EMPTY_LINES" value="false" />
         <JSON>
           <option name="ARRAY_WRAPPING" value="0" />
@@ -45,6 +46,7 @@
         </JavaCodeStyleSettings>
         <XML>
           <option name="XML_TEXT_WRAP" value="0" />
+          <option name="XML_ALIGN_ATTRIBUTES" value="false" />
           <option name="XML_LEGACY_SETTINGS_IMPORTED" value="true" />
         </XML>
         <codeStyleSettings language="Groovy">
@@ -72,13 +74,15 @@
           <option name="ALIGN_MULTILINE_RESOURCES" value="false" />
           <option name="ALIGN_MULTILINE_FOR" value="false" />
           <option name="SPACE_AFTER_TYPE_CAST" value="false" />
+          <option name="METHOD_CALL_CHAIN_WRAP" value="1" />
           <option name="IF_BRACE_FORCE" value="3" />
           <option name="DOWHILE_BRACE_FORCE" value="3" />
           <option name="WHILE_BRACE_FORCE" value="3" />
           <option name="FOR_BRACE_FORCE" value="3" />
+          <option name="WRAP_LONG_LINES" value="true" />
           <indentOptions>
             <option name="INDENT_SIZE" value="2" />
-            <option name="CONTINUATION_INDENT_SIZE" value="2" />
+            <option name="CONTINUATION_INDENT_SIZE" value="4" />
             <option name="TAB_SIZE" value="2" />
             <option name="LABEL_INDENT_SIZE" value="2" />
             <option name="LABEL_INDENT_ABSOLUTE" value="true" />
@@ -94,7 +98,7 @@
           <option name="RIGHT_MARGIN" value="120" />
           <indentOptions>
             <option name="INDENT_SIZE" value="2" />
-            <option name="CONTINUATION_INDENT_SIZE" value="2" />
+            <option name="CONTINUATION_INDENT_SIZE" value="4" />
             <option name="TAB_SIZE" value="2" />
           </indentOptions>
         </codeStyleSettings>
@@ -103,4 +107,3 @@
     <option name="USE_PER_PROJECT_SETTINGS" value="true" />
   </component>
 </project>
-
