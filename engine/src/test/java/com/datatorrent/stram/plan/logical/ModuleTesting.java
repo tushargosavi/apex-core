@@ -61,7 +61,35 @@ public class ModuleTesting
 
     LogicalPlanConfiguration pb = new LogicalPlanConfiguration(conf);
 
-    pb.setModuleProperties(dag, "testSetOperatorProperties");
+    pb.setAllModuleProperties(dag, "testSetOperatorProperties");
+    System.out.println("setted module properties");
+    Assert.assertEquals("o1.myStringProperty", "myStringPropertyValue", o1.getMyStringProperty());
+    Assert.assertArrayEquals("o2.stringArrayField", new String[]{"a", "b", "c"}, o2.getStringArrayField());
+
+    Assert.assertEquals("o2.mapProperty.key1", "key1Val", o2.getMapProperty().get("key1"));
+    Assert.assertEquals("o2.mapProperty(key1.dot)", "key1dotVal", o2.getMapProperty().get("key1.dot"));
+    Assert.assertEquals("o2.mapProperty(key2.dot)", "key2dotVal", o2.getMapProperty().get("key2.dot"));
+
+  }
+
+  @Test
+  public void testModulePropertiesWithOperator()
+  {
+    Configuration conf = new Configuration(false);
+    conf.set(StreamingApplication.DT_PREFIX + "operator.o1.prop.myStringProperty", "myStringPropertyValue");
+    conf.set(StreamingApplication.DT_PREFIX + "operator.o2.prop.stringArrayField", "a,b,c");
+    conf.set(StreamingApplication.DT_PREFIX + "operator.o2.prop.mapProperty.key1", "key1Val");
+    conf.set(StreamingApplication.DT_PREFIX + "operator.o2.prop.mapProperty(key1.dot)", "key1dotVal");
+    conf.set(StreamingApplication.DT_PREFIX + "operator.o2.prop.mapProperty(key2.dot)", "key2dotVal");
+
+    LogicalPlan dag = new LogicalPlan();
+    TestModules.GenericModule o1 = dag.addModule("o1", new TestModules.GenericModule());
+    //LogicalPlanTest.ValidationTestOperator o2 = dag.addOperator("o2", new LogicalPlanTest.ValidationTestOperator());
+    ValidationTestModule o2 = dag.addModule("o2", new ValidationTestModule());
+
+    LogicalPlanConfiguration pb = new LogicalPlanConfiguration(conf);
+
+    pb.setAllModuleProperties(dag, "testSetOperatorProperties");
     System.out.println("setted module properties");
     Assert.assertEquals("o1.myStringProperty", "myStringPropertyValue", o1.getMyStringProperty());
     Assert.assertArrayEquals("o2.stringArrayField", new String[]{"a", "b", "c"}, o2.getStringArrayField());

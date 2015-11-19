@@ -2156,7 +2156,7 @@ public class LogicalPlanConfiguration {
     }
 
     // Expand the modules within the dag recursively
-    setModuleProperties(dag, appName);
+    setAllModuleProperties(dag, appName);
     flattenDAG(dag, conf);
 
     // inject external operator configuration
@@ -2382,14 +2382,23 @@ public class LogicalPlanConfiguration {
    * @param dag
    * @param applicationName
    */
-  public void setModuleProperties(LogicalPlan dag, String applicationName)
+  public void setAllModuleProperties(LogicalPlan dag, String applicationName)
   {
     List<AppConf> appConfs = stramConf.getMatchingChildConf(applicationName, StramElement.APPLICATION);
     for (ModuleMeta ow : dag.getAllModules()) {
-      List<OperatorConf> opConfs = getMatchingChildConf(appConfs, ow.getName(), StramElement.MODULE);
-      Map<String, String> opProps = getProperties(getPropertyArgs(ow), opConfs, applicationName);
-      setObjectProperties(ow.getModule(), opProps);
+      setModuleProperties(applicationName, appConfs, ow);
     }
+  }
+
+  private void setModuleProperties(String applicationName, List<AppConf> appConfs, LogicalPlan.ModuleMeta ow)
+  {
+    List<OperatorConf> opConfs = getMatchingChildConf(appConfs, ow.getName(), StramElement.MODULE);
+    Map<String, String> opProps = getProperties(getPropertyArgs(ow), opConfs, applicationName);
+    setObjectProperties(ow.getModule(), opProps);
+
+    opConfs = getMatchingChildConf(appConfs, ow.getName(), StramElement.OPERATOR);
+    opProps = getProperties(getPropertyArgs(ow), opConfs, applicationName);
+    setObjectProperties(ow.getModule(), opProps);
   }
 
   /**
@@ -2451,9 +2460,7 @@ public class LogicalPlanConfiguration {
   private void setModuleConfiguration(final LogicalPlan dag, List<AppConf> appConfs, String appName)
   {
     for (final ModuleMeta mw : dag.getAllModules()) {
-      List<OperatorConf> opConfs = getMatchingChildConf(appConfs, mw.getName(), StramElement.MODULE);
-      Map<String, String> opProps = getProperties(getPropertyArgs(mw), opConfs, appName);
-      setObjectProperties(mw.getModule(), opProps);
+      setModuleProperties(appName, appConfs, mw);
 
       /*
       // Set the port attributes
