@@ -27,6 +27,7 @@ import org.junit.Test;
 
 import org.apache.hadoop.conf.Configuration;
 
+import com.datatorrent.api.Context;
 import com.datatorrent.api.DAG;
 import com.datatorrent.api.DefaultInputPort;
 import com.datatorrent.api.DefaultOutputPort;
@@ -111,6 +112,8 @@ public class ExtremeModuleTest
     {
       DummyOperator o1 = dag.addOperator("O1", new DummyOperator());
       o1.setOperatorProp(level1ModuleProp);
+      dag.getMeta(o1).getAttributes().put(Context.OperatorContext.MEMORY_MB, 512);
+      dag.setInputPortAttribute(o1.in, Context.PortContext.BUFFER_MEMORY_MB, 1024);
       mIn.set(o1.in);
       mOut.set(o1.out1);
     }
@@ -411,6 +414,13 @@ public class ExtremeModuleTest
     validateOperatorParent(dag, "Md_O1", "Md");
     validateOperatorParent(dag, "Md_M1_O1", "Md_M1");
     validateOperatorParent(dag, "Md_O2", "Md");
+
+    validateOperatorAttribute(dag, "Ma_M1_O1");
+    validateOperatorAttribute(dag, "Ma_M2_O1");
+    validateOperatorAttribute(dag, "Mb_M1_O1");
+    validateOperatorAttribute(dag, "Mc_M1_O1");
+    validateOperatorAttribute(dag, "Mc_M2_O1");
+
   }
 
   private void validateOperatorParent(LogicalPlan dag, String operatorName, String parentModuleName)
@@ -435,4 +445,13 @@ public class ExtremeModuleTest
     }
   }
 
+  private void validateOperatorAttribute(LogicalPlan dag, String name) {
+    LogicalPlan.OperatorMeta oMeta = dag.getOperatorMeta(name);
+    int memory = oMeta.getAttributes().get(Context.OperatorContext.MEMORY_MB);
+    Assert.assertEquals(512, memory);
+
+    LogicalPlan.InputPortMeta imeta = dag.getOperatorMeta(name).getInputStreams().keySet().iterator().next();
+    memory = imeta.getAttributes().get(Context.PortContext.BUFFER_MEMORY_MB);
+    Assert.assertEquals(1024, memory);
+  }
 }
