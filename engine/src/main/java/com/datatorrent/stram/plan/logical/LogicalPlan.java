@@ -41,6 +41,7 @@ import org.slf4j.LoggerFactory;
 
 import com.google.common.collect.ArrayListMultimap;
 import com.google.common.collect.Sets;
+import com.sun.org.apache.xml.internal.serializer.OutputPropertyUtils;
 
 import com.datatorrent.api.*;
 import com.datatorrent.api.Attribute.AttributeMap;
@@ -919,6 +920,33 @@ public class LogicalPlan implements Serializable, DAG
         getValue(OperatorContext.METRICS_DIMENSIONS_SCHEME));
     }
 
+    private void copyAttributes(AttributeMap dest, AttributeMap source) {
+      for (Entry<Attribute<?>, ?> a : source.entrySet())
+        dest.put((Attribute<Object>)a.getKey(), a.getValue());
+    }
+
+    public void updateAttributesFrom(OperatorMeta operatorMeta)
+    {
+      // copy operator attributes
+      copyAttributes(attributes, operatorMeta.getAttributes());
+
+      // copy Input port attributes
+      for (Map.Entry<InputPort<?>, InputPortMeta> entry : operatorMeta.getPortMapping().inPortMap.entrySet()) {
+        InputPort<?> key = entry.getKey();
+        InputPortMeta dest = getPortMapping().inPortMap.get(key);
+        InputPortMeta source = entry.getValue();
+        copyAttributes(dest.attributes, source.attributes);
+      }
+
+      // copy Output port attributes
+      for (Map.Entry<OutputPort<?>, OutputPortMeta> entry : operatorMeta.getPortMapping().outPortMap.entrySet()) {
+        OutputPort<?> key = entry.getKey();
+        OutputPortMeta dest = getPortMapping().outPortMap.get(key);
+        OutputPortMeta source = entry.getValue();
+        copyAttributes(dest.attributes, source.attributes);
+      }
+    }
+
     private class PortMapping implements Operators.OperatorDescriptor
     {
       private final Map<Operator.InputPort<?>, InputPortMeta> inPortMap = new HashMap<Operator.InputPort<?>, InputPortMeta>();
@@ -1368,7 +1396,9 @@ public class LogicalPlan implements Serializable, DAG
     String name;
     for (OperatorMeta operatorMeta : subDag.getAllOperators()) {
       name = subDAGName + "_" + operatorMeta.getName();
-      this.addOperator(name, operatorMeta.getOperator());
+      Operator op = this.addOperator(name, operatorMeta.getOperator());
+      OperatorMeta ometa = this.getMeta(op);
+      ometa.updateAttributesFrom(operatorMeta);
       OperatorMeta operatorMetaNew = this.getOperatorMeta(name);
       operatorMetaNew.setModuleName(operatorMeta.getModuleName() == null ? subDAGName : subDAGName + "_" + operatorMeta.getModuleName());
     }
@@ -1385,6 +1415,7 @@ public class LogicalPlan implements Serializable, DAG
       StreamMeta streamMetaNew = this.addStream(name, sourceMeta.getPortObject(), inputPorts);
       streamMetaNew.setModuleName(streamMeta.getModuleName() == null ? subDAGName : subDAGName + "_" + streamMeta.getModuleName());
     }
+
   }
 
   @Override
