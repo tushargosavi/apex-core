@@ -2336,7 +2336,9 @@ public class StreamingContainerManager implements PlanContext
       return logicalModule;
     }
     for (ModuleMeta m : dag.getAllModules()) {
-      return getModuleMeta(moduleName, m.getDag());
+      logicalModule = getModuleMeta(moduleName, m.getDag());
+      if (logicalModule != null)
+        return logicalModule;
     }
     return null;
   }

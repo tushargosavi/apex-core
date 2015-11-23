@@ -24,7 +24,6 @@ import org.apache.hadoop.conf.Configuration;
 import com.datatorrent.api.Context.PortContext;
 import com.datatorrent.api.Operator.InputPort;
 import com.datatorrent.api.Operator.OutputPort;
-import com.datatorrent.api.Operator.Port;
 import com.datatorrent.api.Operator.Unifier;
 
 @InterfaceStability.Evolving
@@ -32,24 +31,15 @@ public interface Module
 {
   void populateDAG(DAG dag, Configuration conf);
 
-  public interface ProxyPort<T> extends Port
-  {
-    void set(T port);
-
-    T get();
-  }
-
-  public final class ProxyInputPort<T> implements ProxyPort<InputPort<T>>, InputPort<T>
+  public final class ProxyInputPort<T> implements InputPort<T>
   {
     InputPort<T> inputPort;
 
-    @Override
     public void set(InputPort<T> port)
     {
       inputPort = port;
     }
 
-    @Override
     public InputPort<T> get()
     {
       return inputPort;
@@ -100,7 +90,7 @@ public interface Module
     }
   }
 
-  public final class ProxyOutputPort<T> implements ProxyPort<OutputPort<T>>, OutputPort<T>
+  public final class ProxyOutputPort<T> implements OutputPort<T>
   {
     OutputPort<T> outputPort;
 
