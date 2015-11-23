@@ -121,8 +121,8 @@ public class LogicalPlanConfiguration {
    * This represents an element that can be referenced in a DT property.
    */
   protected enum StramElement {
-    APPLICATION("application"), GATEWAY("gateway"), TEMPLATE("template"), OPERATOR("operator"), STREAM("stream"), PORT("port"), INPUT_PORT("inputport"), OUTPUT_PORT("outputport"),
-    ATTR("attr"), PROP("prop"), CLASS("class"), PATH("path"), UNIFIER("unifier"), MODULE("module");
+    APPLICATION("application"), GATEWAY("gateway"), TEMPLATE("template"), OPERATOR("operator"),STREAM("stream"), PORT("port"), INPUT_PORT("inputport"),OUTPUT_PORT("outputport"),
+    ATTR("attr"), PROP("prop"),CLASS("class"),PATH("path"),UNIFIER("unifier");
     private final String value;
 
     /**
@@ -171,8 +171,7 @@ public class LogicalPlanConfiguration {
     OPERATOR(StramElement.OPERATOR, ConfElement.APPLICATION, null, OperatorContext.class),
     STREAM(StramElement.STREAM, ConfElement.APPLICATION, null, null),
     PORT(StramElement.PORT, ConfElement.OPERATOR, EnumSet.of(StramElement.INPUT_PORT, StramElement.OUTPUT_PORT), PortContext.class),
-    UNIFIER(StramElement.UNIFIER, ConfElement.PORT, null, null),
-    MODULE(StramElement.MODULE, ConfElement.APPLICATION, null, null);
+    UNIFIER(StramElement.UNIFIER, ConfElement.PORT, null, null);
 
     protected static final Map<StramElement, ConfElement> STRAM_ELEMENT_TO_CONF_ELEMENT = Maps.newHashMap();
     protected static final Map<Class<? extends Context>, ConfElement> CONTEXT_TO_CONF_ELEMENT = Maps.newHashMap();
@@ -1131,7 +1130,7 @@ public class LogicalPlanConfiguration {
     private final Map<String, String> appAliases = Maps.newHashMap();
 
     private static final StramElement[] CHILD_ELEMENTS = new StramElement[]{StramElement.APPLICATION, StramElement.GATEWAY, StramElement.TEMPLATE, StramElement.OPERATOR,
-      StramElement.PORT, StramElement.INPUT_PORT, StramElement.OUTPUT_PORT, StramElement.STREAM, StramElement.TEMPLATE, StramElement.ATTR, StramElement.UNIFIER, StramElement.MODULE};
+            StramElement.PORT, StramElement.INPUT_PORT, StramElement.OUTPUT_PORT, StramElement.STREAM, StramElement.TEMPLATE, StramElement.ATTR, StramElement.UNIFIER};
 
     StramConf() {
     }
@@ -1155,8 +1154,8 @@ public class LogicalPlanConfiguration {
   private static class AppConf extends Conf {
 
     private static final StramElement[] CHILD_ELEMENTS = new StramElement[]{StramElement.GATEWAY, StramElement.OPERATOR, StramElement.PORT,
-      StramElement.INPUT_PORT, StramElement.OUTPUT_PORT, StramElement.STREAM, StramElement.ATTR, StramElement.CLASS, StramElement.PATH,
-      StramElement.PROP, StramElement.UNIFIER, StramElement.MODULE};
+            StramElement.INPUT_PORT, StramElement.OUTPUT_PORT, StramElement.STREAM, StramElement.ATTR, StramElement.CLASS, StramElement.PATH,
+            StramElement.PROP, StramElement.UNIFIER};
 
     @SuppressWarnings("unused")
     AppConf() {
@@ -1483,7 +1482,6 @@ public class LogicalPlanConfiguration {
     elementMaps.put(StramElement.INPUT_PORT, PortConf.class);
     elementMaps.put(StramElement.OUTPUT_PORT, PortConf.class);
     elementMaps.put(StramElement.UNIFIER, OperatorConf.class);
-    elementMaps.put(StramElement.MODULE, OperatorConf.class);
   }
 
   /**
@@ -1748,8 +1746,8 @@ public class LogicalPlanConfiguration {
         return;
       }
       if ((element == StramElement.APPLICATION) || (element == StramElement.OPERATOR) || (element == StramElement.STREAM)
-        || (element == StramElement.PORT) || (element == StramElement.INPUT_PORT) || (element == StramElement.OUTPUT_PORT)
-        || (element == StramElement.TEMPLATE) || (element == StramElement.MODULE)) {
+              || (element == StramElement.PORT) || (element == StramElement.INPUT_PORT) || (element == StramElement.OUTPUT_PORT)
+              || (element == StramElement.TEMPLATE)) {
         parseAppElement(index, keys, element, conf, propertyName, propertyValue);
       } else if (element == StramElement.GATEWAY) {
         parseGatewayElement(element, conf, keys, index, propertyName, propertyValue);
@@ -2015,11 +2013,32 @@ public class LogicalPlanConfiguration {
       return;
     }
 
-    Map<OperatorConf, Operator> nodeMap = new HashMap<OperatorConf, Operator>();
-    Map<OperatorConf, Module> moduleMap = new HashMap<OperatorConf, Module>();
+    Map<String, OperatorConf> operators = appConf.getChildren(StramElement.OPERATOR);
 
-    populateOperators(appConf, dag, nodeMap);
-    populateModules(appConf, dag, moduleMap);
+    Map<OperatorConf, Operator> nodeMap = Maps.newHashMapWithExpectedSize(operators.size());
+    // add all operators first
+    for (Map.Entry<String, OperatorConf> nodeConfEntry : operators.entrySet()) {
+      OperatorConf nodeConf = nodeConfEntry.getValue();
+      if (!WILDCARD.equals(nodeConf.id)) {
+        Class<? extends Operator> nodeClass = StramUtils.classForName(nodeConf.getClassNameReqd(), Operator.class);
+        String optJson = nodeConf.getProperties().get(nodeClass.getName());
+        Operator nd = null;
+        try {
+          if (optJson != null) {
+            // if there is a special key which is the class name, it means the operator is serialized in json format
+            ObjectMapper mapper = ObjectMapperFactory.getOperatorValueDeserializer();
+            nd = mapper.readValue("{\"" + nodeClass.getName() + "\":" + optJson + "}", nodeClass);
+            dag.addOperator(nodeConfEntry.getKey(), nd);
+          } else {
+            nd = dag.addOperator(nodeConfEntry.getKey(), nodeClass);
+          }
+          setOperatorProperties(nd, nodeConf.getProperties());
+        } catch (IOException e) {
+          throw new IllegalArgumentException("Error setting operator properties " + e.getMessage(), e);
+        }
+        nodeMap.put(nodeConf, nd);
+      }
+    }
 
     Map<String, StreamConf> streams = appConf.getChildren(StramElement.STREAM);
 
@@ -2072,81 +2091,21 @@ public class LogicalPlanConfiguration {
 
   }
 
-  private void populateModules(AppConf appConf, LogicalPlan dag, Map<OperatorConf, Module> moduleMap)
-  {
-    Map<String, OperatorConf> modules = appConf.getChildren(StramElement.MODULE);
-
-    // add all operators first
-    for (Map.Entry<String, OperatorConf> nodeConfEntry : modules.entrySet()) {
-      OperatorConf nodeConf = nodeConfEntry.getValue();
-      if (!WILDCARD.equals(nodeConf.id)) {
-        Class<? extends Module> nodeClass = StramUtils.classForName(nodeConf.getClassNameReqd(), Module.class);
-        String optJson = nodeConf.getProperties().get(nodeClass.getName());
-        Module nd = null;
-        try {
-          if (optJson != null) {
-            // if there is a special key which is the class name, it means the operator is serialized in json format
-            ObjectMapper mapper = ObjectMapperFactory.getOperatorValueDeserializer();
-            nd = mapper.readValue("{\"" + nodeClass.getName() + "\":" + optJson + "}", nodeClass);
-            dag.addModule(nodeConfEntry.getKey(), nd);
-          } else {
-            nd = dag.addModule(nodeConfEntry.getKey(), nodeClass);
-          }
-          setObjectProperties(nd, nodeConf.getProperties());
-        } catch (Exception e) {
-          throw new IllegalArgumentException("Error setting operator properties " + e.getMessage(), e);
-        }
-        moduleMap.put(nodeConf, nd);
-      }
-    }
-  }
-
-  private void populateOperators(AppConf appConf, LogicalPlan dag, Map<OperatorConf, Operator> nodeMap)
-  {
-    Map<String, OperatorConf> operators = appConf.getChildren(StramElement.OPERATOR);
-
-    // add all operators first
-    for (Map.Entry<String, OperatorConf> nodeConfEntry : operators.entrySet()) {
-      OperatorConf nodeConf = nodeConfEntry.getValue();
-      if (!WILDCARD.equals(nodeConf.id)) {
-        Class<? extends Operator> nodeClass = StramUtils.classForName(nodeConf.getClassNameReqd(), Operator.class);
-        String optJson = nodeConf.getProperties().get(nodeClass.getName());
-        Operator nd = null;
-        try {
-          if (optJson != null) {
-            // if there is a special key which is the class name, it means the operator is serialized in json format
-            ObjectMapper mapper = ObjectMapperFactory.getOperatorValueDeserializer();
-            nd = mapper.readValue("{\"" + nodeClass.getName() + "\":" + optJson + "}", nodeClass);
-            dag.addOperator(nodeConfEntry.getKey(), nd);
-          } else {
-            nd = dag.addOperator(nodeConfEntry.getKey(), nodeClass);
-          }
-          setOperatorProperties(nd, nodeConf.getProperties());
-        } catch (Exception e) {
-          throw new IllegalArgumentException("Error setting operator properties " + e.getMessage(), e);
-        }
-        nodeMap.put(nodeConf, nd);
-      }
-    }
-  }
-
   /**
    * Populate the logical plan from the streaming application definition and configuration.
    * Configuration is resolved based on application alias, if any.
-   *
-   * @param app  The {@lin StreamingApplication} to be run.
-   * @param dag  This will hold the {@link LogicalPlan} representation of the given {@link StreamingApplication}.
+   * @param app The {@lin StreamingApplication} to be run.
+   * @param dag This will hold the {@link LogicalPlan} representation of the given {@link StreamingApplication}.
    * @param name The path of the application class in the jar.
    */
   public void prepareDAG(LogicalPlan dag, StreamingApplication app, String name)
   {
     // EVENTUALLY to be replaced by variable enabled configuration in the demo where the attribute below is used
     String connectAddress = conf.get(StreamingApplication.DT_PREFIX + Context.DAGContext.GATEWAY_CONNECT_ADDRESS.getName());
-    dag.setAttribute(Context.DAGContext.GATEWAY_CONNECT_ADDRESS, connectAddress == null ? conf.get(GATEWAY_LISTEN_ADDRESS) : connectAddress);
+    dag.setAttribute(Context.DAGContext.GATEWAY_CONNECT_ADDRESS, connectAddress == null? conf.get(GATEWAY_LISTEN_ADDRESS): connectAddress);
     if (app != null) {
       app.populateDAG(dag, conf);
     }
-
     String appAlias = getAppAlias(name);
     String appName = appAlias == null ? name : appAlias;
     List<AppConf> appConfs = stramConf.getMatchingChildConf(appName, StramElement.APPLICATION);
@@ -2161,14 +2120,12 @@ public class LogicalPlanConfiguration {
 
     // inject external operator configuration
     setOperatorConfiguration(dag, appConfs, appName);
-    setModuleConfiguration(dag, appConfs, appName);
     setStreamConfiguration(dag, appConfs, appName);
   }
 
   private void flattenDAG(LogicalPlan dag, Configuration conf)
   {
     for (ModuleMeta moduleMeta : dag.getAllModules()) {
-      moduleMeta.setParentModuleName(null);
       moduleMeta.flattenModule(dag, conf);
     }
     dag.applyStreamLinks();
@@ -2212,7 +2169,7 @@ public class LogicalPlanConfiguration {
    * @param opConfs
    * @param appName
    */
-  public Map<String, String> getProperties(PropertyArgs pa, List<OperatorConf> opConfs, String appName)
+  private Map<String, String> getProperties(PropertyArgs pa, List<OperatorConf> opConfs, String appName)
   {
     Map<String, String> opProps = Maps.newHashMap();
     Map<String, TemplateConf> templates = stramConf.getChildren(StramElement.TEMPLATE);
@@ -2252,7 +2209,7 @@ public class LogicalPlanConfiguration {
     return refTemplates;
   }
 
-  public static class PropertyArgs
+  private static class PropertyArgs
   {
     String name;
     String className;
@@ -2347,14 +2304,9 @@ public class LogicalPlanConfiguration {
     }
   }
 
-  public static BeanMap getOperatorProperties(Operator operator)
+  public static BeanMap getObjectProperties(Object obj)
   {
-    return new BeanMap(operator);
-  }
-
-  public static BeanMap getModuleProperties(Module module)
-  {
-    return new BeanMap(module);
+    return new BeanMap(obj);
   }
 
   /**
@@ -2385,11 +2337,7 @@ public class LogicalPlanConfiguration {
   public void setModuleProperties(LogicalPlan dag, String applicationName)
   {
     List<AppConf> appConfs = stramConf.getMatchingChildConf(applicationName, StramElement.APPLICATION);
-    for (ModuleMeta ow : dag.getAllModules()) {
-      List<OperatorConf> opConfs = getMatchingChildConf(appConfs, ow.getName(), StramElement.MODULE);
-      Map<String, String> opProps = getProperties(getPropertyArgs(ow), opConfs, applicationName);
-      setObjectProperties(ow.getModule(), opProps);
-    }
+    setModuleConfiguration(dag, appConfs, applicationName);
   }
 
   /**
@@ -2451,35 +2399,9 @@ public class LogicalPlanConfiguration {
   private void setModuleConfiguration(final LogicalPlan dag, List<AppConf> appConfs, String appName)
   {
     for (final ModuleMeta mw : dag.getAllModules()) {
-      List<OperatorConf> opConfs = getMatchingChildConf(appConfs, mw.getName(), StramElement.MODULE);
+      List<OperatorConf> opConfs = getMatchingChildConf(appConfs, mw.getName(), StramElement.OPERATOR);
       Map<String, String> opProps = getProperties(getPropertyArgs(mw), opConfs, appName);
       setObjectProperties(mw.getModule(), opProps);
-
-      /*
-      // Set the port attributes
-      for (Entry<LogicalPlan.InputPortMeta, LogicalPlan.StreamMeta> entry : mw.getInputStreams().entrySet()) {
-        final InputPortMeta im = entry.getKey();
-        List<PortConf> inPortConfs = getMatchingChildConf(opConfs, im.getPortName(), StramElement.INPUT_PORT);
-        // Add the generic port attributes as well
-        List<PortConf> portConfs = getMatchingChildConf(opConfs, im.getPortName(), StramElement.PORT);
-        inPortConfs.addAll(portConfs);
-        setAttributes(inPortConfs, im.getAttributes());
-      }
-
-      for (Entry<LogicalPlan.OutputPortMeta, LogicalPlan.StreamMeta> entry : mw.getOutputStreams().entrySet()) {
-        final OutputPortMeta om = entry.getKey();
-        List<PortConf> outPortConfs = getMatchingChildConf(opConfs, om.getPortName(), StramElement.OUTPUT_PORT);
-        // Add the generic port attributes as well
-        List<PortConf> portConfs = getMatchingChildConf(opConfs, om.getPortName(), StramElement.PORT);
-        outPortConfs.addAll(portConfs);
-        setAttributes(outPortConfs, om.getAttributes());
-        List<OperatorConf> unifConfs = getMatchingChildConf(outPortConfs, null, StramElement.UNIFIER);
-        if(unifConfs.size() != 0) {
-          setAttributes(unifConfs, om.getUnifierMeta().getAttributes());
-        }
-      }
-      mw.populateAggregatorMeta();
-      */
     }
   }
 

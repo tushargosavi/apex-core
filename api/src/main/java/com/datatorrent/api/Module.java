@@ -24,32 +24,35 @@ import org.apache.hadoop.conf.Configuration;
 import com.datatorrent.api.Context.PortContext;
 import com.datatorrent.api.Operator.InputPort;
 import com.datatorrent.api.Operator.OutputPort;
-import com.datatorrent.api.Operator.Port;
 import com.datatorrent.api.Operator.Unifier;
 
+/**
+ * A Module is a component which can be added to the DAG similar to the operator,
+ * using addModule API. The module should implement populateDAG method, which
+ * will be called by the platform, and DAG populated by the module will be
+ * replace in place of the module.
+ *
+ */
 @InterfaceStability.Evolving
 public interface Module
 {
   void populateDAG(DAG dag, Configuration conf);
 
-  public interface ProxyPort<T> extends Port
-  {
-    void set(T port);
-
-    T get();
-  }
-
-  public final class ProxyInputPort<T> implements ProxyPort<InputPort<T>>, InputPort<T>
+  /**
+   * These ports allow platform to short circuit module port to the operator port.
+   * i.e When a module is expanded, it can specify  which operator's port is used
+   * to replaced the module port in the final DAG.
+   * @param <T> data type accepted at the input port.
+   */
+  final class ProxyInputPort<T> implements InputPort<T>
   {
     InputPort<T> inputPort;
 
-    @Override
     public void set(InputPort<T> port)
     {
       inputPort = port;
     }
 
-    @Override
     public InputPort<T> get()
     {
       return inputPort;
@@ -74,11 +77,7 @@ public interface Module
     @Override
     public Sink<T> getSink()
     {
-      if (inputPort != null) {
-        return inputPort.getSink();
-      } else {
-        return null;
-      }
+      return inputPort == null ? null : inputPort.getSink();
     }
 
     @Override
@@ -92,15 +91,15 @@ public interface Module
     @Override
     public StreamCodec<T> getStreamCodec()
     {
-      if (inputPort != null) {
-        return inputPort.getStreamCodec();
-      } else {
-        return null;
-      }
+      return inputPort == null ? null : inputPort.getStreamCodec();
     }
   }
 
-  public final class ProxyOutputPort<T> implements ProxyPort<OutputPort<T>>, OutputPort<T>
+  /**
+   * Similar to ProxyInputPort, but on output side.
+   * @param <T> datatype emitted on the port.
+   */
+  final class ProxyOutputPort<T> implements OutputPort<T>
   {
     OutputPort<T> outputPort;
 
@@ -141,11 +140,7 @@ public interface Module
     @Override
     public Unifier<T> getUnifier()
     {
-      if (outputPort != null) {
-        return outputPort.getUnifier();
-      } else {
-        return null;
-      }
+      return outputPort == null ? null : outputPort.getUnifier();
     }
   }
 }

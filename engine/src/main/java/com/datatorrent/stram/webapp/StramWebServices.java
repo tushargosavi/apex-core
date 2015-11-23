@@ -535,23 +535,13 @@ public class StramWebServices
   @GET
   @Path(PATH_LOGICAL_PLAN_MODULES)
   @Produces(MediaType.APPLICATION_JSON)
-  public JSONObject getLogicalModules() throws Exception
+  public JSONObject getLogicalModules(@QueryParam("flatten") String flatten) throws Exception
   {
     LogicalModulesInfo nodeList = new LogicalModulesInfo();
-    nodeList.modules = dagManager.getLogicalModuleInfoList(false);
+    nodeList.modules = dagManager.getLogicalModuleInfoList(flatten != null);
     return new JSONObject(objectMapper.writeValueAsString(nodeList));
   }
 
-  @GET
-  @Path(PATH_LOGICAL_PLAN_MODULES + "/flatten")
-  @Produces(MediaType.APPLICATION_JSON)
-  public JSONObject getLogicalModulesFlatten() throws Exception
-  {
-    LogicalModulesInfo nodeList = new LogicalModulesInfo();
-    nodeList.modules = dagManager.getLogicalModuleInfoList(true);
-    return new JSONObject(objectMapper.writeValueAsString(nodeList));
-  }
-  
   @GET
   @Path(PATH_LOGICAL_PLAN_OPERATORS + "/{operatorName}")
   @Produces(MediaType.APPLICATION_JSON)
@@ -569,28 +559,13 @@ public class StramWebServices
   @GET
   @Path(PATH_LOGICAL_PLAN_MODULES + "/{moduleName}")
   @Produces(MediaType.APPLICATION_JSON)
-  public JSONObject getLogicalModule(@PathParam("moduleName") String moduleName) throws Exception
+  public JSONObject getLogicalModule(@PathParam("moduleName") String moduleName, @QueryParam("flatten") String flatten) throws Exception
   {
     ModuleMeta logicalModule = dagManager.getModuleMeta(moduleName);
     if (logicalModule == null) {
       throw new NotFoundException();
     }
-    LogicalModuleInfo logicalModuleInfo;
-    logicalModuleInfo = dagManager.getLogicalModuleInfo(moduleName, false, dagManager.getLogicalPlan());
-    return new JSONObject(objectMapper.writeValueAsString(logicalModuleInfo));
-  }
-
-  @GET
-  @Path(PATH_LOGICAL_PLAN_MODULES + "/{moduleName}/flatten")
-  @Produces(MediaType.APPLICATION_JSON)
-  public JSONObject getLogicalModuleFlatten(@PathParam("moduleName") String moduleName) throws Exception
-  {
-    ModuleMeta logicalModule = dagManager.getModuleMeta(moduleName);
-    if (logicalModule == null) {
-      throw new NotFoundException();
-    }
-    LogicalModuleInfo logicalModuleInfo;
-    logicalModuleInfo = dagManager.getLogicalModuleInfo(moduleName, true, dagManager.getLogicalPlan());
+    LogicalModuleInfo logicalModuleInfo = dagManager.getLogicalModuleInfo(logicalModule, flatten != null);
     return new JSONObject(objectMapper.writeValueAsString(logicalModuleInfo));
   }
 
@@ -639,7 +614,6 @@ public class StramWebServices
     }
     return response;
   }
-  
   @POST // not supported by WebAppProxyServlet, can only be called directly
   @Path(PATH_PHYSICAL_PLAN_OPERATORS + "/{operatorId:\\d+}/properties")
   @Consumes(MediaType.APPLICATION_JSON)
@@ -701,51 +675,36 @@ public class StramWebServices
   public JSONObject getPorts(@PathParam("operatorName") String operatorName)
   {
     OperatorMeta logicalOperator = dagManager.getLogicalPlan().getOperatorMeta(operatorName);
+    Set<LogicalPlan.InputPortMeta> inputPorts;
+    Set<LogicalPlan.OutputPortMeta> outputPorts;
     if (logicalOperator == null) {
-      throw new NotFoundException();
-    }
-    JSONObject result = new JSONObject();
-    JSONArray ports = new JSONArray();
-    try {
-      for (LogicalPlan.InputPortMeta inputPort : logicalOperator.getInputStreams().keySet()) {
-        JSONObject port = new JSONObject();
-        port.put("name", inputPort.getPortName());
-        port.put("type", "input");
-        ports.put(port);
+      ModuleMeta logicalModule = dagManager.getModuleMeta(operatorName);
+      if (logicalModule == null) {
+        throw new NotFoundException();
       }
-      for (LogicalPlan.OutputPortMeta outputPort : logicalOperator.getOutputStreams().keySet()) {
-        JSONObject port = new JSONObject();
-        port.put("name", outputPort.getPortName());
-        port.put("type", "output");
-        ports.put(port);
-      }
-      result.put("ports", ports);
+      inputPorts = logicalModule.getInputStreams().keySet();
+      outputPorts = logicalModule.getOutputStreams().keySet();
+    } else {
+      inputPorts = logicalOperator.getInputStreams().keySet();
+      outputPorts = logicalOperator.getOutputStreams().keySet();
     }
-    catch (JSONException ex) {
-      throw new RuntimeException(ex);
-    }
+
+    JSONObject result = getPortsObjects(inputPorts, outputPorts);
     return result;
   }
 
-  @GET
-  @Path(PATH_LOGICAL_PLAN_MODULES + "/{moduleName}/ports")
-  @Produces(MediaType.APPLICATION_JSON)
-  public JSONObject getProxyPorts(@PathParam("moduleName") String moduleName)
+  private JSONObject getPortsObjects(Collection<LogicalPlan.InputPortMeta> inputs, Collection<LogicalPlan.OutputPortMeta> outputs)
   {
-    ModuleMeta logicalModule = dagManager.getModuleMeta(moduleName);
-    if (logicalModule == null) {
-      throw new NotFoundException();
-    }
     JSONObject result = new JSONObject();
     JSONArray ports = new JSONArray();
     try {
-      for (LogicalPlan.InputPortMeta inputPort : logicalModule.getInputStreams().keySet()) {
+      for (LogicalPlan.InputPortMeta inputPort : inputs) {
         JSONObject port = new JSONObject();
         port.put("name", inputPort.getPortName());
         port.put("type", "input");
         ports.put(port);
       }
-      for (LogicalPlan.OutputPortMeta outputPort : logicalModule.getOutputStreams().keySet()) {
+      for (LogicalPlan.OutputPortMeta outputPort : outputs) {
         JSONObject port = new JSONObject();
         port.put("name", outputPort.getPortName());
         port.put("type", "output");
@@ -758,64 +717,53 @@ public class StramWebServices
     return result;
   }
 
+  private JSONObject getPortObject(Collection<LogicalPlan.InputPortMeta> inputs, Collection<LogicalPlan.OutputPortMeta> outputs,
+                                   String portName) throws JSONException
+  {
+    for (LogicalPlan.InputPortMeta inputPort : inputs) {
+      if (inputPort.getPortName().equals(portName)) {
+        JSONObject port = new JSONObject();
+        port.put("name", inputPort.getPortName());
+        port.put("type", "input");
+        return port;
+      }
+    }
+    for (LogicalPlan.OutputPortMeta outputPort : outputs) {
+      if (outputPort.getPortName().equals(portName)) {
+        JSONObject port = new JSONObject();
+        port.put("name", outputPort.getPortName());
+        port.put("type", "output");
+        return port;
+      }
+    }
+    return null;
+  }
+
+
   @GET
   @Path(PATH_LOGICAL_PLAN_OPERATORS + "/{operatorName}/ports/{portName}")
   @Produces(MediaType.APPLICATION_JSON)
   public JSONObject getPort(@PathParam("operatorName") String operatorName, @PathParam("portName") String portName)
   {
     OperatorMeta logicalOperator = dagManager.getLogicalPlan().getOperatorMeta(operatorName);
+    Set<LogicalPlan.InputPortMeta> inputPorts;
+    Set<LogicalPlan.OutputPortMeta> outputPorts;
     if (logicalOperator == null) {
-      throw new NotFoundException();
-    }
-    try {
-      for (LogicalPlan.InputPortMeta inputPort : logicalOperator.getInputStreams().keySet()) {
-        if (portName.equals(portName)) {
-          JSONObject port = new JSONObject();
-          port.put("name", inputPort.getPortName());
-          port.put("type", "input");
-          return port;
-        }
+      ModuleMeta logicalModule = dagManager.getModuleMeta(operatorName);
+      if (logicalModule == null) {
+        throw new NotFoundException();
       }
-      for (LogicalPlan.OutputPortMeta outputPort : logicalOperator.getOutputStreams().keySet()) {
-        if (portName.equals(portName)) {
-          JSONObject port = new JSONObject();
-          port.put("name", outputPort.getPortName());
-          port.put("type", "output");
-          return port;
-        }
-      }
+      inputPorts = logicalModule.getInputStreams().keySet();
+      outputPorts = logicalModule.getOutputStreams().keySet();
+    } else {
+      inputPorts = logicalOperator.getInputStreams().keySet();
+      outputPorts = logicalOperator.getOutputStreams().keySet();
     }
-    catch (JSONException ex) {
-      throw new RuntimeException(ex);
-    }
-    throw new NotFoundException();
-  }
 
-  @GET
-  @Path(PATH_LOGICAL_PLAN_MODULES + "/{moduleName}/ports/{portName}")
-  @Produces(MediaType.APPLICATION_JSON)
-  public JSONObject getProxyPort(@PathParam("moduleName") String moduleName, @PathParam("portName") String portName)
-  {
-    ModuleMeta logicalModule = dagManager.getModuleMeta(moduleName);
-    if (logicalModule == null) {
-      throw new NotFoundException();
-    }
     try {
-      for (LogicalPlan.InputPortMeta inputPort : logicalModule.getInputStreams().keySet()) {
-        if (portName.equals(portName)) {
-          JSONObject port = new JSONObject();
-          port.put("name", inputPort.getPortName());
-          port.put("type", "input");
-          return port;
-        }
-      }
-      for (LogicalPlan.OutputPortMeta outputPort : logicalModule.getOutputStreams().keySet()) {
-        if (portName.equals(portName)) {
-          JSONObject port = new JSONObject();
-          port.put("name", outputPort.getPortName());
-          port.put("type", "output");
-          return port;
-        }
+      JSONObject resp = getPortObject(inputPorts, outputPorts, portName);
+      if (resp != null) {
+        return resp;
       }
     } catch (JSONException ex) {
       throw new RuntimeException(ex);
@@ -842,18 +790,30 @@ public class StramWebServices
   {
     init();
     OperatorMeta logicalOperator = dagManager.getLogicalPlan().getOperatorMeta(operatorName);
+    BeanMap operatorProperties = null;
     if (logicalOperator == null) {
-      throw new NotFoundException();
+      ModuleMeta logicalModule = dagManager.getModuleMeta(operatorName);
+      if (logicalModule == null) {
+        throw new NotFoundException();
+      }
+      operatorProperties = LogicalPlanConfiguration.getObjectProperties(logicalModule.getModule());
+    } else {
+      operatorProperties = LogicalPlanConfiguration.getObjectProperties(logicalOperator.getOperator());
     }
 
-    BeanMap operatorProperties = LogicalPlanConfiguration.getOperatorProperties(logicalOperator.getOperator());
+    Map<String, Object> m = getPropertiesAsMap(propertyName, operatorProperties);
+    return new JSONObject(objectMapper.writeValueAsString(m));
+  }
+
+  private Map<String, Object> getPropertiesAsMap(@QueryParam("propertyName") String propertyName, BeanMap operatorProperties)
+  {
     Map<String, Object> m = new HashMap<String, Object>();
     @SuppressWarnings("rawtypes")
     Iterator entryIterator = operatorProperties.entryIterator();
     while (entryIterator.hasNext()) {
       try {
         @SuppressWarnings("unchecked")
-        Map.Entry<String, Object> entry = (Map.Entry<String, Object>)entryIterator.next();
+        Entry<String, Object> entry = (Entry<String, Object>)entryIterator.next();
         if (propertyName == null) {
           m.put(entry.getKey(), entry.getValue());
         }
@@ -861,45 +821,11 @@ public class StramWebServices
           m.put(entry.getKey(), entry.getValue());
           break;
         }
-      }
-      catch (Exception ex) {
-        LOG.warn("Caught exception", ex);
-      }
-    }
-    return new JSONObject(objectMapper.writeValueAsString(m));
-  }
-
-  @GET
-  @Path(PATH_LOGICAL_PLAN_MODULES + "/{moduleName}/properties")
-  @Produces(MediaType.APPLICATION_JSON)
-  public JSONObject getModuleProperties(@PathParam("moduleName") String moduleName,
-      @QueryParam("propertyName") String propertyName) throws IOException, JSONException
-  {
-    init();
-    ModuleMeta logicalModule = dagManager.getModuleMeta(moduleName);
-    if (logicalModule == null) {
-      throw new NotFoundException();
-    }
-
-    BeanMap moduleProperties = LogicalPlanConfiguration.getModuleProperties(logicalModule.getModule());
-    Map<String, Object> m = new HashMap<String, Object>();
-    @SuppressWarnings("rawtypes")
-    Iterator entryIterator = moduleProperties.entryIterator();
-    while (entryIterator.hasNext()) {
-      try {
-        @SuppressWarnings("unchecked")
-        Map.Entry<String, Object> entry = (Map.Entry<String, Object>)entryIterator.next();
-        if (propertyName == null) {
-          m.put(entry.getKey(), entry.getValue());
-        } else if (propertyName.equals(entry.getKey())) {
-          m.put(entry.getKey(), entry.getValue());
-          break;
-        }
       } catch (Exception ex) {
         LOG.warn("Caught exception", ex);
       }
     }
-    return new JSONObject(objectMapper.writeValueAsString(m));
+    return m;
   }
 
   @GET
@@ -929,19 +855,10 @@ public class StramWebServices
   @GET
   @Path(PATH_LOGICAL_PLAN)
   @Produces(MediaType.APPLICATION_JSON)
-  public JSONObject getLogicalPlan() throws JSONException, IOException
+  public JSONObject getLogicalPlan(@QueryParam("flatten") String flatten) throws JSONException, IOException
   {
     return new JSONObject(objectMapper.writeValueAsString(LogicalPlanSerializer.convertToMap(
-        dagManager.getLogicalPlan(), false)));
-  }
-
-  @GET
-  @Path(PATH_LOGICAL_PLAN + "/flatten")
-  @Produces(MediaType.APPLICATION_JSON)
-  public JSONObject getLogicalPlanFlatten() throws JSONException, IOException
-  {
-    return new JSONObject(objectMapper.writeValueAsString(LogicalPlanSerializer.convertToMap(
-        dagManager.getLogicalPlan(), true)));
+        dagManager.getLogicalPlan(), flatten != null)));
   }
 
   @POST // not supported by WebAppProxyServlet, can only be called directly
