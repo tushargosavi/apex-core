@@ -16,16 +16,16 @@
  * specific language governing permissions and limitations
  * under the License.
  */
-package com.datatorrent.stram.plan.logical;
+package com.datatorrent.stram.plan.logical.module;
 
 import java.util.Random;
-
-import org.apache.hadoop.conf.Configuration;
 
 import org.junit.Assert;
 import org.junit.Test;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
+
+import org.apache.hadoop.conf.Configuration;
 
 import com.datatorrent.api.DAG;
 import com.datatorrent.api.DefaultInputPort;
@@ -34,6 +34,8 @@ import com.datatorrent.api.InputOperator;
 import com.datatorrent.api.Module;
 import com.datatorrent.api.StreamingApplication;
 import com.datatorrent.common.util.BaseOperator;
+import com.datatorrent.stram.plan.logical.LogicalPlan;
+import com.datatorrent.stram.plan.logical.LogicalPlanConfiguration;
 
 /**
  * Unit tests for testing Dag expansion with modules and proxy port substitution
@@ -44,7 +46,7 @@ public class ModuleAppTest
   /*
    * Input Operator - 1
    */
-  public static class DummyInputOperator extends BaseOperator implements InputOperator
+  static class DummyInputOperator extends BaseOperator implements InputOperator
   {
 
     Random r = new Random();
@@ -60,7 +62,7 @@ public class ModuleAppTest
   /*
    * Input Operator - 1.1
    */
-  public static class DummyOperatorAfterInput extends BaseOperator
+  static class DummyOperatorAfterInput extends BaseOperator
   {
 
     public transient DefaultInputPort<Integer> input = new DefaultInputPort<Integer>()
@@ -77,7 +79,7 @@ public class ModuleAppTest
   /*
    * Operator - 2
    */
-  public static class DummyOperator extends BaseOperator
+  static class DummyOperator extends BaseOperator
   {
     int prop;
 
@@ -87,6 +89,7 @@ public class ModuleAppTest
       public void process(Integer tuple)
       {
         LOG.debug(tuple.intValue() + " processed");
+        output.emit(tuple);
       }
     };
     public transient DefaultOutputPort<Integer> output = new DefaultOutputPort<Integer>();
@@ -95,7 +98,7 @@ public class ModuleAppTest
   /*
    * Output Operator - 3
    */
-  public static class DummyOutputOperator extends BaseOperator
+  static class DummyOutputOperator extends BaseOperator
   {
     int prop;
 
@@ -112,7 +115,7 @@ public class ModuleAppTest
   /*
    * Module Definition
    */
-  public static class TestModule implements Module
+  static class TestModule implements Module
   {
 
     public transient ProxyInputPort<Integer> moduleInput = new Module.ProxyInputPort<Integer>();
@@ -121,42 +124,38 @@ public class ModuleAppTest
     @Override
     public void populateDAG(DAG dag, Configuration conf)
     {
-      LOG.info("Module - PopulateDAG");
+      LOG.debug("Module - PopulateDAG");
       DummyOperator dummyOperator = dag.addOperator("DummyOperator", new DummyOperator());
       moduleInput.set(dummyOperator.input);
       moduleOutput.set(dummyOperator.output);
     }
   }
 
-  @Test
-  public void moduleTest()
+  static class Application implements StreamingApplication
   {
-
-    /*
-     * Streaming App
-     */
-    StreamingApplication app = new StreamingApplication()
+    @Override
+    public void populateDAG(DAG dag, Configuration conf)
     {
-      @Override
-      public void populateDAG(DAG dag, Configuration conf)
-      {
-        LOG.info("Application - PopulateDAG");
-        DummyInputOperator dummyInputOperator = dag.addOperator("DummyInputOperator", new DummyInputOperator());
-        DummyOperatorAfterInput dummyOperatorAfterInput = dag.addOperator("DummyOperatorAfterInput", new DummyOperatorAfterInput());
-        Module m1 = dag.addModule("TestModule1", new TestModule());
-        Module m2 = dag.addModule("TestModule2", new TestModule());
-        DummyOutputOperator dummyOutputOperator = dag.addOperator("DummyOutputOperator", new DummyOutputOperator());
-        dag.addStream("Operator To Operator", dummyInputOperator.output, dummyOperatorAfterInput.input);
-        dag.addStream("Operator To Module", dummyOperatorAfterInput.output, ((TestModule)m1).moduleInput);
-        dag.addStream("Module To Module", ((TestModule)m1).moduleOutput, ((TestModule)m2).moduleInput);
-        dag.addStream("Module To Operator", ((TestModule)m2).moduleOutput, dummyOutputOperator.input);
-      }
-    };
+      LOG.debug("Application - PopulateDAG");
+      DummyInputOperator dummyInputOperator = dag.addOperator("DummyInputOperator", new DummyInputOperator());
+      DummyOperatorAfterInput dummyOperatorAfterInput = dag.addOperator("DummyOperatorAfterInput", new DummyOperatorAfterInput());
+      Module m1 = dag.addModule("TestModule1", new TestModule());
+      Module m2 = dag.addModule("TestModule2", new TestModule());
+      DummyOutputOperator dummyOutputOperator = dag.addOperator("DummyOutputOperator", new DummyOutputOperator());
+      dag.addStream("Operator To Operator", dummyInputOperator.output, dummyOperatorAfterInput.input);
+      dag.addStream("Operator To Module", dummyOperatorAfterInput.output, ((TestModule)m1).moduleInput);
+      dag.addStream("Module To Module", ((TestModule)m1).moduleOutput, ((TestModule)m2).moduleInput);
+      dag.addStream("Module To Operator", ((TestModule)m2).moduleOutput, dummyOutputOperator.input);
+    }
+  }
 
+  @Test
+  public void validateTestApplication()
+  {
     Configuration conf = new Configuration(false);
     LogicalPlanConfiguration lpc = new LogicalPlanConfiguration(conf);
     LogicalPlan dag = new LogicalPlan();
-    lpc.prepareDAG(dag, app, "TestApp");
+    lpc.prepareDAG(dag, new Application(), "TestApp");
 
     Assert.assertEquals(2, dag.getAllModules().size(), 2);
     Assert.assertEquals(5, dag.getAllOperators().size());

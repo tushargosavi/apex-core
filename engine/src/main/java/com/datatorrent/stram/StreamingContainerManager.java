@@ -2306,22 +2306,29 @@ public class StreamingContainerManager implements PlanContext
     return fillLogicalOperatorInfo(operatorMeta);
   }
 
-  public LogicalModuleInfo getLogicalModuleInfo(String moduleName, boolean flatten, LogicalPlan dag)
+  public LogicalModuleInfo getLogicalModuleInfo(ModuleMeta module, boolean flatten)
   {
-    ModuleMeta moduleMeta = getModuleMeta(moduleName);
-    if (moduleMeta == null) {
-      return null;
-    }
-    LogicalModuleInfo logicalModuleInfo = fillLogicalModuleInfo(moduleMeta, flatten);
+    LogicalModuleInfo lmi = new LogicalModuleInfo();
+    lmi.name = module.getName();
+    lmi.className = module.getModule().getClass().getName();
     if (flatten) {
-      for (ModuleMeta meta : moduleMeta.getDag().getAllModules()) {
-        if (meta.getParentModuleName() != null && meta.getParentModuleName().equals(moduleName)) {
-          logicalModuleInfo.modules.add(getLogicalModuleInfo(fillLogicalModuleInfo(meta, flatten).name, flatten,
-              moduleMeta.getDag()));
+      for (OperatorMeta operatorMeta : module.getDag().getAllOperators()) {
+        if (operatorMeta.getModuleName() == null) {
+          String fullPath = module.getFullName() + LogicalPlan.MODULE_NAMESPACE_SEPARATOR + operatorMeta.getName();
+          lmi.operators.add(fillLogicalOperatorInfo(getLogicalPlan().getOperatorMeta(fullPath)));
         }
       }
+      for (StreamMeta streamMeta : module.getDag().getAllStreams()) {
+        if (streamMeta.getModuleName() == null) {
+          String fullPath = module.getFullName() + LogicalPlan.MODULE_NAMESPACE_SEPARATOR + streamMeta.getName();
+          lmi.streams.add(fillLogicalStreamInfo(getLogicalPlan().getStream(fullPath)));
+        }
+      }
+      for(ModuleMeta mMeta : module.getDag().getAllModules()) {
+        lmi.modules.add(getLogicalModuleInfo(mMeta, true));
+      }
     }
-    return logicalModuleInfo;
+    return lmi;
   }
 
   public ModuleMeta getModuleMeta(String moduleName)
@@ -2331,16 +2338,18 @@ public class StreamingContainerManager implements PlanContext
 
   private ModuleMeta getModuleMeta(String moduleName, LogicalPlan dag)
   {
-    ModuleMeta logicalModule = dag.getModuleMeta(moduleName);
-    if (logicalModule != null) {
-      return logicalModule;
-    }
     for (ModuleMeta m : dag.getAllModules()) {
-      return getModuleMeta(moduleName, m.getDag());
+      if (m.getFullName().equals(moduleName)) {
+        return m;
+      }
+      ModuleMeta res = getModuleMeta(moduleName, m.getDag());
+      if (res != null)
+        return res;
     }
     return null;
   }
-
+  
+ 
   public List<LogicalOperatorInfo> getLogicalOperatorInfoList()
   {
     List<LogicalOperatorInfo> infoList = new ArrayList<LogicalOperatorInfo>();
@@ -2356,11 +2365,7 @@ public class StreamingContainerManager implements PlanContext
     List<LogicalModuleInfo> infoList = new ArrayList<LogicalModuleInfo>();
     Collection<ModuleMeta> allModules = getLogicalPlan().getAllModules();
     for (ModuleMeta moduleMeta : allModules) {
-      if (!flatten) {
-        infoList.add(fillLogicalModuleInfo(moduleMeta, flatten));
-      } else {
-        infoList.add(getLogicalModuleInfo(moduleMeta.getName(), true, getLogicalPlan()));
-      }
+      infoList.add(getLogicalModuleInfo(moduleMeta, flatten));
     }
     return infoList;
   }
@@ -2512,30 +2517,6 @@ public class StreamingContainerManager implements PlanContext
     }
 
     return loi;
-  }
-
-  private LogicalModuleInfo fillLogicalModuleInfo(ModuleMeta module, boolean flatten)
-  {
-    LogicalModuleInfo lmi = new LogicalModuleInfo();
-    lmi.name = module.getName();
-    lmi.className = module.getModule().getClass().getName();
-    if (flatten) {
-      for (OperatorMeta operatorMeta : getLogicalPlan().getAllOperators()) {
-        if (operatorMeta.getModuleName() != null
-            && (operatorMeta.getModuleName().equals(module.getName()) || operatorMeta.getModuleName().equals(
-                module.getParentModuleName() + "_" + module.getName()))) {
-          lmi.operators.add(fillLogicalOperatorInfo(operatorMeta));
-        }
-      }
-      for (StreamMeta streamMeta : getLogicalPlan().getAllStreams()) {
-        if (streamMeta.getModuleName() != null
-            && (streamMeta.getModuleName().equals(module.getName()) || streamMeta.getModuleName().equals(
-                module.getParentModuleName() + "_" + module.getName()))) {
-          lmi.streams.add(fillLogicalStreamInfo(streamMeta));
-        }
-      }
-    }
-    return lmi;
   }
 
   private StreamInfo fillLogicalStreamInfo(StreamMeta streamMeta)

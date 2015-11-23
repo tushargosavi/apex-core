@@ -27,12 +27,10 @@ import javax.xml.bind.annotation.XmlAccessorType;
 import javax.xml.bind.annotation.XmlRootElement;
 
 /**
- * Provides plan level operator data<p>
+ * Provides plan level module data<p>
  * <br>
- * This call provides restful access to individual operator instance data<br>
+ * This call provides restful access to individual module instance data<br>
  * <br>
- *
- * @since 0.3.2
  */
 @XmlRootElement(name = "modules")
 @XmlAccessorType(XmlAccessType.FIELD)

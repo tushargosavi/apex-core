@@ -25,6 +25,18 @@ import javax.xml.bind.annotation.XmlAccessType;
 import javax.xml.bind.annotation.XmlAccessorType;
 import javax.xml.bind.annotation.XmlRootElement;
 
+/**
+ *
+ * Provides module level data like name, classname, etc.<p>
+ * <br>Current data includes<br>
+ * <b>Module Name</b><br>
+ * <b>Module class name</b><br>
+ * <b>Information about operators added by this module</b><br>
+ * <b>Information about streams added by this module</b><br>
+ * <b>Information about nested modules</b><br>
+ * <br>
+ *
+ */
 @XmlRootElement(name = "Module")
 @XmlAccessorType(XmlAccessType.FIELD)
 public class LogicalModuleInfo

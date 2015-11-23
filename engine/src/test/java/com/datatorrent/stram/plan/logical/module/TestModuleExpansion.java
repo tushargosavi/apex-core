@@ -39,9 +39,9 @@ import com.datatorrent.common.util.BaseOperator;
 import com.datatorrent.stram.plan.logical.LogicalPlan;
 import com.datatorrent.stram.plan.logical.LogicalPlanConfiguration;
 
-public class ExtremeModuleTest
+public class TestModuleExpansion
 {
-  public static class DummyInputOperator extends BaseOperator implements InputOperator
+  static class DummyInputOperator extends BaseOperator implements InputOperator
   {
     private int inputOperatorProp = 0;
 
@@ -65,7 +65,7 @@ public class ExtremeModuleTest
     }
   }
 
-  public static class DummyOperator extends BaseOperator
+  static class DummyOperator extends BaseOperator
   {
     private int operatorProp = 0;
 
@@ -97,7 +97,7 @@ public class ExtremeModuleTest
     }
   }
 
-  public static class Level1Module implements Module
+  static class Level1Module implements Module
   {
     private int level1ModuleProp = 0;
 
@@ -126,7 +126,7 @@ public class ExtremeModuleTest
     }
   }
 
-  public static class Level2ModuleA implements Module
+  static class Level2ModuleA implements Module
   {
     private int level2ModuleAProp1 = 0;
     private int level2ModuleAProp2 = 0;
@@ -191,7 +191,7 @@ public class ExtremeModuleTest
     }
   }
 
-  public static class Level2ModuleB implements Module
+  static class Level2ModuleB implements Module
   {
     private int level2ModuleBProp1 = 0;
     private int level2ModuleBProp2 = 0;
@@ -257,7 +257,29 @@ public class ExtremeModuleTest
     }
   }
 
-  public static class ModuleAppExtreme implements StreamingApplication
+  static class Level3Module implements Module {
+
+    public transient final ProxyInputPort<Integer> mIn = new ProxyInputPort<>();
+    public transient final ProxyOutputPort<Integer> mOut1 = new ProxyOutputPort<>();
+    public transient final ProxyOutputPort<Integer> mOut2 = new ProxyOutputPort<>();
+
+    @Override
+    public void populateDAG(DAG dag, Configuration conf)
+    {
+      DummyOperator op = dag.addOperator("O1", new DummyOperator());
+      Level2ModuleB m1 = dag.addModule("M1", new Level2ModuleB());
+      Level1Module m2 = dag.addModule("M2", new Level1Module());
+
+      dag.addStream("s1", op.out1, m1.mIn);
+      dag.addStream("s2", op.out2, m2.mIn);
+
+      mIn.set(op.in);
+      mOut1.set(m1.mOut1);
+      mOut2.set(m2.mOut);
+    }
+  }
+
+  static class NestedModuleApp implements StreamingApplication
   {
     @Override
     public void populateDAG(DAG dag, Configuration conf)
@@ -288,7 +310,9 @@ public class ExtremeModuleTest
       md.setLevel2ModuleBProp2(42);
       md.setLevel2ModuleBProp3(43);
 
-      dag.addStream("O1_O2", o1.out, o2.in);
+      Level3Module me = dag.addModule("Me", new Level3Module());
+
+      dag.addStream("O1_O2", o1.out, o2.in, me.mIn);
       dag.addStream("O2_Ma", o2.out1, ma.mIn);
       dag.addStream("Ma_Mb", ma.mOut1, mb.mIn);
       dag.addStream("Ma_Md", ma.mOut2, md.mIn);
@@ -299,15 +323,16 @@ public class ExtremeModuleTest
   @Test
   public void testModuleExtreme()
   {
-    StreamingApplication app = new ModuleAppExtreme();
+    StreamingApplication app = new NestedModuleApp();
     Configuration conf = new Configuration(false);
     LogicalPlanConfiguration lpc = new LogicalPlanConfiguration(conf);
     LogicalPlan dag = new LogicalPlan();
     lpc.prepareDAG(dag, app, "ModuleApp");
 
     dag.validate();
-    validateTopLevelStreams(dag);
     validateTopLevelOperators(dag);
+    validateTopLevelStreams(dag);
+    validatePublicMethods(dag);
   }
 
   private void validateTopLevelStreams(LogicalPlan dag)
@@ -317,30 +342,31 @@ public class ExtremeModuleTest
       streamNames.add(streamMeta.getName());
     }
 
-    Assert.assertTrue(streamNames.contains("Mb_O1_M1"));
+    Assert.assertTrue(streamNames.contains(componentName("Mb", "O1_M1")));
     Assert.assertTrue(streamNames.contains("O2_Ma"));
     Assert.assertTrue(streamNames.contains("Mb_Mc"));
-    Assert.assertTrue(streamNames.contains("Mb_O1_O2"));
-    Assert.assertTrue(streamNames.contains("Ma_M1_M2&O1"));
-    Assert.assertTrue(streamNames.contains("Md_O1_M1"));
-    Assert.assertTrue(streamNames.contains("Ma_Md"));
-    Assert.assertTrue(streamNames.contains("Mc_M1_M2&O1"));
-    Assert.assertTrue(streamNames.contains("Md_O1_O2"));
+    Assert.assertTrue(streamNames.contains(componentName("Mb", "O1_O2")));
+    Assert.assertTrue(streamNames.contains(componentName("Ma", "M1_M2&O1")));
+    Assert.assertTrue(streamNames.contains(componentName("Md", "O1_M1")));
+    Assert.assertTrue(streamNames.contains(componentName("Ma_Md")));
+    Assert.assertTrue(streamNames.contains(componentName("Mc", "M1_M2&O1")));
+    Assert.assertTrue(streamNames.contains(componentName("Md", "O1_O2")));
     Assert.assertTrue(streamNames.contains("Ma_Mb"));
     Assert.assertTrue(streamNames.contains("O1_O2"));
 
-    validateSeperateStream(dag, "Mb_O1_M1", "Mb_O1", "Mb_M1_O1");
-    validateSeperateStream(dag, "O2_Ma", "O2", "Ma_M1_O1");
-    validateSeperateStream(dag, "Mb_Mc", "Mb_O2", "Mc_M1_O1");
-    validateSeperateStream(dag, "Mb_O1_O2", "Mb_O1", "Mb_O2");
-    validateSeperateStream(dag, "Ma_M1_M2&O1", "Ma_M1_O1", "Ma_O1", "Ma_M2_O1");
-    validateSeperateStream(dag, "Md_O1_M1", "Md_O1", "Md_M1_O1");
-    validateSeperateStream(dag, "Ma_Md", "Ma_O1", "Md_O1");
-    validateSeperateStream(dag, "Mc_M1_M2&O1", "Mc_M1_O1", "Mc_O1", "Mc_M2_O1");
-    validateSeperateStream(dag, "Md_O1_O2", "Md_O1", "Md_O2");
-    validateSeperateStream(dag, "Ma_Mb", "Ma_M2_O1", "Mb_O1");
-    validateSeperateStream(dag, "O1_O2", "O1", "O2");
-    validateSeperateStream(dag, "O1_O2", "O1", "O2");
+    validateSeperateStream(dag, componentName("Mb", "O1_M1"), componentName("Mb", "O1"), componentName("Mb", "M1", "O1"));
+    validateSeperateStream(dag, "O2_Ma", "O2", componentName("Ma", "M1", "O1"));
+    validateSeperateStream(dag, "Mb_Mc", componentName("Mb", "O2"), componentName("Mc", "M1", "O1"));
+    validateSeperateStream(dag, componentName("Mb", "O1_O2"), componentName("Mb", "O1"), componentName("Mb", "O2"));
+    validateSeperateStream(dag, componentName("Ma", "M1_M2&O1"), componentName("Ma", "M1", "O1"), componentName("Ma", "O1"),
+      componentName("Ma", "M2", "O1"));
+    validateSeperateStream(dag, componentName("Md", "O1_M1"), componentName("Md", "O1"), componentName("Md", "M1", "O1"));
+    validateSeperateStream(dag, "Ma_Md", componentName("Ma", "O1"), componentName("Md", "O1"));
+    validateSeperateStream(dag, componentName("Mc", "M1_M2&O1"), componentName("Mc", "M1", "O1"), componentName("Mc", "O1"),
+      componentName("Mc", "M2", "O1"));
+    validateSeperateStream(dag, componentName("Md", "O1_O2"), componentName("Md", "O1"), componentName("Md","O2"));
+    validateSeperateStream(dag, "Ma_Mb", componentName("Ma", "M2", "O1"), componentName("Mb","O1"));
+    validateSeperateStream(dag, "O1_O2", "O1", "O2", componentName("Me", "O1"));
   }
 
   private void validateSeperateStream(LogicalPlan dag, String streamName, String inputOperatorName, String... outputOperatorNames)
@@ -369,48 +395,48 @@ public class ExtremeModuleTest
     }
     Assert.assertTrue(operatorNames.contains("O1"));
     Assert.assertTrue(operatorNames.contains("O2"));
-    Assert.assertTrue(operatorNames.contains("Ma_M1_O1"));
-    Assert.assertTrue(operatorNames.contains("Ma_M2_O1"));
-    Assert.assertTrue(operatorNames.contains("Ma_O1"));
-    Assert.assertTrue(operatorNames.contains("Mb_O1"));
-    Assert.assertTrue(operatorNames.contains("Mb_M1_O1"));
-    Assert.assertTrue(operatorNames.contains("Mb_O2"));
-    Assert.assertTrue(operatorNames.contains("Mc_M1_O1"));
-    Assert.assertTrue(operatorNames.contains("Mc_M2_O1"));
-    Assert.assertTrue(operatorNames.contains("Mc_O1"));
-    Assert.assertTrue(operatorNames.contains("Md_O1"));
-    Assert.assertTrue(operatorNames.contains("Md_M1_O1"));
-    Assert.assertTrue(operatorNames.contains("Md_O2"));
+    Assert.assertTrue(operatorNames.contains(componentName("Ma", "M1", "O1")));
+    Assert.assertTrue(operatorNames.contains(componentName("Ma", "M2", "O1")));
+    Assert.assertTrue(operatorNames.contains(componentName("Ma","O1")));
+    Assert.assertTrue(operatorNames.contains(componentName("Mb","O1")));
+    Assert.assertTrue(operatorNames.contains(componentName("Mb", "M1", "O1")));
+    Assert.assertTrue(operatorNames.contains(componentName("Mb", "O2")));
+    Assert.assertTrue(operatorNames.contains(componentName("Mc", "M1", "O1")));
+    Assert.assertTrue(operatorNames.contains(componentName("Mc", "M2", "O1")));
+    Assert.assertTrue(operatorNames.contains(componentName("Mc", "O1")));
+    Assert.assertTrue(operatorNames.contains(componentName("Md", "O1")));
+    Assert.assertTrue(operatorNames.contains(componentName("Md", "M1", "O1")));
+    Assert.assertTrue(operatorNames.contains(componentName("Md", "O2")));
 
     validateOperatorPropertyValue(dag, "O1", 1);
     validateOperatorPropertyValue(dag, "O2", 2);
-    validateOperatorPropertyValue(dag, "Ma_M1_O1", 11);
-    validateOperatorPropertyValue(dag, "Ma_M2_O1", 12);
-    validateOperatorPropertyValue(dag, "Ma_O1", 13);
-    validateOperatorPropertyValue(dag, "Mb_O1", 21);
-    validateOperatorPropertyValue(dag, "Mb_M1_O1", 22);
-    validateOperatorPropertyValue(dag, "Mb_O2", 23);
-    validateOperatorPropertyValue(dag, "Mc_M1_O1", 31);
-    validateOperatorPropertyValue(dag, "Mc_M2_O1", 32);
-    validateOperatorPropertyValue(dag, "Mc_O1", 33);
-    validateOperatorPropertyValue(dag, "Md_O1", 41);
-    validateOperatorPropertyValue(dag, "Md_M1_O1", 42);
-    validateOperatorPropertyValue(dag, "Md_O2", 43);
+    validateOperatorPropertyValue(dag, componentName("Ma", "M1", "O1"), 11);
+    validateOperatorPropertyValue(dag, componentName("Ma", "M2", "O1"), 12);
+    validateOperatorPropertyValue(dag, componentName("Ma", "O1"), 13);
+    validateOperatorPropertyValue(dag, componentName("Mb", "O1"), 21);
+    validateOperatorPropertyValue(dag, componentName("Mb", "M1", "O1"), 22);
+    validateOperatorPropertyValue(dag, componentName("Mb", "O2"), 23);
+    validateOperatorPropertyValue(dag, componentName("Mc", "M1", "O1"), 31);
+    validateOperatorPropertyValue(dag, componentName("Mc", "M2", "O1"), 32);
+    validateOperatorPropertyValue(dag, componentName("Mc", "O1"), 33);
+    validateOperatorPropertyValue(dag, componentName("Md", "O1"), 41);
+    validateOperatorPropertyValue(dag, componentName("Md", "M1", "O1"), 42);
+    validateOperatorPropertyValue(dag, componentName("Md", "O2"), 43);
 
     validateOperatorParent(dag, "O1", null);
     validateOperatorParent(dag, "O2", null);
-    validateOperatorParent(dag, "Ma_M1_O1", "Ma_M1");
-    validateOperatorParent(dag, "Ma_M2_O1", "Ma_M2");
-    validateOperatorParent(dag, "Ma_O1", "Ma");
-    validateOperatorParent(dag, "Mb_O1", "Mb");
-    validateOperatorParent(dag, "Mb_M1_O1", "Mb_M1");
-    validateOperatorParent(dag, "Mb_O2", "Mb");
-    validateOperatorParent(dag, "Mc_M1_O1", "Mc_M1");
-    validateOperatorParent(dag, "Mc_M2_O1", "Mc_M2");
-    validateOperatorParent(dag, "Mc_O1", "Mc");
-    validateOperatorParent(dag, "Md_O1", "Md");
-    validateOperatorParent(dag, "Md_M1_O1", "Md_M1");
-    validateOperatorParent(dag, "Md_O2", "Md");
+    validateOperatorParent(dag, componentName("Ma", "M1", "O1"), componentName("Ma", "M1"));
+    validateOperatorParent(dag, componentName("Ma", "M2", "O1"), componentName("Ma", "M2"));
+    validateOperatorParent(dag, componentName("Ma", "O1"), "Ma");
+    validateOperatorParent(dag, componentName("Mb", "O1"), "Mb");
+    validateOperatorParent(dag, componentName("Mb", "M1", "O1"), componentName("Mb", "M1"));
+    validateOperatorParent(dag, componentName("Mb", "O2"), "Mb");
+    validateOperatorParent(dag, componentName("Mc", "M1", "O1"), componentName("Mc", "M1"));
+    validateOperatorParent(dag, componentName("Mc", "M2", "O1"), componentName("Mc", "M2"));
+    validateOperatorParent(dag, componentName("Mc", "O1"), "Mc");
+    validateOperatorParent(dag, componentName("Md", "O1"), "Md");
+    validateOperatorParent(dag, componentName("Md", "M1", "O1"), componentName("Md", "M1"));
+    validateOperatorParent(dag, componentName("Md", "O2"), "Md");
   }
 
   private void validateOperatorParent(LogicalPlan dag, String operatorName, String parentModuleName)
@@ -423,7 +449,7 @@ public class ExtremeModuleTest
     }
   }
 
-  void validateOperatorPropertyValue(LogicalPlan dag, String operatorName, int expectedValue)
+  private void validateOperatorPropertyValue(LogicalPlan dag, String operatorName, int expectedValue)
   {
     LogicalPlan.OperatorMeta oMeta = dag.getOperatorMeta(operatorName);
     if (operatorName.equals("O1")) {
@@ -435,4 +461,82 @@ public class ExtremeModuleTest
     }
   }
 
+  private void validatePublicMethods(LogicalPlan dag) {
+    // Logical dag contains 4 modules added on top level.
+    List<String> moduleNames = new ArrayList<>();
+    for (LogicalPlan.ModuleMeta moduleMeta: dag.getAllModules()) {
+      moduleNames.add(moduleMeta.getName());
+    }
+    Assert.assertTrue(moduleNames.contains("Ma"));
+    Assert.assertTrue(moduleNames.contains("Mb"));
+    Assert.assertTrue(moduleNames.contains("Mc"));
+    Assert.assertTrue(moduleNames.contains("Md"));
+    Assert.assertTrue(moduleNames.contains("Me"));
+    Assert.assertEquals("Number of modules are 5", 5, dag.getAllModules().size());
+
+    // correct module meta is returned by getMeta call.
+    LogicalPlan.ModuleMeta m = dag.getModuleMeta("Ma");
+    Assert.assertEquals("Name of module is Ma", m.getName(), "Ma");
+
+
+  }
+
+  private static String componentName(String... names) {
+    if (names.length == 0) return "";
+    StringBuilder sb = new StringBuilder(names[0]);
+    for(int i = 1; i < names.length; i++) {
+      sb.append(LogicalPlan.MODULE_NAMESPACE_SEPARATOR);
+      sb.append(names[i]);
+    }
+    return sb.toString();
+  }
+
+  /**
+   * Generate a conflict, Add a top level operator with name "m1_O1",
+   * and add a module "m1" which will populate operator "O1", causing name conflict with
+   * top level operator.
+   */
+  @Test(expected = java.lang.IllegalArgumentException.class )
+  public void conflictingNamesWithExpandedModule() {
+    Configuration conf = new Configuration(false);
+    LogicalPlanConfiguration lpc = new LogicalPlanConfiguration(conf);
+    LogicalPlan dag = new LogicalPlan();
+    DummyInputOperator in = dag.addOperator(componentName("m1", "O1"), new DummyInputOperator());
+    Level2ModuleA module = dag.addModule("m1", new Level2ModuleA());
+    dag.addStream("s1", in.out, module.mIn);
+    lpc.prepareDAG(dag, null, "ModuleApp");
+    dag.validate();
+  }
+
+  /**
+   * Module and Operator with same name is not allowed in a DAG, to prevent properties
+   * conflict.
+   */
+  @Test(expected = java.lang.IllegalArgumentException.class )
+  public void conflictingNamesWithOperator1() {
+    Configuration conf = new Configuration(false);
+    LogicalPlanConfiguration lpc = new LogicalPlanConfiguration(conf);
+    LogicalPlan dag = new LogicalPlan();
+    DummyInputOperator in = dag.addOperator("M1", new DummyInputOperator());
+    Level2ModuleA module = dag.addModule("M1", new Level2ModuleA());
+    dag.addStream("s1", in.out, module.mIn);
+    lpc.prepareDAG(dag, null, "ModuleApp");
+    dag.validate();
+  }
+
+  /**
+   * Module and Operator with same name is not allowed in a DAG, to prevent properties
+   * conflict.
+   */
+  @Test(expected = java.lang.IllegalArgumentException.class )
+  public void conflictingNamesWithOperator2() {
+    Configuration conf = new Configuration(false);
+    LogicalPlanConfiguration lpc = new LogicalPlanConfiguration(conf);
+    LogicalPlan dag = new LogicalPlan();
+    Level2ModuleA module = dag.addModule("M1", new Level2ModuleA());
+    DummyInputOperator in = dag.addOperator("M1", new DummyInputOperator());
+    dag.addStream("s1", in.out, module.mIn);
+    lpc.prepareDAG(dag, null, "ModuleApp");
+    dag.validate();
+  }
 }
