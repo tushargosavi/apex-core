@@ -16,20 +16,33 @@
  * specific language governing permissions and limitations
  * under the License.
  */
-package com.datatorrent.stram.plan.logical;
+package com.datatorrent.stram.plan.logical.module;
 
-import com.datatorrent.api.*;
-import com.datatorrent.api.annotation.InputPortFieldAnnotation;
-import com.datatorrent.api.annotation.OutputPortFieldAnnotation;
-import com.datatorrent.common.util.BaseOperator;
-import com.datatorrent.stram.engine.GenericOperatorProperty;
+import java.util.Map;
+import java.util.Random;
 
-import org.apache.hadoop.conf.Configuration;
+import javax.validation.Valid;
+import javax.validation.constraints.AssertTrue;
+import javax.validation.constraints.Min;
+import javax.validation.constraints.NotNull;
+import javax.validation.constraints.Pattern;
 
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
-import java.util.Random;
+import org.apache.hadoop.conf.Configuration;
+
+import com.google.common.collect.Maps;
+
+import com.datatorrent.api.DAG;
+import com.datatorrent.api.DefaultInputPort;
+import com.datatorrent.api.DefaultOutputPort;
+import com.datatorrent.api.InputOperator;
+import com.datatorrent.api.Module;
+import com.datatorrent.api.annotation.InputPortFieldAnnotation;
+import com.datatorrent.api.annotation.OutputPortFieldAnnotation;
+import com.datatorrent.common.util.BaseOperator;
+import com.datatorrent.stram.engine.GenericOperatorProperty;
 
 public class TestModules
 {
@@ -120,11 +133,103 @@ public class TestModules
     @Override
     public void populateDAG(DAG dag, Configuration conf)
     {
-      LOG.info("populateDAG of module called");
+      LOG.debug("populateDAG of module called");
     }
   }
 
-  public static class RandGen extends BaseOperator implements InputOperator
+  public static class ValidationTestModule implements Module
+  {
+    @NotNull
+    @Pattern(regexp = ".*malhar.*", message = "Value has to contain 'malhar'!")
+    private String stringField1;
+
+    @Min(2)
+    private int intField1;
+
+    @AssertTrue(message = "stringField1 should end with intField1")
+    private boolean isValidConfiguration()
+    {
+      return stringField1.endsWith(String.valueOf(intField1));
+    }
+
+    private String getterProperty2 = "";
+
+    @NotNull
+    public String getProperty2()
+    {
+      return getterProperty2;
+    }
+
+    public void setProperty2(String s)
+    {
+      // annotations need to be on the getter
+      getterProperty2 = s;
+    }
+
+    private String[] stringArrayField;
+
+    public String[] getStringArrayField()
+    {
+      return stringArrayField;
+    }
+
+    public void setStringArrayField(String[] stringArrayField)
+    {
+      this.stringArrayField = stringArrayField;
+    }
+
+    public class Nested
+    {
+      @NotNull
+      private String property = "";
+
+      public String getProperty()
+      {
+        return property;
+      }
+
+      public void setProperty(String property)
+      {
+        this.property = property;
+      }
+
+    }
+
+    @Valid
+    private final Nested nestedBean = new Nested();
+
+    private String stringProperty2;
+
+    public String getStringProperty2()
+    {
+      return stringProperty2;
+    }
+
+    public void setStringProperty2(String stringProperty2)
+    {
+      this.stringProperty2 = stringProperty2;
+    }
+
+    private Map<String, String> mapProperty = Maps.newHashMap();
+
+    public Map<String, String> getMapProperty()
+    {
+      return mapProperty;
+    }
+
+    public void setMapProperty(Map<String, String> mapProperty)
+    {
+      this.mapProperty = mapProperty;
+    }
+
+    @Override
+    public void populateDAG(DAG dag, Configuration conf)
+    {
+
+    }
+  }
+
+  public static class RandomInputOperator extends BaseOperator implements InputOperator
   {
     private int min = 0;
     private int max = 100;
@@ -213,7 +318,7 @@ public class TestModules
     @Override
     public void populateDAG(DAG dag, Configuration conf)
     {
-      RandGen gen = dag.addOperator("gen", new RandGen());
+      RandomInputOperator gen = dag.addOperator("gen", new RandomInputOperator());
       gen.setMax(size);
       PiCalculator pc = dag.addOperator("cal", new PiCalculator());
       pc.setSize(size);
@@ -271,7 +376,7 @@ public class TestModules
     @Override
     public void populateDAG(DAG dag, Configuration conf)
     {
-      RandGen rand = dag.addOperator("RandGen", RandGen.class);
+      RandomInputOperator rand = dag.addOperator("RandomInputOperator", RandomInputOperator.class);
     }
   }
 }

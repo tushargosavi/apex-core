@@ -84,6 +84,7 @@ public class LogicalPlan implements Serializable, DAG
   public static final String SER_FILE_NAME = "dt-conf.ser";
   public static final String LAUNCH_CONFIG_FILE_NAME = "dt-launch-config.xml";
   private static final transient AtomicInteger logicalOperatorSequencer = new AtomicInteger();
+  public static final String MODULE_NAMESPACE_SEPARATOR = "/";
 
   /**
    * Constant
@@ -1102,12 +1103,19 @@ public class LogicalPlan implements Serializable, DAG
       throw new IllegalArgumentException("duplicate operator id: " + operators.get(name));
     }
 
+    // Avoid name conflict with module.
+    if (modules.containsKey(name))
+      throw new IllegalArgumentException("duplicate operator id: " + operators.get(name));
+
     OperatorMeta decl = new OperatorMeta(name, operator);
     rootOperators.add(decl); // will be removed when a sink is added to an input port for this operator
     operators.put(name, decl);
     return operator;
   }
 
+  /**
+   * Module meta object.
+   */
   public final class ModuleMeta implements DAG.ModuleMeta, Serializable
   {
     private final LinkedHashMap<InputPortMeta, StreamMeta> inputStreams = new LinkedHashMap<InputPortMeta, StreamMeta>();
@@ -1116,19 +1124,18 @@ public class LogicalPlan implements Serializable, DAG
     @SuppressWarnings("unused")
     private final int id;
     @NotNull
-    private final String name;
-    private transient Integer nindex; // for cycle detection
-    private transient Integer lowlink; // for cycle detection
+    private String name;
     private transient Module module;
-    private String parentModuleName;  // Name of the module which has this module. null if this is a top level Module.
+    private ModuleMeta parent;
     private LogicalPlan dag = null;
+    private transient String fullName;
 
-    public ModuleMeta(String name, Module module)
+    private ModuleMeta(String name, Module module)
     {
       this(name, module, new DefaultAttributeMap());
     }
 
-    public ModuleMeta(String name, Module module, DefaultAttributeMap attributeMap)
+    private ModuleMeta(String name, Module module, DefaultAttributeMap attributeMap)
     {
       LOG.debug("Initializing {} as {}", name, module.getClass().getName());
       this.name = name;
@@ -1165,7 +1172,7 @@ public class LogicalPlan implements Serializable, DAG
     @Override
     public Attribute.AttributeMap getAttributes()
     {
-      return null;
+      return attributes;
     }
 
     @Override
@@ -1186,16 +1193,6 @@ public class LogicalPlan implements Serializable, DAG
 
     }
 
-    public String getParentModuleName()
-    {
-      return parentModuleName;
-    }
-
-    public void setParentModuleName(String parentModuleName)
-    {
-      this.parentModuleName = parentModuleName;
-    }
-
     public LinkedHashMap<InputPortMeta, StreamMeta> getInputStreams()
     {
       return inputStreams;
@@ -1209,16 +1206,6 @@ public class LogicalPlan implements Serializable, DAG
     public int getId()
     {
       return id;
-    }
-
-    public Integer getNindex()
-    {
-      return nindex;
-    }
-
-    public Integer getLowlink()
-    {
-      return lowlink;
     }
 
     public LogicalPlan getDag()
@@ -1241,15 +1228,60 @@ public class LogicalPlan implements Serializable, DAG
       module = (Module)FSStorageAgent.retrieve(input);
     }
 
+    /**
+     * Expand the module and add its operator to the parentDAG. After this method finishes the
+     * module is expanded fully with all its submodules also expanded. The parentDAG contains
+     * the operator added by all the modules.
+     *
+     * @param parentDAG parent dag to populate with operators from this and inner modules.
+     * @param conf configuration object.
+     */
     public void flattenModule(LogicalPlan parentDAG, Configuration conf)
     {
       module.populateDAG(dag, conf);
       for (ModuleMeta subModuleMeta : dag.getAllModules()) {
-        subModuleMeta.setParentModuleName(this.name);
+        subModuleMeta.setParent(this);
         subModuleMeta.flattenModule(dag, conf);
       }
       dag.applyStreamLinks();
-      parentDAG.addDAGToCurrentDAG(dag, this.name);
+      parentDAG.addDAGToCurrentDAG(this);
+    }
+
+    /**
+     * Return full name of the module. If this is a inner module, i.e module inside of module this method will
+     * traverse till the top level module, and construct the name by concatenating name of modules in the chain
+     * in reverse order separated by MODULE_NAMESPACE_SEPARATO.
+     *
+     * For example If there is module M1, which adds another module M2 in the DAG. Then the full name of the
+     * module M2 is ("M1" ++ MODULE_NAMESPACE_SEPARATO + "M2")
+     *
+     * @return full name of the module.
+     */
+    public String getFullName()
+    {
+      if (fullName != null)
+        return fullName;
+
+      if (parent == null) {
+        fullName = name;
+      } else {
+        fullName = parent.getFullName() + MODULE_NAMESPACE_SEPARATOR + name;
+      }
+      return fullName;
+    }
+
+    private void setParent(ModuleMeta meta) {
+      this.parent = meta;
+    }
+
+    /**
+     *
+     * @return full name of parent module.
+     */
+    public String getParentModuleName() {
+      if (parent == null)
+        return null;
+      return parent.getFullName();
     }
   }
 
@@ -1262,6 +1294,8 @@ public class LogicalPlan implements Serializable, DAG
       }
       throw new IllegalArgumentException("duplicate module is: " + modules.get(name));
     }
+    if (operators.containsKey(name))
+      throw new IllegalArgumentException("duplicate module is: " + modules.get(name));
 
     ModuleMeta meta = new ModuleMeta(name, module);
     modules.put(name, meta);
@@ -1349,28 +1383,30 @@ public class LogicalPlan implements Serializable, DAG
         if (s.getSource() == null) {
           Operator.OutputPort<?> outputPort = pair.getKey();
           while (outputPort instanceof ProxyOutputPort) {
-            outputPort = ((ProxyOutputPort)outputPort).get();
+            outputPort = ((ProxyOutputPort<?>)outputPort).get();
           }
           s.setSource(outputPort);
         }
 
         Operator.InputPort<?> inputPort = pair.getValue();
         while (inputPort instanceof ProxyInputPort) {
-          inputPort = ((ProxyInputPort)inputPort).get();
+          inputPort = ((ProxyInputPort<?>)inputPort).get();
         }
         s.addSink(inputPort);
       }
     }
   }
 
-  private void addDAGToCurrentDAG(LogicalPlan subDag, String subDAGName)
+  private void addDAGToCurrentDAG(ModuleMeta moduleMeta)
   {
+    LogicalPlan subDag = moduleMeta.getDag();
+    String subDAGName = moduleMeta.getName();
     String name;
     for (OperatorMeta operatorMeta : subDag.getAllOperators()) {
-      name = subDAGName + "_" + operatorMeta.getName();
+      name = subDAGName + MODULE_NAMESPACE_SEPARATOR + operatorMeta.getName();
       this.addOperator(name, operatorMeta.getOperator());
       OperatorMeta operatorMetaNew = this.getOperatorMeta(name);
-      operatorMetaNew.setModuleName(operatorMeta.getModuleName() == null ? subDAGName : subDAGName + "_" + operatorMeta.getModuleName());
+      operatorMetaNew.setModuleName(operatorMeta.getModuleName() == null ? subDAGName : subDAGName + MODULE_NAMESPACE_SEPARATOR + operatorMeta.getModuleName());
     }
 
     for (StreamMeta streamMeta : subDag.getAllStreams()) {
@@ -1381,7 +1417,7 @@ public class LogicalPlan implements Serializable, DAG
       }
       InputPort[] inputPorts = ports.toArray(new InputPort[]{});
 
-      name = subDAGName + "_" + streamMeta.getName();
+      name = subDAGName + MODULE_NAMESPACE_SEPARATOR + streamMeta.getName();
       StreamMeta streamMetaNew = this.addStream(name, sourceMeta.getPortObject(), inputPorts);
       streamMetaNew.setModuleName(streamMeta.getModuleName() == null ? subDAGName : subDAGName + "_" + streamMeta.getModuleName());
     }

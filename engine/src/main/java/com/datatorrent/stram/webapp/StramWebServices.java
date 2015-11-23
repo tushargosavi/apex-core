@@ -567,7 +567,7 @@ public class StramWebServices
   }
 
   @GET
-  @Path(PATH_LOGICAL_PLAN_MODULES + "/{moduleName}")
+  @Path(PATH_LOGICAL_PLAN_MODULES + "/{moduleName:.+}")
   @Produces(MediaType.APPLICATION_JSON)
   public JSONObject getLogicalModule(@PathParam("moduleName") String moduleName) throws Exception
   {
@@ -575,13 +575,12 @@ public class StramWebServices
     if (logicalModule == null) {
       throw new NotFoundException();
     }
-    LogicalModuleInfo logicalModuleInfo;
-    logicalModuleInfo = dagManager.getLogicalModuleInfo(moduleName, false, dagManager.getLogicalPlan());
+    LogicalModuleInfo logicalModuleInfo = dagManager.getLogicalModuleInfo(logicalModule, false);
     return new JSONObject(objectMapper.writeValueAsString(logicalModuleInfo));
   }
 
   @GET
-  @Path(PATH_LOGICAL_PLAN_MODULES + "/{moduleName}/flatten")
+  @Path(PATH_LOGICAL_PLAN_MODULES + "/{moduleName:.+}/flatten")
   @Produces(MediaType.APPLICATION_JSON)
   public JSONObject getLogicalModuleFlatten(@PathParam("moduleName") String moduleName) throws Exception
   {
@@ -590,7 +589,7 @@ public class StramWebServices
       throw new NotFoundException();
     }
     LogicalModuleInfo logicalModuleInfo;
-    logicalModuleInfo = dagManager.getLogicalModuleInfo(moduleName, true, dagManager.getLogicalPlan());
+    logicalModuleInfo = dagManager.getLogicalModuleInfo(logicalModule, true);
     return new JSONObject(objectMapper.writeValueAsString(logicalModuleInfo));
   }
 
@@ -886,17 +885,13 @@ public class StramWebServices
     @SuppressWarnings("rawtypes")
     Iterator entryIterator = moduleProperties.entryIterator();
     while (entryIterator.hasNext()) {
-      try {
-        @SuppressWarnings("unchecked")
-        Map.Entry<String, Object> entry = (Map.Entry<String, Object>)entryIterator.next();
-        if (propertyName == null) {
-          m.put(entry.getKey(), entry.getValue());
-        } else if (propertyName.equals(entry.getKey())) {
-          m.put(entry.getKey(), entry.getValue());
-          break;
-        }
-      } catch (Exception ex) {
-        LOG.warn("Caught exception", ex);
+      @SuppressWarnings("unchecked")
+      Map.Entry<String, Object> entry = (Map.Entry<String, Object>)entryIterator.next();
+      if (propertyName == null) {
+        m.put(entry.getKey(), entry.getValue());
+      } else if (propertyName.equals(entry.getKey())) {
+        m.put(entry.getKey(), entry.getValue());
+        break;
       }
     }
     return new JSONObject(objectMapper.writeValueAsString(m));
