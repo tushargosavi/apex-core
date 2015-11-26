@@ -196,6 +196,7 @@ public class LogicalPlan implements Serializable, DAG
     @SuppressWarnings("FieldNameHidesFieldInSuperclass")
     private static final long serialVersionUID = 1L;
     private OperatorMeta operatorMeta;
+    private ModuleMeta moduleMeta;
     private String fieldName;
     private InputPortFieldAnnotation portAnnotation;
     private AppData.QueryPort adqAnnotation;
@@ -206,6 +207,10 @@ public class LogicalPlan implements Serializable, DAG
     public OperatorMeta getOperatorWrapper()
     {
       return operatorMeta;
+    }
+
+    public ModuleMeta getModuleMeta() {
+      return moduleMeta;
     }
 
     public String getPortName()
@@ -274,6 +279,7 @@ public class LogicalPlan implements Serializable, DAG
     @SuppressWarnings("FieldNameHidesFieldInSuperclass")
     private static final long serialVersionUID = 201412091633L;
     private OperatorMeta operatorMeta;
+    private ModuleMeta moduleMeta; // if port belongs to the module.
     private OperatorMeta unifierMeta;
     private OperatorMeta sliderMeta;
     private String fieldName;
@@ -292,6 +298,7 @@ public class LogicalPlan implements Serializable, DAG
     {
       return operatorMeta;
     }
+    public ModuleMeta getModuleMeta() { return moduleMeta; }
 
     @Override
     public OperatorMeta getUnifierMeta()
@@ -461,13 +468,28 @@ public class LogicalPlan implements Serializable, DAG
     {
       OutputPortMeta portMeta = assertGetPortMeta(port);
       OperatorMeta om = portMeta.getOperatorMeta();
-      if (om.outputStreams.containsKey(portMeta)) {
-        String msg = String.format("Operator %s already connected to %s", om.name, om.outputStreams.get(portMeta).id);
-        throw new IllegalArgumentException(msg);
+      if (om != null) {
+        if (om.outputStreams.containsKey(portMeta)) {
+          String msg = String.format("Operator %s already connected to %s", om.name, om.outputStreams.get(portMeta).id);
+          throw new IllegalArgumentException(msg);
+        }
+        this.source = portMeta;
+        om.outputStreams.put(portMeta, this);
+        return this;
       }
-      this.source = portMeta;
-      om.outputStreams.put(portMeta, this);
-      return this;
+
+      ModuleMeta mm = portMeta.getModuleMeta();
+      if (mm != null) {
+        if (mm.outputStreams.containsKey(portMeta)) {
+          String msg = String.format("Module %s already connected to %s", om.name, om.outputStreams.get(portMeta).id);
+          throw new IllegalArgumentException(msg);
+        }
+        this.source = portMeta;
+        mm.outputStreams.put(portMeta, this);
+        return this;
+      }
+
+      return null;
     }
 
     public List<InputPortMeta> getSinks()
@@ -481,18 +503,33 @@ public class LogicalPlan implements Serializable, DAG
       InputPortMeta portMeta = assertGetPortMeta(port);
       OperatorMeta om = portMeta.getOperatorWrapper();
       String portName = portMeta.getPortName();
-      if (om.inputStreams.containsKey(portMeta)) {
-        throw new IllegalArgumentException(String.format("Port %s already connected to stream %s", portName, om.inputStreams.get(portMeta)));
+      if (om != null) {
+        if (om.inputStreams.containsKey(portMeta)) {
+          throw new IllegalArgumentException(String.format("Port %s already connected to stream %s", portName, om.inputStreams.get(portMeta)));
+        }
+        om.inputStreams.put(portMeta, this);
+      } else {
+        ModuleMeta mm = portMeta.getModuleMeta();
+        if (mm.inputStreams.containsKey(portMeta)) {
+          throw new IllegalArgumentException(String.format("Port %s already connected to stream %s", portName, mm.inputStreams.get(portMeta)));
+        }
+        mm.inputStreams.put(portMeta, this);
       }
 
       /*
       finalizeValidate(portMeta);
       */
-
-      sinks.add(portMeta);
-      om.inputStreams.put(portMeta, this);
-      rootOperators.remove(portMeta.operatorMeta);
-
+      if (source.getPortObject() instanceof ProxyOutputPort || port instanceof ProxyInputPort) {
+        ArrayListMultimap<Operator.OutputPort<?>, Operator.InputPort<?>> streamMap = streamLinks.get(id);
+        if (streamMap == null) {
+          streamMap = ArrayListMultimap.create();
+          streamLinks.put(id, streamMap);
+        }
+        streamMap.put(source.getPortObject(), portMeta.getPortObject());
+      } else {
+        sinks.add(portMeta);
+        rootOperators.remove(portMeta.operatorMeta);
+      }
       return this;
     }
 
@@ -1251,6 +1288,94 @@ public class LogicalPlan implements Serializable, DAG
       dag.applyStreamLinks();
       parentDAG.addDAGToCurrentDAG(dag, this.name);
     }
+
+    private class PortMapping implements Operators.OperatorDescriptor
+    {
+      private final Map<Operator.InputPort<?>, InputPortMeta> inPortMap = new HashMap<Operator.InputPort<?>, InputPortMeta>();
+      private final Map<Operator.OutputPort<?>, OutputPortMeta> outPortMap = new HashMap<Operator.OutputPort<?>, OutputPortMeta>();
+      private final Map<String, Object> portNameMap = new HashMap<String, Object>();
+
+      @Override
+      public void addInputPort(InputPort<?> portObject, Field field, InputPortFieldAnnotation portAnnotation, AppData.QueryPort adqAnnotation)
+      {
+        if (!ModuleMeta.this.inputStreams.isEmpty()) {
+          for (Map.Entry<LogicalPlan.InputPortMeta, LogicalPlan.StreamMeta> e : ModuleMeta.this.inputStreams.entrySet()) {
+            LogicalPlan.InputPortMeta pm = e.getKey();
+            if (pm.moduleMeta == ModuleMeta.this && pm.fieldName.equals(field.getName())) {
+              //LOG.debug("Found existing port meta for: " + field);
+              inPortMap.put(portObject, pm);
+              markInputPortIfHidden(pm.getPortName(), pm, field.getDeclaringClass());
+              return;
+            }
+          }
+        }
+        InputPortMeta metaPort = new InputPortMeta();
+        metaPort.moduleMeta = ModuleMeta.this;
+        metaPort.fieldName = field.getName();
+        metaPort.portAnnotation = portAnnotation;
+        metaPort.adqAnnotation = adqAnnotation;
+        inPortMap.put(portObject, metaPort);
+        markInputPortIfHidden(metaPort.getPortName(), metaPort, field.getDeclaringClass());
+      }
+
+      @Override
+      public void addOutputPort(OutputPort<?> portObject, Field field, OutputPortFieldAnnotation portAnnotation, AppData.ResultPort adrAnnotation)
+      {
+        if (!ModuleMeta.this.outputStreams.isEmpty()) {
+          for (Map.Entry<LogicalPlan.OutputPortMeta, LogicalPlan.StreamMeta> e : ModuleMeta.this.outputStreams.entrySet()) {
+            LogicalPlan.OutputPortMeta pm = e.getKey();
+            if (pm.moduleMeta == ModuleMeta.this && pm.fieldName.equals(field.getName())) {
+              //LOG.debug("Found existing port meta for: " + field);
+              outPortMap.put(portObject, pm);
+              markOutputPortIfHidden(pm.getPortName(), pm, field.getDeclaringClass());
+              return;
+            }
+          }
+        }
+        OutputPortMeta metaPort = new OutputPortMeta();
+        metaPort.moduleMeta = ModuleMeta.this;
+        metaPort.fieldName = field.getName();
+        metaPort.portAnnotation = portAnnotation;
+        metaPort.adrAnnotation = adrAnnotation;
+        outPortMap.put(portObject, metaPort);
+        markOutputPortIfHidden(metaPort.getPortName(), metaPort, field.getDeclaringClass());
+      }
+
+      private void markOutputPortIfHidden(String portName, OutputPortMeta portMeta, Class<?> declaringClass)
+      {
+        if (!portNameMap.containsKey(portName)) {
+          portNameMap.put(portName, portMeta);
+        } else {
+          // make the port optional
+          portMeta.classDeclaringHiddenPort = declaringClass;
+        }
+
+      }
+
+      private void markInputPortIfHidden(String portName, InputPortMeta portMeta, Class<?> declaringClass)
+      {
+        if (!portNameMap.containsKey(portName)) {
+          portNameMap.put(portName, portMeta);
+        } else {
+          // make the port optional
+          portMeta.classDeclaringHiddenPort = declaringClass;
+        }
+      }
+    }
+    /**
+     * Ports objects are transient, we keep a lazy initialized mapping
+     */
+    private transient PortMapping portMapping = null;
+
+    private PortMapping getPortMapping()
+    {
+      if (this.portMapping == null) {
+        this.portMapping = new PortMapping();
+        Operators.describe(this.getModule(), portMapping);
+      }
+      return portMapping;
+    }
+
   }
 
   @Override
@@ -1441,6 +1566,13 @@ public class LogicalPlan implements Serializable, DAG
         return opm;
       }
     }
+
+    for(ModuleMeta m : getAllModules()) {
+      OutputPortMeta opm = m.getPortMapping().outPortMap.get(port);
+      if (opm != null)
+        return opm;
+    }
+
     throw new IllegalArgumentException("Port is not associated to any operator in the DAG: " + port);
   }
 

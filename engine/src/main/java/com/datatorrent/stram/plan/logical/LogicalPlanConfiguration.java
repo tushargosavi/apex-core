@@ -38,6 +38,7 @@ import com.google.common.base.Preconditions;
 import com.google.common.collect.Lists;
 import com.google.common.collect.Maps;
 import com.google.common.collect.Sets;
+import com.sun.org.apache.xpath.internal.operations.Mod;
 
 import org.codehaus.jackson.map.ObjectMapper;
 import org.codehaus.jettison.json.JSONArray;
@@ -2018,7 +2019,7 @@ public class LogicalPlanConfiguration {
     Map<OperatorConf, Operator> nodeMap = new HashMap<OperatorConf, Operator>();
     Map<OperatorConf, Module> moduleMap = new HashMap<OperatorConf, Module>();
 
-    populateOperators(appConf, dag, nodeMap);
+    populateOperators(appConf, dag, nodeMap, moduleMap);
     populateModules(appConf, dag, moduleMap);
 
     Map<String, StreamConf> streams = appConf.getChildren(StramElement.STREAM);
@@ -2042,13 +2043,12 @@ public class LogicalPlanConfiguration {
             portName = e.getKey();
           }
         }
-        Operator sourceDecl = nodeMap.get(streamConf.sourceNode);
-        Operators.PortMappingDescriptor sourcePortMap = new Operators.PortMappingDescriptor();
-        Operators.describe(sourceDecl, sourcePortMap);
-        sd.setSource(sourcePortMap.outputPorts.get(portName).component);
+        //TODO
+        Operator.OutputPort outputPort = getOutputPort(nodeMap, moduleMap, streamConf, portName);
+        sd.setSource(outputPort);
 
         if (schemaClass != null) {
-          dag.setOutputPortAttribute(sourcePortMap.outputPorts.get(portName).component, PortContext.TUPLE_CLASS, schemaClass);
+          dag.setOutputPortAttribute(outputPort, PortContext.TUPLE_CLASS, schemaClass);
         }
       }
 
@@ -2059,17 +2059,39 @@ public class LogicalPlanConfiguration {
             portName = e.getKey();
           }
         }
-        Operator targetDecl = nodeMap.get(targetNode);
-        Operators.PortMappingDescriptor targetPortMap = new Operators.PortMappingDescriptor();
-        Operators.describe(targetDecl, targetPortMap);
-        sd.addSink(targetPortMap.inputPorts.get(portName).component);
+        Operator.InputPort inputPort = getInputPort(nodeMap, moduleMap, targetNode, portName);
+        sd.addSink(inputPort);
 
         if (schemaClass != null) {
-          dag.setInputPortAttribute(targetPortMap.inputPorts.get(portName).component, PortContext.TUPLE_CLASS, schemaClass);
+          dag.setInputPortAttribute(inputPort, PortContext.TUPLE_CLASS, schemaClass);
         }
       }
     }
+  }
 
+  Operator.OutputPort getOutputPort(Map<OperatorConf, Operator> nodeMap,
+                                    Map<OperatorConf, Module> moduleMap,
+                                    StreamConf streamConf,
+                                    String portName)
+  {
+    Object sourceDecl = nodeMap.get(streamConf.sourceNode);
+    if (sourceDecl == null)
+      sourceDecl = moduleMap.get(streamConf.sourceNode);
+
+    Operators.PortMappingDescriptor sourcePortMap = new Operators.PortMappingDescriptor();
+    Operators.describe(sourceDecl, sourcePortMap);
+    return sourcePortMap.outputPorts.get(portName).component;
+  }
+
+  Operator.InputPort getInputPort(Map<OperatorConf, Operator> nodeMap,
+                                  Map<OperatorConf, Module> moduleMap,
+                                  OperatorConf OperatorConf,
+                                  String portName)
+  {
+    Operator targetDecl = nodeMap.get(OperatorConf);
+    Operators.PortMappingDescriptor targetPortMap = new Operators.PortMappingDescriptor();
+    Operators.describe(targetDecl, targetPortMap);
+    return targetPortMap.inputPorts.get(portName).component;
   }
 
   private void populateModules(AppConf appConf, LogicalPlan dag, Map<OperatorConf, Module> moduleMap)
@@ -2101,7 +2123,46 @@ public class LogicalPlanConfiguration {
     }
   }
 
-  private void populateOperators(AppConf appConf, LogicalPlan dag, Map<OperatorConf, Operator> nodeMap)
+  static boolean isOperator(Object o) {
+    return (o instanceof Operator);
+  }
+
+  static boolean isOperator(Class c) {
+    return (Operator.class.isAssignableFrom(c));
+  }
+
+  static private boolean isModule(Object o) {
+    return (o instanceof Module);
+  }
+
+  static private boolean isModule(Class c) {
+    return (Module.class.isAssignableFrom(c));
+  }
+
+  static private boolean isOperatorOrModule(Object o) {
+    return (isOperator(o) || isModule(o));
+  }
+
+  static private boolean isOperatorOrModule(Class c) {
+    return (isOperator(c) || isModule(c));
+  }
+
+  private Object getObject(String nodeClassName, String jsonStr) throws IOException, IllegalAccessException, InstantiationException
+  {
+    Class nodeClass = StramUtils.classForName(nodeClassName);
+    if (! isOperatorOrModule(nodeClass))
+      throw new IllegalArgumentException("Argument is not a operator or module");
+
+    if (jsonStr != null) {
+      ObjectMapper mapper = ObjectMapperFactory.getOperatorValueDeserializer();
+      return mapper.readValue("{\"" + nodeClass.getName() + "\":" + jsonStr + "}", nodeClass);
+    } else {
+      return nodeClass.newInstance();
+    }
+  }
+
+  private void populateOperators(AppConf appConf, LogicalPlan dag, Map<OperatorConf, Operator> nodeMap,
+                                 Map<OperatorConf, Module> moduleMap)
   {
     Map<String, OperatorConf> operators = appConf.getChildren(StramElement.OPERATOR);
 
@@ -2109,23 +2170,21 @@ public class LogicalPlanConfiguration {
     for (Map.Entry<String, OperatorConf> nodeConfEntry : operators.entrySet()) {
       OperatorConf nodeConf = nodeConfEntry.getValue();
       if (!WILDCARD.equals(nodeConf.id)) {
-        Class<? extends Operator> nodeClass = StramUtils.classForName(nodeConf.getClassNameReqd(), Operator.class);
+        Class nodeClass = StramUtils.classForName(nodeConf.getClassNameReqd());
         String optJson = nodeConf.getProperties().get(nodeClass.getName());
-        Operator nd = null;
         try {
-          if (optJson != null) {
-            // if there is a special key which is the class name, it means the operator is serialized in json format
-            ObjectMapper mapper = ObjectMapperFactory.getOperatorValueDeserializer();
-            nd = mapper.readValue("{\"" + nodeClass.getName() + "\":" + optJson + "}", nodeClass);
-            dag.addOperator(nodeConfEntry.getKey(), nd);
+          Object nd = getObject(nodeConf.getClassNameReqd(), optJson);
+          if (isOperator(nd)) {
+            dag.addOperator(nodeConfEntry.getKey(), (Operator)nd);
+            nodeMap.put(nodeConf, (Operator)nd);
           } else {
-            nd = dag.addOperator(nodeConfEntry.getKey(), nodeClass);
+            dag.addModule(nodeConfEntry.getKey(), (Module)nd);
+            moduleMap.put(nodeConf, (Module)nd);
           }
-          setOperatorProperties(nd, nodeConf.getProperties());
+          setObjectProperties(nd, nodeConf.getProperties());
         } catch (Exception e) {
           throw new IllegalArgumentException("Error setting operator properties " + e.getMessage(), e);
         }
-        nodeMap.put(nodeConf, nd);
       }
     }
   }
