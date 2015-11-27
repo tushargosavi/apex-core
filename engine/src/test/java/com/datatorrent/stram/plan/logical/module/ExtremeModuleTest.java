@@ -18,8 +18,11 @@
  */
 package com.datatorrent.stram.plan.logical.module;
 
+import java.io.IOException;
+import java.io.InputStream;
 import java.util.ArrayList;
 import java.util.List;
+import java.util.Properties;
 import java.util.Random;
 
 import org.junit.Assert;
@@ -38,6 +41,8 @@ import com.datatorrent.api.annotation.OutputPortFieldAnnotation;
 import com.datatorrent.common.util.BaseOperator;
 import com.datatorrent.stram.plan.logical.LogicalPlan;
 import com.datatorrent.stram.plan.logical.LogicalPlanConfiguration;
+
+import static org.junit.Assert.fail;
 
 public class ExtremeModuleTest
 {
@@ -433,6 +438,27 @@ public class ExtremeModuleTest
       DummyOperator operator = (DummyOperator)oMeta.getOperator();
       Assert.assertEquals(expectedValue, operator.getOperatorProp());
     }
+  }
+
+  @Test
+  public void generateDAGFromPropertyFile() throws IOException
+  {
+    Properties props = new Properties();
+    String resourcePath = "/testModuleTopology1.properties";
+    InputStream is = this.getClass().getResourceAsStream(resourcePath);
+    if (is == null) {
+      fail("Could not load " + resourcePath);
+    }
+    props.load(is);
+    LogicalPlanConfiguration pb = new LogicalPlanConfiguration(new Configuration(false))
+      .addFromProperties(props, null);
+
+    LogicalPlan dag = new LogicalPlan();
+    pb.populateDAG(dag);
+    pb.prepareDAG(dag, null, "");
+    dag.validate();
+    validateTopLevelStreams(dag);
+    validateTopLevelOperators(dag);
   }
 
 }

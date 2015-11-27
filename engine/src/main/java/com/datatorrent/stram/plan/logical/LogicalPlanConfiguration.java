@@ -1407,9 +1407,9 @@ public class LogicalPlanConfiguration {
       }
     }
 
-    private String getClassNameReqd() {
+    private String getClassNameReqd(boolean force) {
       String className = properties.getProperty(OPERATOR_CLASSNAME);
-      if (className == null) {
+      if (className == null && force) {
         throw new IllegalArgumentException(String.format("Operator '%s' is missing property '%s'", getId(), LogicalPlanConfiguration.OPERATOR_CLASSNAME));
       }
       return className;
@@ -2067,6 +2067,8 @@ public class LogicalPlanConfiguration {
         }
       }
     }
+
+
   }
 
   Operator.OutputPort getOutputPort(Map<OperatorConf, Operator> nodeMap,
@@ -2074,6 +2076,7 @@ public class LogicalPlanConfiguration {
                                     StreamConf streamConf,
                                     String portName)
   {
+    System.out.println("Output port name " + portName + " stream conf " + streamConf.getId());
     Object sourceDecl = nodeMap.get(streamConf.sourceNode);
     if (sourceDecl == null)
       sourceDecl = moduleMap.get(streamConf.sourceNode);
@@ -2088,7 +2091,11 @@ public class LogicalPlanConfiguration {
                                   OperatorConf OperatorConf,
                                   String portName)
   {
-    Operator targetDecl = nodeMap.get(OperatorConf);
+    System.out.println("Input port name " + portName + " operator conf " + OperatorConf.getId());
+    Object targetDecl = nodeMap.get(OperatorConf);
+    if (targetDecl == null)
+      targetDecl = moduleMap.get(OperatorConf);
+
     Operators.PortMappingDescriptor targetPortMap = new Operators.PortMappingDescriptor();
     Operators.describe(targetDecl, targetPortMap);
     return targetPortMap.inputPorts.get(portName).component;
@@ -2102,7 +2109,7 @@ public class LogicalPlanConfiguration {
     for (Map.Entry<String, OperatorConf> nodeConfEntry : modules.entrySet()) {
       OperatorConf nodeConf = nodeConfEntry.getValue();
       if (!WILDCARD.equals(nodeConf.id)) {
-        Class<? extends Module> nodeClass = StramUtils.classForName(nodeConf.getClassNameReqd(), Module.class);
+        Class<? extends Module> nodeClass = StramUtils.classForName(nodeConf.getClassNameReqd(true), Module.class);
         String optJson = nodeConf.getProperties().get(nodeClass.getName());
         Module nd = null;
         try {
@@ -2170,10 +2177,13 @@ public class LogicalPlanConfiguration {
     for (Map.Entry<String, OperatorConf> nodeConfEntry : operators.entrySet()) {
       OperatorConf nodeConf = nodeConfEntry.getValue();
       if (!WILDCARD.equals(nodeConf.id)) {
-        Class nodeClass = StramUtils.classForName(nodeConf.getClassNameReqd());
+        String className = nodeConf.getClassNameReqd(false);
+        if (className == null)
+          continue;
+        Class nodeClass = StramUtils.classForName(className);
         String optJson = nodeConf.getProperties().get(nodeClass.getName());
         try {
-          Object nd = getObject(nodeConf.getClassNameReqd(), optJson);
+          Object nd = getObject(className, optJson);
           if (isOperator(nd)) {
             dag.addOperator(nodeConfEntry.getKey(), (Operator)nd);
             nodeMap.put(nodeConf, (Operator)nd);

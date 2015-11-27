@@ -219,9 +219,17 @@ public class LogicalPlan implements Serializable, DAG
     }
 
     public InputPort<?> getPortObject() {
-      for (Map.Entry<InputPort<?>, InputPortMeta> e : operatorMeta.getPortMapping().inPortMap.entrySet()) {
-        if (e.getValue() == this) {
-          return e.getKey();
+      if (operatorMeta != null) {
+        for (Map.Entry<InputPort<?>, InputPortMeta> e : operatorMeta.getPortMapping().inPortMap.entrySet()) {
+          if (e.getValue() == this) {
+            return e.getKey();
+          }
+        }
+      } else if (moduleMeta != null) {
+        for (Map.Entry<InputPort<?>, InputPortMeta> e : moduleMeta.getPortMapping().inPortMap.entrySet()) {
+          if (e.getValue() == this) {
+            return e.getKey();
+          }
         }
       }
       throw new AssertionError("Cannot find the port object for " + this);
@@ -332,11 +340,20 @@ public class LogicalPlan implements Serializable, DAG
     }
 
     public OutputPort<?> getPortObject() {
-      for (Map.Entry<OutputPort<?>, OutputPortMeta> e : operatorMeta.getPortMapping().outPortMap.entrySet()) {
-        if (e.getValue() == this) {
-          return e.getKey();
+      if (operatorMeta != null) {
+        for (Map.Entry<OutputPort<?>, OutputPortMeta> e : operatorMeta.getPortMapping().outPortMap.entrySet()) {
+          if (e.getValue() == this) {
+            return e.getKey();
+          }
+        }
+      } else if (moduleMeta != null) {
+        for (Map.Entry<OutputPort<?>, OutputPortMeta> e : moduleMeta.getPortMapping().outPortMap.entrySet()) {
+          if (e.getValue() == this) {
+            return e.getKey();
+          }
         }
       }
+
       throw new AssertionError("Cannot find the port object for " + this);
     }
 
@@ -520,11 +537,16 @@ public class LogicalPlan implements Serializable, DAG
       finalizeValidate(portMeta);
       */
       if (source.getPortObject() instanceof ProxyOutputPort || port instanceof ProxyInputPort) {
+        boolean s1 = source.getPortObject() instanceof ProxyOutputPort;
+        boolean s2 = port instanceof ProxyInputPort;
+        System.out.println("id " + id + " source " + s1 + " sink " + s2);
         ArrayListMultimap<Operator.OutputPort<?>, Operator.InputPort<?>> streamMap = streamLinks.get(id);
         if (streamMap == null) {
+          System.out.println("Adding element in streamMap " + id);
           streamMap = ArrayListMultimap.create();
           streamLinks.put(id, streamMap);
         }
+        System.out.println("Adding element in arrylist " + id);
         streamMap.put(source.getPortObject(), portMeta.getPortObject());
       } else {
         sinks.add(portMeta);
@@ -1470,8 +1492,9 @@ public class LogicalPlan implements Serializable, DAG
   {
     for (String id : streamLinks.keySet()) {
       StreamMeta s = getStream(id);
+      System.out.println("Populating stream id " + s.id);
       for (Map.Entry<Operator.OutputPort<?>, Operator.InputPort<?>> pair : streamLinks.get(id).entries()) {
-        if (s.getSource() == null) {
+        if (s.getSource() == null || s.getSource().getPortObject() == null || s.getSource().getPortObject() instanceof ProxyOutputPort) {
           Operator.OutputPort<?> outputPort = pair.getKey();
           while (outputPort instanceof ProxyOutputPort) {
             outputPort = ((ProxyOutputPort)outputPort).get();
@@ -1579,11 +1602,18 @@ public class LogicalPlan implements Serializable, DAG
   private InputPortMeta assertGetPortMeta(Operator.InputPort<?> port)
   {
     for (OperatorMeta o : getAllOperators()) {
-      InputPortMeta opm = o.getPortMapping().inPortMap.get(port);
-      if (opm != null) {
-        return opm;
+      InputPortMeta ipm = o.getPortMapping().inPortMap.get(port);
+      if (ipm != null) {
+        return ipm;
       }
     }
+
+    for(ModuleMeta m : getAllModules()) {
+      InputPortMeta ipm = m.getPortMapping().inPortMap.get(port);
+      if (ipm != null)
+        return ipm;
+    }
+
     throw new IllegalArgumentException("Port is not associated to any operator in the DAG: " + port);
   }
 
