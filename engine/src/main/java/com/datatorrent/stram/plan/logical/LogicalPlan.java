@@ -157,6 +157,7 @@ public class LogicalPlan implements Serializable, DAG
   private transient int nodeIndex = 0; // used for cycle validation
   private transient Stack<OperatorMeta> stack = new Stack<OperatorMeta>(); // used for cycle validation
   private transient Map<String, ArrayListMultimap<OutputPort<?>, InputPort<?>>> streamLinks = new HashMap<String, ArrayListMultimap<Operator.OutputPort<?>, Operator.InputPort<?>>>();
+  private boolean flatterned;
 
   @Override
   public Attribute.AttributeMap getAttributes()
@@ -189,6 +190,16 @@ public class LogicalPlan implements Serializable, DAG
   public void sendMetrics(Collection<String> metricNames)
   {
     throw new UnsupportedOperationException("Not supported yet.");
+  }
+
+  public boolean isFlatterned()
+  {
+    return flatterned;
+  }
+
+  public void setFlatterned(boolean flatterned)
+  {
+    this.flatterned = flatterned;
   }
 
   public final class InputPortMeta implements DAG.InputPortMeta, Serializable
@@ -1181,6 +1192,7 @@ public class LogicalPlan implements Serializable, DAG
     private transient Module module;
     private String parentModuleName;  // Name of the module which has this module. null if this is a top level Module.
     private LogicalPlan dag = null;
+    private boolean flatternred = false;
 
     public ModuleMeta(String name, Module module)
     {
@@ -1302,6 +1314,10 @@ public class LogicalPlan implements Serializable, DAG
 
     public void flattenModule(LogicalPlan parentDAG, Configuration conf)
     {
+      if (flatternred)
+        return;
+
+      System.out.println("flattern module called for " + getName());
       module.populateDAG(dag, conf);
       for (ModuleMeta subModuleMeta : dag.getAllModules()) {
         subModuleMeta.setParentModuleName(this.name);
@@ -1309,6 +1325,7 @@ public class LogicalPlan implements Serializable, DAG
       }
       dag.applyStreamLinks();
       parentDAG.addDAGToCurrentDAG(dag, this.name);
+      flatternred = true;
     }
 
     private class PortMapping implements Operators.OperatorDescriptor
@@ -1407,7 +1424,7 @@ public class LogicalPlan implements Serializable, DAG
       if (modules.get(name).module == module) {
         return module;
       }
-      throw new IllegalArgumentException("duplicate module is: " + modules.get(name));
+      throw new IllegalArgumentException("duplicate module name = " + name + " is: " + modules.get(name));
     }
 
     ModuleMeta meta = new ModuleMeta(name, module);

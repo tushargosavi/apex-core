@@ -2236,11 +2236,16 @@ public class LogicalPlanConfiguration {
 
   private void flattenDAG(LogicalPlan dag, Configuration conf)
   {
+    if (dag.isFlatterned())
+      return;
+
     for (ModuleMeta moduleMeta : dag.getAllModules()) {
       moduleMeta.setParentModuleName(null);
+      System.out.println("Calling flatter dag for module " + moduleMeta.getName());
       moduleMeta.flattenModule(dag, conf);
     }
     dag.applyStreamLinks();
+    dag.setFlatterned(true);
   }
 
   public static Properties readProperties(String filePath) throws IOException

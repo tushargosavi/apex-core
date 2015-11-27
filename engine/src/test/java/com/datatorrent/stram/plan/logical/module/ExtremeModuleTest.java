@@ -20,14 +20,18 @@ package com.datatorrent.stram.plan.logical.module;
 
 import java.io.IOException;
 import java.io.InputStream;
+import java.io.StringWriter;
 import java.util.ArrayList;
 import java.util.List;
 import java.util.Properties;
 import java.util.Random;
 
+import org.codehaus.jettison.json.JSONException;
+import org.codehaus.jettison.json.JSONObject;
 import org.junit.Assert;
 import org.junit.Test;
 
+import org.apache.commons.io.IOUtils;
 import org.apache.hadoop.conf.Configuration;
 
 import com.datatorrent.api.DAG;
@@ -444,7 +448,7 @@ public class ExtremeModuleTest
   public void generateDAGFromPropertyFile() throws IOException
   {
     Properties props = new Properties();
-    String resourcePath = "/testModuleTopology1.properties";
+    String resourcePath = "/testModuleTopology.properties";
     InputStream is = this.getClass().getResourceAsStream(resourcePath);
     if (is == null) {
       fail("Could not load " + resourcePath);
@@ -461,4 +465,47 @@ public class ExtremeModuleTest
     validateTopLevelOperators(dag);
   }
 
+
+  @Test
+  public void generateDAGFromPropertyFile1() throws IOException
+  {
+    Properties props = new Properties();
+    String resourcePath = "/testModuleTopology.properties";
+    InputStream is = this.getClass().getResourceAsStream(resourcePath);
+    if (is == null) {
+      fail("Could not load " + resourcePath);
+    }
+    props.load(is);
+    LogicalPlanConfiguration pb = new LogicalPlanConfiguration(new Configuration(false))
+      .addFromProperties(props, null);
+
+    LogicalPlan dag = pb.createFromProperties(props, "testPropAppName");
+    dag.validate();
+    validateTopLevelStreams(dag);
+    validateTopLevelOperators(dag);
+  }
+
+  @Test
+  public void testModuleFromJsonFile() throws Exception
+  {
+    String resourcePath = "/schemaModuleTestTopology.json";
+    InputStream is = this.getClass().getResourceAsStream(resourcePath);
+    if (is == null) {
+      fail("Could not load " + resourcePath);
+    }
+    StringWriter writer = new StringWriter();
+
+    IOUtils.copy(is, writer);
+
+    JSONObject json = new JSONObject(writer.toString());
+
+    Configuration conf = new Configuration(false);
+
+    LogicalPlanConfiguration planConf = new LogicalPlanConfiguration(conf);
+    LogicalPlan dag = planConf.createFromJson(json, "testLoadFromJson");
+    planConf.prepareDAG(dag, null, "testLoadFromJson");
+    dag.validate();
+    validateTopLevelStreams(dag);
+    validateTopLevelOperators(dag);
+  }
 }
