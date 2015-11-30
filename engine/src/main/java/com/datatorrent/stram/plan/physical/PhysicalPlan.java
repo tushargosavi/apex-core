@@ -390,8 +390,8 @@ public class PhysicalPlan implements Serializable
       for (OperatorMeta n : dag.getAllOperators()) {
         for (StreamMeta s : n.getOutputStreams().values()) {
           if (s.getPersistOperator() != null) {
-            InputPortMeta persistInputPort = s.getPersistOperatorInputPort();
-            StreamCodecWrapperForPersistance persistCodec = (StreamCodecWrapperForPersistance) persistInputPort.getAttributes().get(PortContext.STREAM_CODEC);
+            InputPortMeta<Operator> persistInputPort = s.getPersistOperatorInputPort();
+            StreamCodecWrapperForPersistance persistCodec = (StreamCodecWrapperForPersistance)persistInputPort.getAttributes().get(PortContext.STREAM_CODEC);
             if (persistCodec == null)
               continue;
             // Logging is enabled for the stream
@@ -439,7 +439,7 @@ public class PhysicalPlan implements Serializable
           if (s.getPersistOperator() != null) {
             Map<InputPortMeta, StreamCodec<Object>> inputStreamCodecs = new HashMap<InputPortMeta, StreamCodec<Object>>();
             // Logging is enabled for the stream
-            for (InputPortMeta portMeta : s.getSinksToPersist()) {
+            for (InputPortMeta<Operator> portMeta : s.getSinksToPersist()) {
               InputPort<?> port = portMeta.getPortObject();
               StreamCodec<?> inputStreamCodec = (portMeta.getValue(PortContext.STREAM_CODEC) != null) ? portMeta.getValue(PortContext.STREAM_CODEC) : port.getStreamCodec();
               if (inputStreamCodec != null) {
@@ -718,13 +718,13 @@ public class PhysicalPlan implements Serializable
     int memoryPerPartition = currentMapping.logicalOperator.getValue(OperatorContext.MEMORY_MB);
     for (Map.Entry<OutputPortMeta, StreamMeta> stream : currentMapping.logicalOperator.getOutputStreams().entrySet()) {
       if (stream.getValue().getLocality() != Locality.THREAD_LOCAL && stream.getValue().getLocality() != Locality.CONTAINER_LOCAL) {
-        memoryPerPartition += stream.getKey().getValue(PortContext.BUFFER_MEMORY_MB);
+        memoryPerPartition += (Integer)stream.getKey().getValue(PortContext.BUFFER_MEMORY_MB);
       }
     }
     for (OperatorMeta pp : currentMapping.parallelPartitions) {
       for (Map.Entry<OutputPortMeta, StreamMeta> stream : pp.getOutputStreams().entrySet()) {
         if (stream.getValue().getLocality() != Locality.THREAD_LOCAL && stream.getValue().getLocality() != Locality.CONTAINER_LOCAL) {
-          memoryPerPartition += stream.getKey().getValue(PortContext.BUFFER_MEMORY_MB);
+          memoryPerPartition += (Integer)stream.getKey().getValue(PortContext.BUFFER_MEMORY_MB);
         }
       }
       memoryPerPartition += pp.getValue(OperatorContext.MEMORY_MB);
@@ -906,7 +906,7 @@ public class PhysicalPlan implements Serializable
     for (Map.Entry<InputPortMeta, StreamMeta> ipm : m.logicalOperator.getInputStreams().entrySet()) {
       PMapping sourceMapping = this.logicalToPTOperator.get(ipm.getValue().getSource().getOperatorMeta());
 
-      if (ipm.getKey().getValue(PortContext.PARTITION_PARALLEL)) {
+      if ((Boolean)ipm.getKey().getValue(PortContext.PARTITION_PARALLEL)) {
         if (sourceMapping.partitions.size() < m.partitions.size()) {
           throw new AssertionError("Number of partitions don't match in parallel mapping " + sourceMapping.logicalOperator.getName() + " -> " + m.logicalOperator.getName() + ", " + sourceMapping.partitions.size() + " -> " + m.partitions.size());
         }

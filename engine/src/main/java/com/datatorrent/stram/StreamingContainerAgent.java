@@ -327,7 +327,7 @@ public class StreamingContainerAgent {
     return operator;
   }
 
-  public static StreamCodec<?> getStreamCodec(InputPortMeta inputPortMeta)
+  public static StreamCodec<?> getStreamCodec(InputPortMeta<?> inputPortMeta)
   {
     if (inputPortMeta != null) {
       StreamCodec<?> codec = inputPortMeta.getValue(PortContext.STREAM_CODEC);

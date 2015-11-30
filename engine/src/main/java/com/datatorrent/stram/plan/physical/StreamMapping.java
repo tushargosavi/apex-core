@@ -197,16 +197,16 @@ public class StreamMapping implements java.io.Serializable
    */
   private void redoMapping() {
 
-    Set<Pair<PTOperator, InputPortMeta>> downstreamOpers = Sets.newHashSet();
+    Set<Pair<PTOperator, InputPortMeta<?>>> downstreamOpers = Sets.newHashSet();
 
     // figure out the downstream consumers
-    for (InputPortMeta ipm : streamMeta.getSinks()) {
+    for (InputPortMeta<?> ipm : streamMeta.getSinks()) {
       // gets called prior to all logical operators mapped
       // skipped for parallel partitions - those are handled elsewhere
       if (!ipm.getValue(PortContext.PARTITION_PARALLEL) && plan.hasMapping(ipm.getOperatorWrapper())) {
         List<PTOperator> partitions = plan.getOperators(ipm.getOperatorWrapper());
         for (PTOperator doper : partitions) {
-          downstreamOpers.add(new Pair<PTOperator, InputPortMeta>(doper, ipm));
+          downstreamOpers.add(new Pair<PTOperator, InputPortMeta<?>>(doper, ipm));
         }
       }
     }
@@ -267,7 +267,7 @@ public class StreamMapping implements java.io.Serializable
       Boolean sourceSingleFinal = streamMeta.getSource().getAttributes().get(PortContext.UNIFIER_SINGLE_FINAL);
 
       // link the downstream operators with the unifiers
-      for (Pair<PTOperator, InputPortMeta> doperEntry : downstreamOpers) {
+      for (Pair<PTOperator, InputPortMeta<?>> doperEntry : downstreamOpers) {
 
         Map<LogicalPlan.InputPortMeta, PartitionKeys> partKeys = doperEntry.first.partitionKeys;
         PartitionKeys pks = partKeys != null ? partKeys.get(doperEntry.second) : null;

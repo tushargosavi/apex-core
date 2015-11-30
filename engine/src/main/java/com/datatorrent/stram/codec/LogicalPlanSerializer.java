@@ -205,7 +205,7 @@ public class LogicalPlanSerializer extends JsonSerializer<LogicalPlan>
       sourcePortDetailMap.put("portName", sourcePortName);
       streamDetailMap.put("name", streamName);
       streamDetailMap.put("source", sourcePortDetailMap);
-      List<InputPortMeta> sinks = streamMeta.getSinks();
+      List<InputPortMeta<?>> sinks = streamMeta.getSinks();
       ArrayList<HashMap<String, Object>> sinkPortList = new ArrayList<HashMap<String, Object>>();
       for (InputPortMeta sinkPort : sinks) {
         HashMap<String, Object> sinkPortDetailMap = new HashMap<String, Object>();
@@ -377,7 +377,7 @@ public class LogicalPlanSerializer extends JsonSerializer<LogicalPlan>
     sourcePortDetailMap.put("portName", sourcePortName);
     streamDetailMap.put("name", streamName);
     streamDetailMap.put("source", sourcePortDetailMap);
-    List<InputPortMeta> sinks = streamMeta.getSinks();
+    List<InputPortMeta<?>> sinks = streamMeta.getSinks();
     ArrayList<HashMap<String, Object>> sinkPortList = new ArrayList<HashMap<String, Object>>();
     for (InputPortMeta sinkPort : sinks) {
       HashMap<String, Object> sinkPortDetailMap = new HashMap<String, Object>();
@@ -446,7 +446,7 @@ public class LogicalPlanSerializer extends JsonSerializer<LogicalPlan>
     for (StreamMeta streamMeta : allStreams) {
       String streamKey = LogicalPlanConfiguration.STREAM_PREFIX + streamMeta.getName();
       OutputPortMeta source = streamMeta.getSource();
-      List<InputPortMeta> sinks = streamMeta.getSinks();
+      List<InputPortMeta<?>> sinks = streamMeta.getSinks();
       props.setProperty(streamKey + "." + LogicalPlanConfiguration.STREAM_SOURCE, source.getOperatorMeta().getName() + "." + source.getPortName());
       String sinksValue = "";
       for (InputPortMeta sink : sinks) {

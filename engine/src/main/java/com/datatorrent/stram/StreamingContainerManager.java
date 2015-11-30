@@ -689,7 +689,7 @@ public class StreamingContainerManager implements PlanContext
               appDataSource.setQueryOperatorName(queryOperatorName);
               appDataSource.setQueryTopic(queryTopic);
               appDataSource.setQueryUrl(convertAppDataUrl(queryUrl));
-              List<LogicalPlan.InputPortMeta> sinks = entry.getValue().getSinks();
+              List<LogicalPlan.InputPortMeta<?>> sinks = entry.getValue().getSinks();
               if (sinks.isEmpty()) {
                 LOG.warn("There is no result operator for the App Data Source {}.{}. Ignoring the App Data Source.", operatorMeta.getName(), portMeta.getPortName());
                 continue;

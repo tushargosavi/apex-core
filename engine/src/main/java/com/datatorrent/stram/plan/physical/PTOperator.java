@@ -32,6 +32,7 @@ import com.google.common.collect.Sets;
 import com.datatorrent.api.Context;
 import com.datatorrent.api.Context.OperatorContext;
 import com.datatorrent.api.DAG.Locality;
+import com.datatorrent.api.Operator;
 import com.datatorrent.api.Operator.InputPort;
 import com.datatorrent.api.Partitioner.PartitionKeys;
 import com.datatorrent.api.StatsListener;
@@ -351,7 +352,8 @@ public class PTOperator implements java.io.Serializable
     int bufferServerMemory = 0;
     for (int i = 0; i < outputs.size(); i++) {
       if (!outputs.get(i).isDownStreamInline()) {
-        bufferServerMemory += outputs.get(i).logicalStream.getSource().getValue(Context.PortContext.BUFFER_MEMORY_MB);
+        LogicalPlan.OutputPortMeta<Operator> ometa = outputs.get(i).logicalStream.getSource();
+        bufferServerMemory += ometa.getValue(Context.PortContext.BUFFER_MEMORY_MB);
       }
     }
     return bufferServerMemory;
