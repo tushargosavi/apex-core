@@ -64,6 +64,7 @@ import com.google.common.primitives.Primitives;
 
 import com.datatorrent.api.Component;
 import com.datatorrent.api.InputOperator;
+import com.datatorrent.api.Module;
 import com.datatorrent.api.Operator;
 import com.datatorrent.common.util.BaseOperator;
 import com.datatorrent.netlet.util.DTThrowable;
@@ -366,6 +367,21 @@ public class TypeGraph
     return result;
   }
 
+  public Set<String> getAllDTInstantiableModules()
+  {
+    TypeGraphVertex tgv = typeGraph.get(Module.class.getName());
+    if (tgv == null) {
+      return null;
+    }
+    Set<String> result = new TreeSet<String>();
+    for (TypeGraphVertex node : tgv.allInstantiableDescendants) {
+      result.add(node.typeName);
+    }
+
+    return result;
+  }
+
+
   public Set<String> getDescendants(String fullClassName)
   {
     Set<String> result = new HashSet<String>();
@@ -608,7 +624,8 @@ public class TypeGraph
         this.classNode = ccn;
 
         // update the port information if it is a Operator
-        if (owner.isAncestor(Operator.class.getName(), typeName)) {
+        if (owner.isAncestor(Operator.class.getName(), typeName) ||
+            owner.isAncestor(Module.class.getName(), typeName)) {
           // load ports if it is an Operator class
           CompactUtil.updateCompactClassPortInfo(classN, ccn);
           List<CompactFieldNode> prunedFields = new LinkedList<CompactFieldNode>();

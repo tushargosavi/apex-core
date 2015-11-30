@@ -42,8 +42,10 @@ import org.codehaus.jettison.json.JSONObject;
 import org.junit.Assert;
 import org.junit.Test;
 
+import com.datatorrent.api.DAG;
 import com.datatorrent.api.DefaultInputPort;
 import com.datatorrent.api.DefaultOutputPort;
+import com.datatorrent.api.Module;
 import com.datatorrent.api.annotation.InputPortFieldAnnotation;
 import com.datatorrent.api.annotation.OutputPortFieldAnnotation;
 import com.datatorrent.common.util.BaseOperator;
@@ -52,6 +54,7 @@ import com.datatorrent.api.InputOperator;
 import com.datatorrent.stram.plan.logical.LogicalPlan;
 import com.datatorrent.stram.plan.logical.LogicalPlan.OperatorMeta;
 import com.datatorrent.stram.plan.logical.LogicalPlanConfiguration;
+import com.datatorrent.stram.plan.logical.module.ExtremeModuleTest;
 import com.datatorrent.stram.support.StramTestSupport;
 import com.datatorrent.stram.util.ObjectMapperFactory;
 import com.datatorrent.stram.webapp.TypeDiscoverer.UI_TYPE;
@@ -1139,5 +1142,34 @@ public class OperatorDiscoveryTest
     Assert.assertEquals("@random", null, OperatorDiscoverer.MethodTagType.from("@random"));
   }
 
+  public static class Module1 implements Module
+  {
+    public transient ProxyInputPort in;
+    public transient ProxyOutputPort out;
+    private int pri;
+
+    @Override
+    public void populateDAG(DAG dag, Configuration conf)
+    {
+
+    }
+
+    public int getPriority() { return pri; }
+    public void setPriority(int pri) { this.pri = pri; }
+  }
+
+  @Test
+  public void testModuleDescription() throws Exception
+  {
+    String[] classFilePath = getClassFileInClasspath();
+    OperatorDiscoverer operatorDiscoverer = new OperatorDiscoverer(classFilePath);
+    operatorDiscoverer.buildTypeGraph();
+    JSONObject operator = operatorDiscoverer.describeOperator(Module1.class.getName());
+    JSONArray inputs = operator.getJSONArray("inputPorts");
+    JSONArray outputs = operator.getJSONArray("outputPorts");
+    Assert.assertEquals("no. of input ports", 1, inputs.length());
+    Assert.assertEquals("no. of output ports", 1, outputs.length());
+
+  }
 }
 

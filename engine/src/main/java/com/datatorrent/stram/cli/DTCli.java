@@ -75,8 +75,10 @@ import sun.misc.SignalHandler;
 import com.google.common.base.Preconditions;
 import com.google.common.collect.Sets;
 import com.sun.jersey.api.client.WebResource;
+import com.sun.org.apache.xpath.internal.operations.Mod;
 
 import com.datatorrent.api.Context;
+import com.datatorrent.api.Module;
 import com.datatorrent.api.Operator;
 import com.datatorrent.api.StreamingApplication;
 import com.datatorrent.stram.StramClient;
@@ -2911,6 +2913,54 @@ public class DTCli
 
   private class GetJarOperatorClassesCommand implements Command
   {
+    private JSONObject json = new JSONObject();
+    private JSONArray arr = new JSONArray();
+    private JSONObject portClassHier = new JSONObject();
+    private JSONObject portTypesWithSchemaClasses = new JSONObject();
+    private JSONObject failed = new JSONObject();
+
+    private void findClasses(String[] jarFiles, String parentName, String searchTerm) throws Exception
+    {
+      OperatorDiscoverer operatorDiscoverer = new OperatorDiscoverer(jarFiles);
+      Set<String> operatorClasses = operatorDiscoverer.getOperatorClasses(parentName, searchTerm);
+
+      for (final String clazz : operatorClasses) {
+        try {
+          JSONObject oper = operatorDiscoverer.describeOperator(clazz);
+
+          // add default value
+          operatorDiscoverer.addDefaultValueUnchecked(clazz, oper);
+
+          // add class hierarchy info to portClassHier and fetch port types with schema classes
+          operatorDiscoverer.buildAdditionalPortInfo(oper, portClassHier, portTypesWithSchemaClasses);
+
+          Iterator portTypesIter = portTypesWithSchemaClasses.keys();
+          while (portTypesIter.hasNext()) {
+            if (!portTypesWithSchemaClasses.getBoolean((String)portTypesIter.next())) {
+              portTypesIter.remove();
+            }
+          }
+
+          arr.put(oper);
+        } catch (Exception | NoClassDefFoundError ex) {
+          // ignore this class
+          final String cls = clazz;
+          failed.put(cls, ex.toString());
+        }
+      }
+    }
+
+    public void displayClasses() throws JSONException, IOException
+    {
+      json.put("operatorClasses", arr);
+      json.put("portClassHier", portClassHier);
+      json.put("portTypesWithSchemaClasses", portTypesWithSchemaClasses);
+      if (failed.length() > 0) {
+        json.put("failedOperators", failed);
+      }
+      printJson(json);
+    }
+
     @Override
     public void execute(String[] args, ConsoleReader reader) throws Exception
     {
@@ -2925,48 +2975,10 @@ public class DTCli
       String[] jarFiles = files.split(",");
       File tmpDir = copyToLocal(jarFiles);
       try {
-        OperatorDiscoverer operatorDiscoverer = new OperatorDiscoverer(jarFiles);
         String searchTerm = commandLineInfo.args.length > 1 ? commandLineInfo.args[1] : null;
-        Set<String> operatorClasses = operatorDiscoverer.getOperatorClasses(parentName, searchTerm);
-        JSONObject json = new JSONObject();
-        JSONArray arr = new JSONArray();
-        JSONObject portClassHier = new JSONObject();
-        JSONObject portTypesWithSchemaClasses = new JSONObject();
-
-        JSONObject failed = new JSONObject();
-
-        for (final String clazz : operatorClasses) {
-          try {
-            JSONObject oper = operatorDiscoverer.describeOperator(clazz);
-
-            // add default value
-            operatorDiscoverer.addDefaultValue(clazz, oper);
-
-            // add class hierarchy info to portClassHier and fetch port types with schema classes
-            operatorDiscoverer.buildAdditionalPortInfo(oper, portClassHier, portTypesWithSchemaClasses);
-
-            Iterator portTypesIter = portTypesWithSchemaClasses.keys();
-            while (portTypesIter.hasNext()) {
-              if (!portTypesWithSchemaClasses.getBoolean((String)portTypesIter.next())) {
-                portTypesIter.remove();
-              }
-            }
-
-            arr.put(oper);
-          } catch (Exception | NoClassDefFoundError ex) {
-            // ignore this class
-            final String cls = clazz;
-            failed.put(cls, ex.toString());
-          }
-        }
-
-        json.put("operatorClasses", arr);
-        json.put("portClassHier", portClassHier);
-        json.put("portTypesWithSchemaClasses", portTypesWithSchemaClasses);
-        if (failed.length() > 0) {
-          json.put("failedOperators", failed);
-        }
-        printJson(json);
+        findClasses(jarFiles, parentName, searchTerm);
+        findClasses(jarFiles, Module.class.getName(), searchTerm);
+        displayClasses();
       } finally {
         FileUtils.deleteDirectory(tmpDir);
       }
