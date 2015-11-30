@@ -18,26 +18,53 @@
  */
 package com.datatorrent.stram.cli;
 
-import java.io.*;
-import java.lang.NoClassDefFoundError;
+import java.io.BufferedReader;
+import java.io.File;
+import java.io.FileNotFoundException;
+import java.io.FileReader;
+import java.io.IOException;
+import java.io.OutputStream;
+import java.io.PrintStream;
+import java.io.PrintWriter;
 import java.lang.management.ManagementFactory;
 import java.net.URI;
 import java.net.URISyntaxException;
 import java.net.URLEncoder;
 import java.security.PrivilegedExceptionAction;
 import java.text.SimpleDateFormat;
-import java.util.*;
+import java.util.ArrayList;
+import java.util.Collections;
+import java.util.Comparator;
+import java.util.Enumeration;
+import java.util.HashMap;
+import java.util.Iterator;
+import java.util.LinkedList;
+import java.util.List;
+import java.util.Map;
 import java.util.Map.Entry;
+import java.util.Set;
+import java.util.TreeMap;
+import java.util.TreeSet;
 
 import javax.validation.constraints.NotNull;
 import javax.ws.rs.core.MediaType;
 
-import jline.console.ConsoleReader;
-import jline.console.completer.*;
-import jline.console.history.FileHistory;
-import jline.console.history.History;
-import jline.console.history.MemoryHistory;
-import org.apache.commons.cli.*;
+import org.codehaus.jackson.map.ObjectMapper;
+import org.codehaus.jettison.json.JSONArray;
+import org.codehaus.jettison.json.JSONException;
+import org.codehaus.jettison.json.JSONObject;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
+
+import org.apache.commons.cli.BasicParser;
+import org.apache.commons.cli.CommandLine;
+import org.apache.commons.cli.CommandLineParser;
+import org.apache.commons.cli.HelpFormatter;
+import org.apache.commons.cli.Option;
+import org.apache.commons.cli.OptionBuilder;
+import org.apache.commons.cli.Options;
+import org.apache.commons.cli.ParseException;
+import org.apache.commons.cli.PosixParser;
 import org.apache.commons.io.FileUtils;
 import org.apache.commons.io.IOUtils;
 import org.apache.commons.lang.ArrayUtils;
@@ -60,33 +87,40 @@ import org.apache.log4j.Appender;
 import org.apache.log4j.ConsoleAppender;
 import org.apache.log4j.Level;
 import org.apache.tools.ant.DirectoryScanner;
-import org.codehaus.jackson.map.ObjectMapper;
-import org.codehaus.jettison.json.JSONArray;
-import org.codehaus.jettison.json.JSONException;
-import org.codehaus.jettison.json.JSONObject;
-import org.slf4j.Logger;
-import org.slf4j.LoggerFactory;
-import sun.misc.Signal;
-import sun.misc.SignalHandler;
 
 import com.google.common.base.Preconditions;
 import com.google.common.collect.Sets;
 import com.sun.jersey.api.client.WebResource;
 
 import com.datatorrent.api.Context;
+import com.datatorrent.api.Module;
 import com.datatorrent.api.Operator;
 import com.datatorrent.api.StreamingApplication;
-
 import com.datatorrent.stram.StramClient;
-import com.datatorrent.stram.client.*;
+import com.datatorrent.stram.client.AppPackage;
 import com.datatorrent.stram.client.AppPackage.AppInfo;
+import com.datatorrent.stram.client.ConfigPackage;
+import com.datatorrent.stram.client.DTConfiguration;
 import com.datatorrent.stram.client.DTConfiguration.Scope;
+import com.datatorrent.stram.client.RecordingsAgent;
 import com.datatorrent.stram.client.RecordingsAgent.RecordingInfo;
+import com.datatorrent.stram.client.StramAgent;
+import com.datatorrent.stram.client.StramAppLauncher;
 import com.datatorrent.stram.client.StramAppLauncher.AppFactory;
+import com.datatorrent.stram.client.StramClientUtils;
 import com.datatorrent.stram.client.StramClientUtils.ClientRMHelper;
 import com.datatorrent.stram.codec.LogicalPlanSerializer;
 import com.datatorrent.stram.plan.logical.LogicalPlan;
-import com.datatorrent.stram.plan.logical.requests.*;
+import com.datatorrent.stram.plan.logical.requests.AddStreamSinkRequest;
+import com.datatorrent.stram.plan.logical.requests.CreateOperatorRequest;
+import com.datatorrent.stram.plan.logical.requests.CreateStreamRequest;
+import com.datatorrent.stram.plan.logical.requests.LogicalPlanRequest;
+import com.datatorrent.stram.plan.logical.requests.RemoveOperatorRequest;
+import com.datatorrent.stram.plan.logical.requests.RemoveStreamRequest;
+import com.datatorrent.stram.plan.logical.requests.SetOperatorAttributeRequest;
+import com.datatorrent.stram.plan.logical.requests.SetOperatorPropertyRequest;
+import com.datatorrent.stram.plan.logical.requests.SetPortAttributeRequest;
+import com.datatorrent.stram.plan.logical.requests.SetStreamAttributeRequest;
 import com.datatorrent.stram.security.StramUserLogin;
 import com.datatorrent.stram.util.JSONSerializationProvider;
 import com.datatorrent.stram.util.VersionInfo;
@@ -94,7 +128,19 @@ import com.datatorrent.stram.util.WebServicesClient;
 import com.datatorrent.stram.webapp.OperatorDiscoverer;
 import com.datatorrent.stram.webapp.StramWebServices;
 import com.datatorrent.stram.webapp.TypeDiscoverer;
+
+import jline.console.ConsoleReader;
+import jline.console.completer.AggregateCompleter;
+import jline.console.completer.ArgumentCompleter;
+import jline.console.completer.Completer;
+import jline.console.completer.FileNameCompleter;
+import jline.console.completer.StringsCompleter;
+import jline.console.history.FileHistory;
+import jline.console.history.History;
+import jline.console.history.MemoryHistory;
 import net.lingala.zip4j.exception.ZipException;
+import sun.misc.Signal;
+import sun.misc.SignalHandler;
 
 /**
  * Provides command line interface for a streaming application on hadoop (yarn)
@@ -2983,6 +3029,54 @@ public class DTCli
 
   private class GetJarOperatorClassesCommand implements Command
   {
+    private JSONObject json = new JSONObject();
+    private JSONArray arr = new JSONArray();
+    private JSONObject portClassHier = new JSONObject();
+    private JSONObject portTypesWithSchemaClasses = new JSONObject();
+    private JSONObject failed = new JSONObject();
+
+    private void findClasses(String[] jarFiles, String parentName, String searchTerm) throws Exception
+    {
+      OperatorDiscoverer operatorDiscoverer = new OperatorDiscoverer(jarFiles);
+      Set<String> operatorClasses = operatorDiscoverer.getOperatorClasses(parentName, searchTerm);
+
+      for (final String clazz : operatorClasses) {
+        try {
+          JSONObject oper = operatorDiscoverer.describeOperator(clazz);
+
+          // add default value
+          operatorDiscoverer.addDefaultValueUnchecked(clazz, oper);
+
+          // add class hierarchy info to portClassHier and fetch port types with schema classes
+          operatorDiscoverer.buildAdditionalPortInfo(oper, portClassHier, portTypesWithSchemaClasses);
+
+          Iterator portTypesIter = portTypesWithSchemaClasses.keys();
+          while (portTypesIter.hasNext()) {
+            if (!portTypesWithSchemaClasses.getBoolean((String)portTypesIter.next())) {
+              portTypesIter.remove();
+            }
+          }
+
+          arr.put(oper);
+        } catch (Exception | NoClassDefFoundError ex) {
+          // ignore this class
+          final String cls = clazz;
+          failed.put(cls, ex.toString());
+        }
+      }
+    }
+
+    public void displayClasses() throws JSONException, IOException
+    {
+      json.put("operatorClasses", arr);
+      json.put("portClassHier", portClassHier);
+      json.put("portTypesWithSchemaClasses", portTypesWithSchemaClasses);
+      if (failed.length() > 0) {
+        json.put("failedOperators", failed);
+      }
+      printJson(json);
+    }
+
     @Override
     public void execute(String[] args, ConsoleReader reader) throws Exception
     {
@@ -2997,50 +3091,12 @@ public class DTCli
       String[] jarFiles = files.split(",");
       File tmpDir = copyToLocal(jarFiles);
       try {
-        OperatorDiscoverer operatorDiscoverer = new OperatorDiscoverer(jarFiles);
         String searchTerm = commandLineInfo.args.length > 1 ? commandLineInfo.args[1] : null;
-        Set<String> operatorClasses = operatorDiscoverer.getOperatorClasses(parentName, searchTerm);
-        JSONObject json = new JSONObject();
-        JSONArray arr = new JSONArray();
-        JSONObject portClassHier = new JSONObject();
-        JSONObject portTypesWithSchemaClasses = new JSONObject();
 
-        JSONObject failed = new JSONObject();
-
-        for (final String clazz : operatorClasses) {
-          try {
-            JSONObject oper = operatorDiscoverer.describeOperator(clazz);
-
-            // add default value
-            operatorDiscoverer.addDefaultValue(clazz, oper);
-            
-            // add class hierarchy info to portClassHier and fetch port types with schema classes
-            operatorDiscoverer.buildAdditionalPortInfo(oper, portClassHier, portTypesWithSchemaClasses);
-
-            Iterator portTypesIter = portTypesWithSchemaClasses.keys();
-            while (portTypesIter.hasNext()) {
-              if (!portTypesWithSchemaClasses.getBoolean((String) portTypesIter.next())) {
-                portTypesIter.remove();
-              }
-            }
-
-            arr.put(oper);
-          } catch (Exception | NoClassDefFoundError ex) {
-            // ignore this class
-            final String cls = clazz;
-            failed.put(cls, ex.toString());
-          }
-        }
-
-        json.put("operatorClasses", arr);
-        json.put("portClassHier", portClassHier);
-        json.put("portTypesWithSchemaClasses", portTypesWithSchemaClasses);
-        if (failed.length() > 0) {
-          json.put("failedOperators", failed);
-        }
-        printJson(json);
-      }
-      finally {
+        findClasses(jarFiles, parentName, searchTerm);
+        findClasses(jarFiles, Module.class.getName(), searchTerm);
+        displayClasses();
+      } finally {
         FileUtils.deleteDirectory(tmpDir);
       }
     }

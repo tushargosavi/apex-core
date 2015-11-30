@@ -48,6 +48,18 @@ import org.codehaus.jettison.json.JSONException;
 import org.codehaus.jettison.json.JSONObject;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
+import org.apache.commons.collections.CollectionUtils;
+import org.apache.commons.lang3.text.WordUtils;
+import org.apache.xbean.asm5.ClassReader;
+import org.apache.xbean.asm5.Opcodes;
+import org.apache.xbean.asm5.tree.ClassNode;
+
+import com.esotericsoftware.kryo.Kryo;
+import com.esotericsoftware.kryo.Serializer;
+import com.esotericsoftware.kryo.io.Input;
+import com.esotericsoftware.kryo.io.Output;
+import com.google.common.collect.ImmutableSet;
+import com.google.common.primitives.Primitives;
 
 import org.apache.commons.collections.CollectionUtils;
 import org.apache.commons.io.IOUtils;
@@ -64,6 +76,7 @@ import com.google.common.primitives.Primitives;
 
 import com.datatorrent.api.Component;
 import com.datatorrent.api.InputOperator;
+import com.datatorrent.api.Module;
 import com.datatorrent.api.Operator;
 import com.datatorrent.common.util.BaseOperator;
 import com.datatorrent.netlet.util.DTThrowable;
@@ -361,6 +374,20 @@ public class TypeGraph
       if ((isAncestor(InputOperator.class.getName(), node.typeName) || !getAllInputPorts(node).isEmpty())) {
         result.add(node.typeName);
       }
+    }
+
+    return result;
+  }
+
+  public Set<String> getAllDTInstantiableModules()
+  {
+    TypeGraphVertex tgv = typeGraph.get(Module.class.getName());
+    if (tgv == null) {
+      return null;
+    }
+    Set<String> result = new TreeSet<String>();
+    for (TypeGraphVertex node : tgv.allInstantiableDescendants) {
+      result.add(node.typeName);
     }
 
     return result;

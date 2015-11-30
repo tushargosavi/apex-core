@@ -18,13 +18,48 @@
  */
 package com.datatorrent.stram.webapp;
 
-import com.datatorrent.api.Operator;
-import com.datatorrent.netlet.util.DTThrowable;
-import com.datatorrent.stram.util.ObjectMapperFactory;
-import com.datatorrent.stram.webapp.TypeDiscoverer.UI_TYPE;
-import com.datatorrent.stram.webapp.TypeGraph.TypeGraphVertex;
-import com.datatorrent.stram.webapp.asm.CompactAnnotationNode;
-import com.datatorrent.stram.webapp.asm.CompactFieldNode;
+import java.beans.IntrospectionException;
+import java.beans.Introspector;
+import java.beans.PropertyDescriptor;
+import java.io.File;
+import java.io.IOException;
+import java.io.InputStream;
+import java.lang.reflect.Method;
+import java.net.MalformedURLException;
+import java.net.URL;
+import java.net.URLClassLoader;
+import java.util.ArrayList;
+import java.util.HashMap;
+import java.util.HashSet;
+import java.util.Iterator;
+import java.util.LinkedList;
+import java.util.List;
+import java.util.Map;
+import java.util.Map.Entry;
+import java.util.Set;
+import java.util.jar.JarEntry;
+import java.util.jar.JarFile;
+import java.util.regex.Matcher;
+import java.util.regex.Pattern;
+
+import javax.xml.parsers.ParserConfigurationException;
+import javax.xml.parsers.SAXParserFactory;
+
+import org.codehaus.jackson.map.ObjectMapper;
+import org.codehaus.jettison.json.JSONArray;
+import org.codehaus.jettison.json.JSONException;
+import org.codehaus.jettison.json.JSONObject;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
+import org.xml.sax.Attributes;
+import org.xml.sax.SAXException;
+import org.xml.sax.helpers.DefaultHandler;
+
+import org.apache.commons.collections.CollectionUtils;
+import org.apache.commons.lang.ClassUtils;
+import org.apache.commons.lang3.StringUtils;
+import org.apache.commons.lang3.text.WordUtils;
+
 import com.google.common.base.Predicate;
 import com.google.common.base.Splitter;
 import com.google.common.collect.Iterables;
@@ -32,32 +67,14 @@ import com.google.common.collect.Lists;
 import com.google.common.collect.Maps;
 import com.google.common.collect.Sets;
 
-import java.beans.*;
-import java.io.File;
-import java.io.IOException;
-import java.io.InputStream;
-import java.lang.reflect.*;
-import java.net.*;
-import java.util.*;
-import java.util.Map.Entry;
-import java.util.jar.JarEntry;
-import java.util.jar.JarFile;
-import java.util.regex.Matcher;
-import java.util.regex.Pattern;
-
-import javax.xml.parsers.*;
-
-import org.apache.commons.collections.CollectionUtils;
-import org.apache.commons.lang.ClassUtils;
-import org.apache.commons.lang3.StringUtils;
-import org.apache.commons.lang3.text.WordUtils;
-import org.codehaus.jackson.map.ObjectMapper;
-import org.codehaus.jettison.json.*;
-import org.slf4j.Logger;
-import org.slf4j.LoggerFactory;
-import org.xml.sax.Attributes;
-import org.xml.sax.SAXException;
-import org.xml.sax.helpers.DefaultHandler;
+import com.datatorrent.api.Module;
+import com.datatorrent.api.Operator;
+import com.datatorrent.netlet.util.DTThrowable;
+import com.datatorrent.stram.util.ObjectMapperFactory;
+import com.datatorrent.stram.webapp.TypeDiscoverer.UI_TYPE;
+import com.datatorrent.stram.webapp.TypeGraph.TypeGraphVertex;
+import com.datatorrent.stram.webapp.asm.CompactAnnotationNode;
+import com.datatorrent.stram.webapp.asm.CompactFieldNode;
 
 /**
  * <p>OperatorDiscoverer class.</p>
@@ -82,6 +99,7 @@ public class OperatorDiscoverer
   private static final String SCHEMA_REQUIRED_KEY = "schemaRequired";
 
   private final Map<String, OperatorClassInfo> classInfo = new HashMap<String, OperatorClassInfo>();
+  private Set<String> moduleClassNames;
 
   private static class OperatorClassInfo {
     String comment;
@@ -288,6 +306,7 @@ public class OperatorDiscoverer
   {
     buildTypeGraph();
     operatorClassNames =  typeGraph.getAllDTInstantiableOperators();
+    moduleClassNames = typeGraph.getAllDTInstantiableModules();
   }
 
   @SuppressWarnings("unchecked")
@@ -297,6 +316,18 @@ public class OperatorDiscoverer
     Class<? extends Operator> clazz = (Class<? extends Operator>) classLoader.loadClass(className);
     if (clazz != null) {
       Operator operIns = clazz.newInstance();
+      String s = defaultValueMapper.writeValueAsString(operIns);
+      oper.put("defaultValue", new JSONObject(s).get(className));
+    }
+  }
+
+  @SuppressWarnings("unchecked")
+  public void addDefaultValueUnchecked(String className, JSONObject oper) throws Exception
+  {
+    ObjectMapper defaultValueMapper = ObjectMapperFactory.getOperatorValueSerializer();
+    Class<?> clazz = (Class<?>)classLoader.loadClass(className);
+    if (clazz != null) {
+      Object operIns = clazz.newInstance();
       String s = defaultValueMapper.writeValueAsString(operIns);
       oper.put("defaultValue", new JSONObject(s).get(className));
     }
@@ -400,7 +431,8 @@ public class OperatorDiscoverer
     if (parent == null) {
       parent = Operator.class.getName();
     } else {
-      if (!typeGraph.isAncestor(Operator.class.getName(), parent)) {
+      if (!(typeGraph.isAncestor(Operator.class.getName(), parent) ||
+        typeGraph.isAncestor(Module.class.getName(), parent))) {
         throw new IllegalArgumentException("Argument must be a subclass of Operator class");
       }
     }
@@ -414,6 +446,16 @@ public class OperatorDiscoverer
         return oci == null || !oci.tags.containsKey("@omitFromUI");
       }
     });
+    Set<String> filteredModuleClass = Sets.filter(moduleClassNames, new Predicate<String>()
+    {
+      @Override
+      public boolean apply(String className)
+      {
+        OperatorClassInfo oci = classInfo.get(className);
+        return oci == null || !oci.tags.containsKey("@omitFromUI");
+      }
+    });
+    filteredClass.addAll(filteredModuleClass);
 
     if (searchTerm == null && parent.equals(Operator.class.getName())) {
       return filteredClass;
@@ -425,7 +467,8 @@ public class OperatorDiscoverer
 
     Set<String> result = new HashSet<String>();
     for (String clazz : filteredClass) {
-      if (parent.equals(Operator.class.getName()) || typeGraph.isAncestor(parent, clazz)) {
+      if (parent.equals(Operator.class.getName()) || typeGraph.isAncestor(parent, clazz) ||
+        parent.equals(Module.class.getCanonicalName())) {
         if (searchTerm == null) {
           result.add(clazz);
         } else {
