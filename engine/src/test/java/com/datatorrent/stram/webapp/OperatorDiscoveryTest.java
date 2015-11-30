@@ -25,7 +25,15 @@ import java.io.ByteArrayInputStream;
 import java.io.ByteArrayOutputStream;
 import java.io.File;
 import java.net.URI;
-import java.util.*;
+import java.util.AbstractList;
+import java.util.AbstractMap;
+import java.util.ArrayList;
+import java.util.Comparator;
+import java.util.HashMap;
+import java.util.LinkedList;
+import java.util.List;
+import java.util.Map;
+import java.util.Properties;
 import java.util.concurrent.Callable;
 import java.util.concurrent.DelayQueue;
 import java.util.concurrent.LinkedBlockingDeque;
@@ -33,8 +41,6 @@ import java.util.concurrent.LinkedBlockingQueue;
 import java.util.concurrent.PriorityBlockingQueue;
 import java.util.concurrent.SynchronousQueue;
 
-import org.apache.hadoop.conf.Configuration;
-import org.apache.tools.ant.DirectoryScanner;
 import org.codehaus.jackson.map.ObjectMapper;
 import org.codehaus.jettison.json.JSONArray;
 import org.codehaus.jettison.json.JSONException;
@@ -42,24 +48,28 @@ import org.codehaus.jettison.json.JSONObject;
 import org.junit.Assert;
 import org.junit.Test;
 
+import org.apache.hadoop.conf.Configuration;
+import org.apache.tools.ant.DirectoryScanner;
+
+import com.esotericsoftware.kryo.Kryo;
+import com.esotericsoftware.kryo.io.Input;
+import com.esotericsoftware.kryo.io.Output;
+import com.google.common.collect.Lists;
+
+import com.datatorrent.api.DAG;
 import com.datatorrent.api.DefaultInputPort;
 import com.datatorrent.api.DefaultOutputPort;
+import com.datatorrent.api.InputOperator;
+import com.datatorrent.api.Module;
 import com.datatorrent.api.annotation.InputPortFieldAnnotation;
 import com.datatorrent.api.annotation.OutputPortFieldAnnotation;
 import com.datatorrent.common.util.BaseOperator;
-import com.datatorrent.api.InputOperator;
-
 import com.datatorrent.stram.plan.logical.LogicalPlan;
 import com.datatorrent.stram.plan.logical.LogicalPlan.OperatorMeta;
 import com.datatorrent.stram.plan.logical.LogicalPlanConfiguration;
 import com.datatorrent.stram.support.StramTestSupport;
 import com.datatorrent.stram.util.ObjectMapperFactory;
 import com.datatorrent.stram.webapp.TypeDiscoverer.UI_TYPE;
-
-import com.esotericsoftware.kryo.Kryo;
-import com.esotericsoftware.kryo.io.Input;
-import com.esotericsoftware.kryo.io.Output;
-import com.google.common.collect.Lists;
 
 public class OperatorDiscoveryTest
 {
@@ -1138,5 +1148,43 @@ public class OperatorDiscoveryTest
     Assert.assertEquals("@description", OperatorDiscoverer.MethodTagType.DESCRIPTION, OperatorDiscoverer.MethodTagType.from("@description"));
     Assert.assertEquals("@random", null, OperatorDiscoverer.MethodTagType.from("@random"));
   }
+
+  public static class Module1 implements Module
+  {
+    public transient ProxyInputPort in;
+    public transient ProxyOutputPort out;
+    private int pri;
+
+    @Override
+    public void populateDAG(DAG dag, Configuration conf)
+    {
+
+    }
+
+    public int getPriority()
+    {
+      return pri;
+    }
+
+    public void setPriority(int pri)
+    {
+      this.pri = pri;
+    }
+  }
+
+  @Test
+  public void testModuleDescription() throws Exception
+  {
+    String[] classFilePath = getClassFileInClasspath();
+    OperatorDiscoverer operatorDiscoverer = new OperatorDiscoverer(classFilePath);
+    operatorDiscoverer.buildTypeGraph();
+    JSONObject operator = operatorDiscoverer.describeOperator(Module1.class.getName());
+    JSONArray inputs = operator.getJSONArray("inputPorts");
+    JSONArray outputs = operator.getJSONArray("outputPorts");
+    Assert.assertEquals("no. of input ports", 1, inputs.length());
+    Assert.assertEquals("no. of output ports", 1, outputs.length());
+
+  }
+
 }
 
