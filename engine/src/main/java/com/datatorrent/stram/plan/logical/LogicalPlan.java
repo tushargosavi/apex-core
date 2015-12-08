@@ -731,6 +731,10 @@ public class LogicalPlan implements Serializable, DAG
         removeOperator(persistOpMeta.getOperator());
       }
     }
+
+    private void copyFrom(StreamMeta meta) {
+      this.locality = meta.getLocality();
+    }
   }
 
   /**
@@ -917,6 +921,33 @@ public class LogicalPlan implements Serializable, DAG
       }
       this.metricAggregatorMeta = new MetricAggregatorMeta(aggregator,
         getValue(OperatorContext.METRICS_DIMENSIONS_SCHEME));
+    }
+
+    private void copyAttributes(AttributeMap dest, AttributeMap source) {
+      for (Entry<Attribute<?>, ?> a : source.entrySet())
+        dest.put((Attribute<Object>)a.getKey(), a.getValue());
+    }
+
+    private void copyFrom(OperatorMeta operatorMeta)
+    {
+      // copy operator attributes
+      copyAttributes(attributes, operatorMeta.getAttributes());
+
+      // copy Input port attributes
+      for (Map.Entry<InputPort<?>, InputPortMeta> entry : operatorMeta.getPortMapping().inPortMap.entrySet()) {
+        InputPort<?> key = entry.getKey();
+        InputPortMeta dest = getPortMapping().inPortMap.get(key);
+        InputPortMeta source = entry.getValue();
+        copyAttributes(dest.attributes, source.attributes);
+      }
+
+      // copy Output port attributes
+      for (Map.Entry<OutputPort<?>, OutputPortMeta> entry : operatorMeta.getPortMapping().outPortMap.entrySet()) {
+        OutputPort<?> key = entry.getKey();
+        OutputPortMeta dest = getPortMapping().outPortMap.get(key);
+        OutputPortMeta source = entry.getValue();
+        copyAttributes(dest.attributes, source.attributes);
+      }
     }
 
     private class PortMapping implements Operators.OperatorDescriptor
@@ -1368,7 +1399,9 @@ public class LogicalPlan implements Serializable, DAG
     String name;
     for (OperatorMeta operatorMeta : subDag.getAllOperators()) {
       name = subDAGName + MODULE_NAMESPACE_SEPARATOR + operatorMeta.getName();
-      this.addOperator(name, operatorMeta.getOperator());
+      Operator op = this.addOperator(name, operatorMeta.getOperator());
+      OperatorMeta ometa = this.getMeta(op);
+      ometa.copyFrom(operatorMeta);
       OperatorMeta operatorMetaNew = this.getOperatorMeta(name);
       operatorMetaNew.setModuleName(operatorMeta.getModuleName() == null ? subDAGName : subDAGName + MODULE_NAMESPACE_SEPARATOR + operatorMeta.getModuleName());
     }
@@ -1384,7 +1417,9 @@ public class LogicalPlan implements Serializable, DAG
       name = subDAGName + MODULE_NAMESPACE_SEPARATOR + streamMeta.getName();
       StreamMeta streamMetaNew = this.addStream(name, sourceMeta.getPortObject(), inputPorts);
       streamMetaNew.setModuleName(streamMeta.getModuleName() == null ? subDAGName : subDAGName + "_" + streamMeta.getModuleName());
+      streamMetaNew.copyFrom(streamMeta);
     }
+
   }
 
   @Override

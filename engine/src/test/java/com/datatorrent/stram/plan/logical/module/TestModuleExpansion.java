@@ -27,6 +27,7 @@ import org.junit.Test;
 
 import org.apache.hadoop.conf.Configuration;
 
+import com.datatorrent.api.Context;
 import com.datatorrent.api.DAG;
 import com.datatorrent.api.DefaultInputPort;
 import com.datatorrent.api.DefaultOutputPort;
@@ -111,6 +112,8 @@ public class TestModuleExpansion
     {
       DummyOperator o1 = dag.addOperator("O1", new DummyOperator());
       o1.setOperatorProp(level1ModuleProp);
+      dag.getMeta(o1).getAttributes().put(Context.OperatorContext.MEMORY_MB, 512);
+      dag.setInputPortAttribute(o1.in, Context.PortContext.BUFFER_MEMORY_MB, 1024);
       mIn.set(o1.in);
       mOut.set(o1.out1);
     }
@@ -153,7 +156,7 @@ public class TestModuleExpansion
       DummyOperator o1 = dag.addOperator("O1", new DummyOperator());
       o1.setOperatorProp(level2ModuleAProp3);
 
-      dag.addStream("M1_M2&O1", m1.mOut, m2.mIn, o1.in);
+      dag.addStream("M1_M2&O1", m1.mOut, m2.mIn, o1.in).setLocality(DAG.Locality.THREAD_LOCAL);
 
       mIn.set(m1.mIn);
       mOut1.set(m2.mOut);
@@ -367,6 +370,12 @@ public class TestModuleExpansion
     validateSeperateStream(dag, componentName("Md", "O1_O2"), componentName("Md", "O1"), componentName("Md","O2"));
     validateSeperateStream(dag, "Ma_Mb", componentName("Ma", "M2", "O1"), componentName("Mb","O1"));
     validateSeperateStream(dag, "O1_O2", "O1", "O2", componentName("Me", "O1"));
+
+    /* validate if stream attributes are copied or not */
+    LogicalPlan.StreamMeta meta = dag.getStream(componentName("Mc", "M1_M2&O1"));
+    Assert.assertTrue("Metadata for stream is available ", meta != null);
+    Assert.assertEquals("Locality is thread locality ", meta.getLocality(), DAG.Locality.THREAD_LOCAL);
+
   }
 
   private void validateSeperateStream(LogicalPlan dag, String streamName, String inputOperatorName, String... outputOperatorNames)
@@ -437,6 +446,12 @@ public class TestModuleExpansion
     validateOperatorParent(dag, componentName("Md", "O1"), "Md");
     validateOperatorParent(dag, componentName("Md", "M1", "O1"), componentName("Md", "M1"));
     validateOperatorParent(dag, componentName("Md", "O2"), "Md");
+
+    validateOperatorAttribute(dag, componentName("Ma", "M1", "O1"));
+    validateOperatorAttribute(dag, componentName("Ma", "M2", "O1"));
+    validateOperatorAttribute(dag, componentName("Mb", "M1", "O1"));
+    validateOperatorAttribute(dag, componentName("Mc", "M1", "O1"));
+    validateOperatorAttribute(dag, componentName("Mc", "M2", "O1"));
   }
 
   private void validateOperatorParent(LogicalPlan dag, String operatorName, String parentModuleName)
@@ -459,6 +474,16 @@ public class TestModuleExpansion
       DummyOperator operator = (DummyOperator)oMeta.getOperator();
       Assert.assertEquals(expectedValue, operator.getOperatorProp());
     }
+  }
+
+  private void validateOperatorAttribute(LogicalPlan dag, String name) {
+    LogicalPlan.OperatorMeta oMeta = dag.getOperatorMeta(name);
+    int memory = oMeta.getAttributes().get(Context.OperatorContext.MEMORY_MB);
+    Assert.assertEquals(512, memory);
+
+    LogicalPlan.InputPortMeta imeta = dag.getOperatorMeta(name).getInputStreams().keySet().iterator().next();
+    memory = imeta.getAttributes().get(Context.PortContext.BUFFER_MEMORY_MB);
+    Assert.assertEquals(1024, memory);
   }
 
   private void validatePublicMethods(LogicalPlan dag) {
@@ -539,4 +564,5 @@ public class TestModuleExpansion
     lpc.prepareDAG(dag, null, "ModuleApp");
     dag.validate();
   }
+
 }
