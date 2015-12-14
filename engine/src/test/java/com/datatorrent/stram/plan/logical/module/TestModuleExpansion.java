@@ -18,13 +18,19 @@
  */
 package com.datatorrent.stram.plan.logical.module;
 
+import java.io.IOException;
+import java.io.InputStream;
+import java.io.StringWriter;
 import java.util.ArrayList;
 import java.util.List;
+import java.util.Properties;
 import java.util.Random;
 
+import org.codehaus.jettison.json.JSONObject;
 import org.junit.Assert;
 import org.junit.Test;
 
+import org.apache.commons.io.IOUtils;
 import org.apache.hadoop.conf.Configuration;
 
 import com.datatorrent.api.Context;
@@ -40,9 +46,11 @@ import com.datatorrent.common.util.BaseOperator;
 import com.datatorrent.stram.plan.logical.LogicalPlan;
 import com.datatorrent.stram.plan.logical.LogicalPlanConfiguration;
 
+import static org.junit.Assert.fail;
+
 public class TestModuleExpansion
 {
-  static class DummyInputOperator extends BaseOperator implements InputOperator
+  static public class DummyInputOperator extends BaseOperator implements InputOperator
   {
     private int inputOperatorProp = 0;
 
@@ -66,7 +74,7 @@ public class TestModuleExpansion
     }
   }
 
-  static class DummyOperator extends BaseOperator
+  static public class DummyOperator extends BaseOperator
   {
     private int operatorProp = 0;
 
@@ -98,7 +106,7 @@ public class TestModuleExpansion
     }
   }
 
-  static class Level1Module implements Module
+  static public class Level1Module implements Module
   {
     private int level1ModuleProp = 0;
 
@@ -129,7 +137,7 @@ public class TestModuleExpansion
     }
   }
 
-  static class Level2ModuleA implements Module
+  static public class Level2ModuleA implements Module
   {
     private int level2ModuleAProp1 = 0;
     private int level2ModuleAProp2 = 0;
@@ -194,7 +202,7 @@ public class TestModuleExpansion
     }
   }
 
-  static class Level2ModuleB implements Module
+  static public class Level2ModuleB implements Module
   {
     private int level2ModuleBProp1 = 0;
     private int level2ModuleBProp2 = 0;
@@ -260,7 +268,7 @@ public class TestModuleExpansion
     }
   }
 
-  static class Level3Module implements Module {
+  static public class Level3Module implements Module {
 
     public transient final ProxyInputPort<Integer> mIn = new ProxyInputPort<>();
     public transient final ProxyOutputPort<Integer> mOut1 = new ProxyOutputPort<>();
@@ -563,6 +571,54 @@ public class TestModuleExpansion
     dag.addStream("s1", in.out, module.mIn);
     lpc.prepareDAG(dag, null, "ModuleApp");
     dag.validate();
+  }
+
+
+  @Test
+  public void testLoadFromPropertiesFile() throws IOException
+  {
+    Properties props = new Properties();
+    String resourcePath = "/testModuleTopology.properties";
+    InputStream is = this.getClass().getResourceAsStream(resourcePath);
+    if (is == null) {
+      fail("Could not load " + resourcePath);
+    }
+    props.load(is);
+    LogicalPlanConfiguration pb = new LogicalPlanConfiguration(new Configuration(false))
+      .addFromProperties(props, null);
+
+    LogicalPlan dag = new LogicalPlan();
+    pb.populateDAG(dag);
+    pb.prepareDAG(dag, null, "testApplication");
+    dag.validate();
+    validateTopLevelOperators(dag);
+    validateTopLevelStreams(dag);
+    validatePublicMethods(dag);
+  }
+
+  @Test
+  public void testLoadFromJson() throws Exception
+  {
+    String resourcePath = "/testModuleTopology.json";
+    InputStream is = this.getClass().getResourceAsStream(resourcePath);
+    if (is == null) {
+      fail("Could not load " + resourcePath);
+    }
+    StringWriter writer = new StringWriter();
+
+    IOUtils.copy(is, writer);
+    JSONObject json = new JSONObject(writer.toString());
+
+    Configuration conf = new Configuration(false);
+    conf.set(StreamingApplication.DT_PREFIX + "operator.operator3.prop.myStringProperty", "o3StringFromConf");
+
+    LogicalPlanConfiguration planConf = new LogicalPlanConfiguration(conf);
+    LogicalPlan dag = planConf.createFromJson(json, "testLoadFromJson");
+    planConf.prepareDAG(dag, null, "testApplication");
+    dag.validate();
+    validateTopLevelOperators(dag);
+    validateTopLevelStreams(dag);
+    validatePublicMethods(dag);
   }
 
 }
