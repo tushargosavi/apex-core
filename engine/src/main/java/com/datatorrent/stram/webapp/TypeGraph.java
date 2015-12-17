@@ -325,6 +325,10 @@ public class TypeGraph
       Map<String, File> openClassFiles) {
     TypeGraphVertex tgv = typeGraph.get(Operator.class.getName());
     updatePortTypeInfoInTypeGraph(openJarFiles, openClassFiles, tgv);
+
+    tgv = typeGraph.get(Module.class.getName());
+    updatePortTypeInfoInTypeGraph(openJarFiles, openClassFiles, tgv);
+
   }
 
   public void updatePortTypeInfoInTypeGraph(Map<String, JarFile> openJarFiles,

@@ -3094,7 +3094,7 @@ public class DTCli
         String searchTerm = commandLineInfo.args.length > 1 ? commandLineInfo.args[1] : null;
 
         findClasses(jarFiles, parentName, searchTerm);
-        findClasses(jarFiles, Module.class.getName(), searchTerm);
+        //findClasses(jarFiles, Module.class.getName(), searchTerm);
         displayClasses();
       } finally {
         FileUtils.deleteDirectory(tmpDir);
