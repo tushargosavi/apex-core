@@ -157,7 +157,7 @@ public class LogicalPlan implements Serializable, DAG
   private transient int nodeIndex = 0; // used for cycle validation
   private transient Stack<OperatorMeta> stack = new Stack<OperatorMeta>(); // used for cycle validation
   // streamLinks is used for connecting proxy ports to actual ports. This is not needed after dag is fully expanded.
-  private transient Map<String, ArrayListMultimap<OutputPort<?>, InputPort<?>>> streamLinks = new HashMap<String, ArrayListMultimap<Operator.OutputPort<?>, Operator.InputPort<?>>>();
+  private transient Map<String, ArrayListMultimap<OutputPort<?>, InputPort<?>>> streamLinks = new HashMap<>();
 
   @Override
   public Attribute.AttributeMap getAttributes()
@@ -1104,8 +1104,9 @@ public class LogicalPlan implements Serializable, DAG
     }
 
     // Avoid name conflict with module.
-    if (modules.containsKey(name))
+    if (modules.containsKey(name)) {
       throw new IllegalArgumentException("duplicate operator id: " + operators.get(name));
+    }
 
     OperatorMeta decl = new OperatorMeta(name, operator);
     rootOperators.add(decl); // will be removed when a sink is added to an input port for this operator
@@ -1231,8 +1232,9 @@ public class LogicalPlan implements Serializable, DAG
      */
     public String getFullName()
     {
-      if (fullName != null)
+      if (fullName != null) {
         return fullName;
+      }
 
       if (parent == null) {
         fullName = name;
@@ -1242,7 +1244,8 @@ public class LogicalPlan implements Serializable, DAG
       return fullName;
     }
 
-    private void setParent(ModuleMeta meta) {
+    private void setParent(ModuleMeta meta)
+    {
       this.parent = meta;
     }
 
@@ -1258,8 +1261,9 @@ public class LogicalPlan implements Serializable, DAG
       }
       throw new IllegalArgumentException("duplicate module is: " + modules.get(name));
     }
-    if (operators.containsKey(name))
+    if (operators.containsKey(name)) {
       throw new IllegalArgumentException("duplicate module is: " + modules.get(name));
+    }
 
     ModuleMeta meta = new ModuleMeta(name, module);
     modules.put(name, meta);

@@ -70,13 +70,13 @@ public class TestModuleExpansion
     private int operatorProp = 0;
 
     @OutputPortFieldAnnotation(optional = true)
-    public transient final DefaultOutputPort<Integer> out1 = new DefaultOutputPort<>();
+    public final transient DefaultOutputPort<Integer> out1 = new DefaultOutputPort<>();
 
     @OutputPortFieldAnnotation(optional = true)
-    public transient final DefaultOutputPort<Integer> out2 = new DefaultOutputPort<>();
+    public final transient DefaultOutputPort<Integer> out2 = new DefaultOutputPort<>();
 
     @InputPortFieldAnnotation(optional = true)
-    public transient final DefaultInputPort<Integer> in = new DefaultInputPort<Integer>()
+    public final transient DefaultInputPort<Integer> in = new DefaultInputPort<Integer>()
     {
       @Override
       public void process(Integer tuple)
@@ -102,9 +102,9 @@ public class TestModuleExpansion
     private int level1ModuleProp = 0;
 
     @InputPortFieldAnnotation(optional = true)
-    public transient final ProxyInputPort<Integer> mIn = new ProxyInputPort<>();
+    public final transient ProxyInputPort<Integer> mIn = new ProxyInputPort<>();
     @OutputPortFieldAnnotation(optional = true)
-    public transient final ProxyOutputPort<Integer> mOut = new ProxyOutputPort<>();
+    public final transient ProxyOutputPort<Integer> mOut = new ProxyOutputPort<>();
 
     @Override
     public void populateDAG(DAG dag, Configuration conf)
@@ -133,13 +133,13 @@ public class TestModuleExpansion
     private int level2ModuleAProp3 = 0;
 
     @InputPortFieldAnnotation(optional = true)
-    public transient final ProxyInputPort<Integer> mIn = new ProxyInputPort<>();
+    public final transient ProxyInputPort<Integer> mIn = new ProxyInputPort<>();
 
     @OutputPortFieldAnnotation(optional = true)
-    public transient final ProxyOutputPort<Integer> mOut1 = new ProxyOutputPort<>();
+    public final transient ProxyOutputPort<Integer> mOut1 = new ProxyOutputPort<>();
 
     @OutputPortFieldAnnotation(optional = true)
-    public transient final ProxyOutputPort<Integer> mOut2 = new ProxyOutputPort<>();
+    public final transient ProxyOutputPort<Integer> mOut2 = new ProxyOutputPort<>();
 
     @Override
     public void populateDAG(DAG dag, Configuration conf)
@@ -198,13 +198,13 @@ public class TestModuleExpansion
     private int level2ModuleBProp3 = 0;
 
     @InputPortFieldAnnotation(optional = true)
-    public transient final ProxyInputPort<Integer> mIn = new ProxyInputPort<>();
+    public final transient ProxyInputPort<Integer> mIn = new ProxyInputPort<>();
 
     @OutputPortFieldAnnotation(optional = true)
-    public transient final ProxyOutputPort<Integer> mOut1 = new ProxyOutputPort<>();
+    public final transient ProxyOutputPort<Integer> mOut1 = new ProxyOutputPort<>();
 
     @OutputPortFieldAnnotation(optional = true)
-    public transient final ProxyOutputPort<Integer> mOut2 = new ProxyOutputPort<>();
+    public final transient ProxyOutputPort<Integer> mOut2 = new ProxyOutputPort<>();
 
     @Override
     public void populateDAG(DAG dag, Configuration conf)
@@ -257,11 +257,12 @@ public class TestModuleExpansion
     }
   }
 
-  static class Level3Module implements Module {
+  static class Level3Module implements Module
+  {
 
-    public transient final ProxyInputPort<Integer> mIn = new ProxyInputPort<>();
-    public transient final ProxyOutputPort<Integer> mOut1 = new ProxyOutputPort<>();
-    public transient final ProxyOutputPort<Integer> mOut2 = new ProxyOutputPort<>();
+    public final transient ProxyInputPort<Integer> mIn = new ProxyInputPort<>();
+    public final transient ProxyOutputPort<Integer> mOut1 = new ProxyOutputPort<>();
+    public final transient ProxyOutputPort<Integer> mOut2 = new ProxyOutputPort<>();
 
     @Override
     public void populateDAG(DAG dag, Configuration conf)
@@ -354,22 +355,25 @@ public class TestModuleExpansion
     Assert.assertTrue(streamNames.contains("Ma_Mb"));
     Assert.assertTrue(streamNames.contains("O1_O2"));
 
-    validateSeperateStream(dag, componentName("Mb", "O1_M1"), componentName("Mb", "O1"), componentName("Mb", "M1", "O1"));
+    validateSeperateStream(dag, componentName("Mb", "O1_M1"), componentName("Mb", "O1"),
+        componentName("Mb", "M1", "O1"));
     validateSeperateStream(dag, "O2_Ma", "O2", componentName("Ma", "M1", "O1"));
     validateSeperateStream(dag, "Mb_Mc", componentName("Mb", "O2"), componentName("Mc", "M1", "O1"));
     validateSeperateStream(dag, componentName("Mb", "O1_O2"), componentName("Mb", "O1"), componentName("Mb", "O2"));
-    validateSeperateStream(dag, componentName("Ma", "M1_M2&O1"), componentName("Ma", "M1", "O1"), componentName("Ma", "O1"),
-      componentName("Ma", "M2", "O1"));
-    validateSeperateStream(dag, componentName("Md", "O1_M1"), componentName("Md", "O1"), componentName("Md", "M1", "O1"));
+    validateSeperateStream(dag, componentName("Ma", "M1_M2&O1"), componentName("Ma", "M1", "O1"),
+        componentName("Ma", "O1"), componentName("Ma", "M2", "O1"));
+    validateSeperateStream(dag, componentName("Md", "O1_M1"), componentName("Md", "O1"),
+        componentName("Md", "M1", "O1"));
     validateSeperateStream(dag, "Ma_Md", componentName("Ma", "O1"), componentName("Md", "O1"));
-    validateSeperateStream(dag, componentName("Mc", "M1_M2&O1"), componentName("Mc", "M1", "O1"), componentName("Mc", "O1"),
-      componentName("Mc", "M2", "O1"));
-    validateSeperateStream(dag, componentName("Md", "O1_O2"), componentName("Md", "O1"), componentName("Md","O2"));
-    validateSeperateStream(dag, "Ma_Mb", componentName("Ma", "M2", "O1"), componentName("Mb","O1"));
+    validateSeperateStream(dag, componentName("Mc", "M1_M2&O1"), componentName("Mc", "M1", "O1"),
+        componentName("Mc", "O1"), componentName("Mc", "M2", "O1"));
+    validateSeperateStream(dag, componentName("Md", "O1_O2"), componentName("Md", "O1"), componentName("Md", "O2"));
+    validateSeperateStream(dag, "Ma_Mb", componentName("Ma", "M2", "O1"), componentName("Mb", "O1"));
     validateSeperateStream(dag, "O1_O2", "O1", "O2", componentName("Me", "O1"));
   }
 
-  private void validateSeperateStream(LogicalPlan dag, String streamName, String inputOperatorName, String... outputOperatorNames)
+  private void validateSeperateStream(LogicalPlan dag, String streamName, String inputOperatorName,
+      String... outputOperatorNames)
   {
     LogicalPlan.StreamMeta streamMeta = dag.getStream(streamName);
     String sourceName = streamMeta.getSource().getOperatorMeta().getName();
@@ -397,8 +401,8 @@ public class TestModuleExpansion
     Assert.assertTrue(operatorNames.contains("O2"));
     Assert.assertTrue(operatorNames.contains(componentName("Ma", "M1", "O1")));
     Assert.assertTrue(operatorNames.contains(componentName("Ma", "M2", "O1")));
-    Assert.assertTrue(operatorNames.contains(componentName("Ma","O1")));
-    Assert.assertTrue(operatorNames.contains(componentName("Mb","O1")));
+    Assert.assertTrue(operatorNames.contains(componentName("Ma", "O1")));
+    Assert.assertTrue(operatorNames.contains(componentName("Mb", "O1")));
     Assert.assertTrue(operatorNames.contains(componentName("Mb", "M1", "O1")));
     Assert.assertTrue(operatorNames.contains(componentName("Mb", "O2")));
     Assert.assertTrue(operatorNames.contains(componentName("Mc", "M1", "O1")));
@@ -461,10 +465,11 @@ public class TestModuleExpansion
     }
   }
 
-  private void validatePublicMethods(LogicalPlan dag) {
+  private void validatePublicMethods(LogicalPlan dag)
+  {
     // Logical dag contains 4 modules added on top level.
     List<String> moduleNames = new ArrayList<>();
-    for (LogicalPlan.ModuleMeta moduleMeta: dag.getAllModules()) {
+    for (LogicalPlan.ModuleMeta moduleMeta : dag.getAllModules()) {
       moduleNames.add(moduleMeta.getName());
     }
     Assert.assertTrue(moduleNames.contains("Ma"));
@@ -478,13 +483,15 @@ public class TestModuleExpansion
     LogicalPlan.ModuleMeta m = dag.getModuleMeta("Ma");
     Assert.assertEquals("Name of module is Ma", m.getName(), "Ma");
 
-
   }
 
-  private static String componentName(String... names) {
-    if (names.length == 0) return "";
+  private static String componentName(String... names)
+  {
+    if (names.length == 0) {
+      return "";
+    }
     StringBuilder sb = new StringBuilder(names[0]);
-    for(int i = 1; i < names.length; i++) {
+    for (int i = 1; i < names.length; i++) {
       sb.append(LogicalPlan.MODULE_NAMESPACE_SEPARATOR);
       sb.append(names[i]);
     }
@@ -496,8 +503,9 @@ public class TestModuleExpansion
    * and add a module "m1" which will populate operator "O1", causing name conflict with
    * top level operator.
    */
-  @Test(expected = java.lang.IllegalArgumentException.class )
-  public void conflictingNamesWithExpandedModule() {
+  @Test(expected = java.lang.IllegalArgumentException.class)
+  public void conflictingNamesWithExpandedModule()
+  {
     Configuration conf = new Configuration(false);
     LogicalPlanConfiguration lpc = new LogicalPlanConfiguration(conf);
     LogicalPlan dag = new LogicalPlan();
@@ -512,8 +520,9 @@ public class TestModuleExpansion
    * Module and Operator with same name is not allowed in a DAG, to prevent properties
    * conflict.
    */
-  @Test(expected = java.lang.IllegalArgumentException.class )
-  public void conflictingNamesWithOperator1() {
+  @Test(expected = java.lang.IllegalArgumentException.class)
+  public void conflictingNamesWithOperator1()
+  {
     Configuration conf = new Configuration(false);
     LogicalPlanConfiguration lpc = new LogicalPlanConfiguration(conf);
     LogicalPlan dag = new LogicalPlan();
@@ -528,8 +537,9 @@ public class TestModuleExpansion
    * Module and Operator with same name is not allowed in a DAG, to prevent properties
    * conflict.
    */
-  @Test(expected = java.lang.IllegalArgumentException.class )
-  public void conflictingNamesWithOperator2() {
+  @Test(expected = java.lang.IllegalArgumentException.class)
+  public void conflictingNamesWithOperator2()
+  {
     Configuration conf = new Configuration(false);
     LogicalPlanConfiguration lpc = new LogicalPlanConfiguration(conf);
     LogicalPlan dag = new LogicalPlan();

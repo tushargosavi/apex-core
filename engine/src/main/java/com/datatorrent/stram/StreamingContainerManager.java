@@ -143,7 +143,6 @@ import com.datatorrent.stram.plan.logical.LogicalPlan.InputPortMeta;
 import com.datatorrent.stram.plan.logical.LogicalPlan.ModuleMeta;
 import com.datatorrent.stram.plan.logical.LogicalPlan.OperatorMeta;
 import com.datatorrent.stram.plan.logical.LogicalPlan.OutputPortMeta;
-import com.datatorrent.stram.plan.logical.LogicalPlan.StreamMeta;
 import com.datatorrent.stram.plan.logical.LogicalPlanConfiguration;
 import com.datatorrent.stram.plan.logical.Operators;
 import com.datatorrent.stram.plan.logical.Operators.PortContextPair;
@@ -2317,8 +2316,9 @@ public class StreamingContainerManager implements PlanContext
         return m;
       }
       ModuleMeta res = getModuleMeta(moduleName, m.getDag());
-      if (res != null)
+      if (res != null) {
         return res;
+      }
     }
     return null;
   }

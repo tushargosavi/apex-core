@@ -580,16 +580,15 @@ public class StramWebServices
         LOG.debug("Setting property for {}: {}={}", operatorName, key, val);
         dagManager.setOperatorProperty(operatorName, key, val);
       }
-    }
-    catch (JSONException ex) {
+    } catch (JSONException ex) {
       LOG.warn("Got JSON Exception: ", ex);
-    }
-    catch (Exception ex) {
+    } catch (Exception ex) {
       LOG.error("Caught exception: ", ex);
       throw new RuntimeException(ex);
     }
     return response;
   }
+
   @POST // not supported by WebAppProxyServlet, can only be called directly
   @Path(PATH_PHYSICAL_PLAN_OPERATORS + "/{operatorId:\\d+}/properties")
   @Consumes(MediaType.APPLICATION_JSON)
@@ -715,7 +714,6 @@ public class StramWebServices
     return null;
   }
 
-
   @GET
   @Path(PATH_LOGICAL_PLAN_OPERATORS + "/{operatorName}/ports/{portName}")
   @Produces(MediaType.APPLICATION_JSON)
@@ -792,8 +790,7 @@ public class StramWebServices
         Entry<String, Object> entry = (Entry<String, Object>)entryIterator.next();
         if (propertyName == null) {
           m.put(entry.getKey(), entry.getValue());
-        }
-        else if (propertyName.equals(entry.getKey())) {
+        } else if (propertyName.equals(entry.getKey())) {
           m.put(entry.getKey(), entry.getValue());
           break;
         }
@@ -834,7 +831,7 @@ public class StramWebServices
   public JSONObject getLogicalPlan(@QueryParam("includeModules") String includeModules) throws JSONException, IOException
   {
     return new JSONObject(objectMapper.writeValueAsString(LogicalPlanSerializer.convertToMap(
-        dagManager.getLogicalPlan(), includeModules != null)));
+      dagManager.getLogicalPlan(), includeModules != null)));
   }
 
   @POST // not supported by WebAppProxyServlet, can only be called directly

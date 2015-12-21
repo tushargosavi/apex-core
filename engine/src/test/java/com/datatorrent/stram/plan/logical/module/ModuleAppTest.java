@@ -138,7 +138,8 @@ public class ModuleAppTest
     {
       LOG.debug("Application - PopulateDAG");
       DummyInputOperator dummyInputOperator = dag.addOperator("DummyInputOperator", new DummyInputOperator());
-      DummyOperatorAfterInput dummyOperatorAfterInput = dag.addOperator("DummyOperatorAfterInput", new DummyOperatorAfterInput());
+      DummyOperatorAfterInput dummyOperatorAfterInput = dag.addOperator("DummyOperatorAfterInput",
+          new DummyOperatorAfterInput());
       Module m1 = dag.addModule("TestModule1", new TestModule());
       Module m2 = dag.addModule("TestModule2", new TestModule());
       DummyOutputOperator dummyOutputOperator = dag.addOperator("DummyOutputOperator", new DummyOutputOperator());
