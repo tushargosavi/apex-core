@@ -197,7 +197,7 @@ public class LogicalPlan implements Serializable, DAG
   private final List<OperatorMeta> rootOperators = new ArrayList<OperatorMeta>();
   private final List<OperatorMeta> leafOperators = new ArrayList<>();
   private final Attribute.AttributeMap attributes = new DefaultAttributeMap();
-  private transient Map<String, ArrayListMultimap<OutputPort<?>, InputPort<?>>> streamLinks = new HashMap<>();
+  private transient Map<String, StreamLinkInfo> streamLinks = new HashMap<>();
 
   @Override
   public Attribute.AttributeMap getAttributes()
@@ -489,10 +489,21 @@ public class LogicalPlan implements Serializable, DAG
     @Override
     public StreamMeta setSource(Operator.OutputPort<?> port)
     {
+      if (port instanceof ProxyOutputPort) {
+        StreamLinkInfo sli = streamLinks.get(id);
+        if (sli == null) {
+          sli = new StreamLinkInfo(this);
+          streamLinks.put(id, sli);
+        }
+        sli.setSource(port);
+        return this;
+      }
+
       OutputPortMeta portMeta = assertGetPortMeta(port);
       OperatorMeta om = portMeta.getOperatorMeta();
+
       if (om.outputStreams.containsKey(portMeta)) {
-        String msg = String.format("Operator %s already connected to %s", om.name, om.outputStreams.get(portMeta).id);
+        String msg = String.format("Operator %s already connected to %s", om.name, om.outputStreams.get(portMeta));
         throw new IllegalArgumentException(msg);
       }
       this.source = portMeta;
@@ -508,6 +519,16 @@ public class LogicalPlan implements Serializable, DAG
     @Override
     public StreamMeta addSink(Operator.InputPort<?> port)
     {
+      if (port instanceof ProxyInputPort) {
+        StreamLinkInfo sli = streamLinks.get(id);
+        if (sli == null) {
+          sli = new StreamLinkInfo(this);
+          streamLinks.put(id, sli);
+        }
+        sli.addSink(port);
+        return this;
+      }
+
       InputPortMeta portMeta = assertGetPortMeta(port);
       OperatorMeta om = portMeta.getOperatorWrapper();
       String portName = portMeta.getPortName();
@@ -772,7 +793,7 @@ public class LogicalPlan implements Serializable, DAG
   /**
    * Operator meta object.
    */
-  public final class OperatorMeta implements DAG.OperatorMeta, Serializable
+  public class OperatorMeta implements DAG.OperatorMeta, Serializable
   {
     private final LinkedHashMap<InputPortMeta, StreamMeta> inputStreams = new LinkedHashMap<InputPortMeta, StreamMeta>();
     private final LinkedHashMap<OutputPortMeta, StreamMeta> outputStreams = new LinkedHashMap<OutputPortMeta, StreamMeta>();
@@ -1173,6 +1194,9 @@ public class LogicalPlan implements Serializable, DAG
   @Override
   public <T extends Operator> T addOperator(String name, T operator)
   {
+    if (operator instanceof Module) {
+      return (T)addModule(name, (Module)operator);
+    }
     if (operators.containsKey(name)) {
       if (operators.get(name).operator == operator) {
         return operator;
@@ -1194,31 +1218,21 @@ public class LogicalPlan implements Serializable, DAG
   /**
    * Module meta object.
    */
-  public final class ModuleMeta implements DAG.ModuleMeta, Serializable
+  public final class ModuleMeta extends OperatorMeta implements DAG.ModuleMeta, Serializable
   {
-    private final LinkedHashMap<InputPortMeta, StreamMeta> inputStreams = new LinkedHashMap<>();
-    private final LinkedHashMap<OutputPortMeta, StreamMeta> outputStreams = new LinkedHashMap<>();
-    private final Attribute.AttributeMap attributes;
-    @NotNull
-    private String name;
-    private transient Module module;
     private ModuleMeta parent;
     private LogicalPlan dag = null;
     private transient String fullName;
+    /** typecasted reference to the module */
+    private transient Module module;
+    private transient boolean flatterned = false;
 
     private ModuleMeta(String name, Module module)
     {
-      LOG.debug("Initializing {} as {}", name, module.getClass().getName());
-      this.name = name;
+      super(name, module);
       this.module = module;
-      this.attributes = new DefaultAttributeMap();
+      LOG.debug("Initializing {} as {}", name, module.getClass().getName());
       this.dag = new LogicalPlan();
-    }
-
-    @Override
-    public String getName()
-    {
-      return name;
     }
 
     @Override
@@ -1227,55 +1241,9 @@ public class LogicalPlan implements Serializable, DAG
       return module;
     }
 
-    @Override
-    public Attribute.AttributeMap getAttributes()
-    {
-      return attributes;
-    }
-
-    @Override
-    public <T> T getValue(Attribute<T> key)
-    {
-      return attributes.get(key);
-    }
-
-    @Override
-    public void setCounters(Object counters)
-    {
-
-    }
-
-    @Override
-    public void sendMetrics(Collection<String> metricNames)
-    {
-
-    }
-
-    public LinkedHashMap<InputPortMeta, StreamMeta> getInputStreams()
-    {
-      return inputStreams;
-    }
-
-    public LinkedHashMap<OutputPortMeta, StreamMeta> getOutputStreams()
-    {
-      return outputStreams;
-    }
-
     public LogicalPlan getDag()
     {
       return dag;
-    }
-
-    private void writeObject(ObjectOutputStream out) throws IOException
-    {
-      out.defaultWriteObject();
-      FSStorageAgent.store(out, module);
-    }
-
-    private void readObject(ObjectInputStream input) throws IOException, ClassNotFoundException
-    {
-      input.defaultReadObject();
-      module = (Module)FSStorageAgent.retrieve(input);
     }
 
     /**
@@ -1287,6 +1255,10 @@ public class LogicalPlan implements Serializable, DAG
      */
     public void flattenModule(LogicalPlan parentDAG, Configuration conf)
     {
+      if (flatterned) {
+        return;
+      }
+
       module.populateDAG(dag, conf);
       for (ModuleMeta subModuleMeta : dag.getAllModules()) {
         subModuleMeta.setParent(this);
@@ -1294,6 +1266,7 @@ public class LogicalPlan implements Serializable, DAG
       }
       dag.applyStreamLinks();
       parentDAG.addDAGToCurrentDAG(this);
+      flatterned = true;
     }
 
     /**
@@ -1313,9 +1286,9 @@ public class LogicalPlan implements Serializable, DAG
       }
 
       if (parent == null) {
-        fullName = name;
+        fullName = getName();
       } else {
-        fullName = parent.getFullName() + MODULE_NAMESPACE_SEPARATOR + name;
+        fullName = parent.getFullName() + MODULE_NAMESPACE_SEPARATOR + getName();
       }
       return fullName;
     }
@@ -1397,21 +1370,9 @@ public class LogicalPlan implements Serializable, DAG
   public <T> StreamMeta addStream(String id, Operator.OutputPort<? extends T> source, Operator.InputPort<? super T>... sinks)
   {
     StreamMeta s = addStream(id);
-    id = s.id;
-    ArrayListMultimap<OutputPort<?>, InputPort<?>> streamMap = ArrayListMultimap.create();
-    if (!(source instanceof ProxyOutputPort)) {
-      s.setSource(source);
-    }
-    for (Operator.InputPort<?> sink : sinks) {
-      if (source instanceof ProxyOutputPort || sink instanceof ProxyInputPort) {
-        streamMap.put(source, sink);
-        streamLinks.put(id, streamMap);
-      } else {
-        if (s.getSource() == null) {
-          s.setSource(source);
-        }
-        s.addSink(sink);
-      }
+    s.setSource(source);
+    for (Operator.InputPort<?> sink: sinks) {
+      s.addSink(sink);
     }
     return s;
   }
@@ -1423,24 +1384,10 @@ public class LogicalPlan implements Serializable, DAG
    */
   public void applyStreamLinks()
   {
-    for (String id : streamLinks.keySet()) {
-      StreamMeta s = getStream(id);
-      for (Map.Entry<Operator.OutputPort<?>, Operator.InputPort<?>> pair : streamLinks.get(id).entries()) {
-        if (s.getSource() == null) {
-          Operator.OutputPort<?> outputPort = pair.getKey();
-          while (outputPort instanceof ProxyOutputPort) {
-            outputPort = ((ProxyOutputPort<?>)outputPort).get();
-          }
-          s.setSource(outputPort);
-        }
-
-        Operator.InputPort<?> inputPort = pair.getValue();
-        while (inputPort instanceof ProxyInputPort) {
-          inputPort = ((ProxyInputPort<?>)inputPort).get();
-        }
-        s.addSink(inputPort);
-      }
+    for (StreamLinkInfo sli : streamLinks.values()) {
+      sli.resolvePorts();
     }
+    streamLinks.clear();
   }
 
   @SuppressWarnings({ "unchecked", "rawtypes" })
@@ -2200,4 +2147,64 @@ public class LogicalPlan implements Serializable, DAG
     return result;
   }
 
+   /**
+    * This class hold Proxy Ports for a stream, and resolves them later after modules
+    * are expanded.
+    *
+    * If any source and sink added to a stream is ProxyInputPort or ProxyOutputPort
+    * we create a StreamLinkInfo with the stream reference and keep ProxyPorts In this class.
+    * Later we go over each Proxy port and find out the actual port connected to the ProxyPort
+    * and update StreamMeta.
+    */
+   private static final class StreamLinkInfo
+   {
+     OutputPort<?> source;
+     List<InputPort<?>> sinks = new ArrayList<>();
+     final StreamMeta smeta;
+
+     private StreamLinkInfo(StreamMeta smeta)
+     {
+       this.smeta = smeta;
+     }
+
+     private void setSource(OutputPort<?> source)
+     {
+       if (!(source instanceof ProxyOutputPort)) {
+         throw new IllegalArgumentException("Invalid port type expected ProxyOutputPort");
+       }
+       this.source = source;
+     }
+
+     private void addSink(InputPort<?> sink)
+     {
+       if (!(sink instanceof ProxyInputPort)) {
+         throw new IllegalArgumentException("Invalid port type expected ProxyOutputPort");
+       }
+       sinks.add(sink);
+     }
+
+     private void resolvePorts()
+     {
+       /* If source connected to the stream is ProxyOuputPort find out the actual operator
+          output port recursively, and set it in the original stream.
+        */
+       if (source != null && source instanceof ProxyOutputPort) {
+         OutputPort<?> outputPort = source;
+         while (outputPort instanceof ProxyOutputPort) {
+           outputPort = ((ProxyOutputPort<?>)outputPort).get();
+         }
+         smeta.setSource(outputPort);
+       }
+
+       /* for each connected proxy input port, find out final operator's input port recursively
+          and add it to the original stream.
+        */
+       for (InputPort<?> inputPort : sinks) {
+         while (inputPort instanceof ProxyInputPort) {
+           inputPort = ((ProxyInputPort<?>)inputPort).get();
+         }
+         smeta.addSink(inputPort);
+       }
+     }
+   }
 }

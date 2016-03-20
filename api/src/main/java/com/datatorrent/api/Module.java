@@ -36,7 +36,7 @@ import com.datatorrent.api.Operator.Unifier;
  * @since 3.3.0
  */
 @InterfaceStability.Evolving
-public interface Module
+public interface Module extends Operator
 {
   void populateDAG(DAG dag, Configuration conf);
 

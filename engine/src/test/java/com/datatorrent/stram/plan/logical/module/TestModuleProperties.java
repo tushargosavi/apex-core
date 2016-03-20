@@ -18,14 +18,12 @@
  */
 package com.datatorrent.stram.plan.logical.module;
 
-import org.junit.Assert;
-import org.junit.Test;
-
-import org.apache.hadoop.conf.Configuration;
-
 import com.datatorrent.api.StreamingApplication;
 import com.datatorrent.stram.plan.logical.LogicalPlan;
 import com.datatorrent.stram.plan.logical.LogicalPlanConfiguration;
+import org.apache.hadoop.conf.Configuration;
+import org.junit.Assert;
+import org.junit.Test;
 
 public class TestModuleProperties
 {

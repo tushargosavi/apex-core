@@ -18,31 +18,28 @@
  */
 package com.datatorrent.stram.plan.logical.module;
 
-import java.util.Map;
+import com.datatorrent.api.DAG;
+import com.datatorrent.api.DefaultOutputPort;
+import com.datatorrent.api.Module;
+import com.datatorrent.api.annotation.OutputPortFieldAnnotation;
+import com.datatorrent.common.util.BaseOperator;
+import com.datatorrent.stram.engine.GenericOperatorProperty;
+import com.google.common.collect.Maps;
+import org.apache.hadoop.conf.Configuration;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
 
 import javax.validation.Valid;
 import javax.validation.constraints.AssertTrue;
 import javax.validation.constraints.Min;
 import javax.validation.constraints.NotNull;
 import javax.validation.constraints.Pattern;
-
-import org.slf4j.Logger;
-import org.slf4j.LoggerFactory;
-
-import org.apache.hadoop.conf.Configuration;
-
-import com.google.common.collect.Maps;
-
-import com.datatorrent.api.DAG;
-import com.datatorrent.api.DefaultOutputPort;
-import com.datatorrent.api.Module;
-import com.datatorrent.api.annotation.OutputPortFieldAnnotation;
-import com.datatorrent.stram.engine.GenericOperatorProperty;
+import java.util.Map;
 
 public class TestModules
 {
 
-  public static class GenericModule implements Module
+  public static class GenericModule extends BaseOperator implements Module
   {
     private static final Logger LOG = LoggerFactory.getLogger(TestModules.class);
 
@@ -121,7 +118,7 @@ public class TestModules
     }
   }
 
-  public static class ValidationTestModule implements Module
+  public static class ValidationTestModule extends BaseOperator implements Module
   {
     @NotNull
     @Pattern(regexp = ".*malhar.*", message = "Value has to contain 'malhar'!")
