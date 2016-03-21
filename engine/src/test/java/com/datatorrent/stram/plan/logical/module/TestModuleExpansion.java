@@ -112,7 +112,7 @@ public class TestModuleExpansion
     }
   }
 
-  public static class Level1Module extends BaseModule
+  public static class Level1Module extends BaseOperator implements Module
   {
     private int level1ModuleProp = 0;
 
@@ -175,7 +175,7 @@ public class TestModuleExpansion
     }
   }
 
-  public static class Level2ModuleA extends BaseModule
+  public static class Level2ModuleA extends BaseOperator implements Module
   {
     private int level2ModuleAProp1 = 0;
     private int level2ModuleAProp2 = 0;
@@ -244,7 +244,7 @@ public class TestModuleExpansion
     }
   }
 
-  public static class Level2ModuleB extends BaseModule
+  public static class Level2ModuleB extends BaseOperator implements Module
   {
     private int level2ModuleBProp1 = 0;
     private int level2ModuleBProp2 = 0;
@@ -312,7 +312,7 @@ public class TestModuleExpansion
     }
   }
 
-  public static class Level3Module extends BaseModule
+  public static class Level3Module extends BaseOperator implements Module
   {
 
     public final transient ProxyInputPort<Integer> mIn = new ProxyInputPort<>();

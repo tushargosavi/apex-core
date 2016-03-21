@@ -108,7 +108,7 @@ public class ModuleAppTest
   /*
    * Module Definition
    */
-  static class TestModule extends BaseModule
+  static class TestModule extends BaseOperator implements Module
   {
 
     public transient ProxyInputPort<Integer> moduleInput = new ProxyInputPort<Integer>();
