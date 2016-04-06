@@ -555,10 +555,6 @@ public class TestModuleExpansion
     Assert.assertTrue(moduleNames.contains("Me"));
     Assert.assertEquals("Number of modules are 5", 5, dag.getAllModules().size());
 
-    // correct module meta is returned by getMeta call.
-    LogicalPlan.ModuleMeta m = dag.getModuleMeta("Ma");
-    Assert.assertEquals("Name of module is Ma", m.getName(), "Ma");
-
   }
 
   private static String componentName(String... names)

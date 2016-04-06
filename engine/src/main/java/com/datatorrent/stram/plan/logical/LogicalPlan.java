@@ -1227,7 +1227,7 @@ public class LogicalPlan implements Serializable, DAG
   /**
    * Module meta object.
    */
-  public final class ModuleMeta extends OperatorMeta implements DAG.ModuleMeta, Serializable
+  public final class ModuleMeta extends OperatorMeta implements Serializable
   {
     private ModuleMeta parent;
     private LogicalPlan dag = null;
@@ -1242,12 +1242,6 @@ public class LogicalPlan implements Serializable, DAG
       this.module = module;
       LOG.debug("Initializing {} as {}", name, module.getClass().getName());
       this.dag = new LogicalPlan();
-    }
-
-    @Override
-    public Module getModule()
-    {
-      return module;
     }
 
     public LogicalPlan getDag()
@@ -1546,12 +1540,6 @@ public class LogicalPlan implements Serializable, DAG
   }
 
   @Override
-  public ModuleMeta getModuleMeta(String moduleName)
-  {
-    return this.modules.get(moduleName);
-  }
-
-  @Override
   public OperatorMeta getMeta(Operator operator)
   {
     // TODO: cache mapping
@@ -1561,17 +1549,6 @@ public class LogicalPlan implements Serializable, DAG
       }
     }
     throw new IllegalArgumentException("Operator not associated with the DAG: " + operator);
-  }
-
-  @Override
-  public ModuleMeta getMeta(Module module)
-  {
-    for (ModuleMeta m : getAllModules()) {
-      if (m.module == module) {
-        return m;
-      }
-    }
-    throw new IllegalArgumentException("Module not associated with the DAG: " + module);
   }
 
   public int getMaxContainerCount()
