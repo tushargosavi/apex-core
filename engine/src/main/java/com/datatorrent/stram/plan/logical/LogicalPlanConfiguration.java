@@ -2228,11 +2228,6 @@ public class LogicalPlanConfiguration {
     return new PropertyArgs(om.getName(), om.getOperator().getClass().getName());
   }
 
-  private PropertyArgs getPropertyArgs(ModuleMeta mm)
-  {
-    return new PropertyArgs(mm.getName(), mm.getModule().getClass().getName());
-  }
-
   /**
    * Produce the collections of templates that apply for the given id.
    * @param pa
@@ -2403,7 +2398,7 @@ public class LogicalPlanConfiguration {
     for (final ModuleMeta mw : dag.getAllModules()) {
       List<OperatorConf> opConfs = getMatchingChildConf(appConfs, mw.getName(), StramElement.OPERATOR);
       Map<String, String> opProps = getProperties(getPropertyArgs(mw), opConfs, appName);
-      setObjectProperties(mw.getModule(), opProps);
+      setObjectProperties(mw.getOperator(), opProps);
     }
   }
 
