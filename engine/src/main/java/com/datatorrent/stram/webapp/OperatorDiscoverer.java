@@ -18,6 +18,7 @@
  */
 package com.datatorrent.stram.webapp;
 
+import com.datatorrent.api.Module;
 import com.datatorrent.api.Operator;
 import com.datatorrent.netlet.util.DTThrowable;
 import com.datatorrent.stram.util.ObjectMapperFactory;
@@ -519,6 +520,7 @@ public class OperatorDiscoverer
         response.put(PORT_TYPE_INFO_KEY, portTypeInfo);
         response.put("inputPorts", inputPorts);
         response.put("outputPorts", outputPorts);
+        response.put("isModule", Module.class.isAssignableFrom(classLoader.loadClass(clazz)));
 
         OperatorClassInfo oci = classInfo.get(clazz);
 
