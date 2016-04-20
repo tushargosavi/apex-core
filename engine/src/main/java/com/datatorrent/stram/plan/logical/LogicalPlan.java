@@ -579,7 +579,7 @@ public class LogicalPlan implements Serializable, DAG
       if (this.source != null) {
         this.source.getOperatorMeta().outputStreams.remove(this.source);
         if (this.source.getOperatorMeta().outputStreams.isEmpty() &&
-          !(this.source.getOperatorMeta().getOperator() instanceof Operator.DelayOperator)) {
+            !(this.source.getOperatorMeta().getOperator() instanceof Operator.DelayOperator)) {
           leafOperators.remove(this.source.getOperatorMeta());
         }
       }
@@ -752,15 +752,15 @@ public class LogicalPlan implements Serializable, DAG
     private void addStreamCodec(InputPortMeta sinkToPersistPortMeta, InputPort<?> port)
     {
       StreamCodec<Object> inputStreamCodec = sinkToPersistPortMeta.getValue(PortContext.STREAM_CODEC) != null
-        ? (StreamCodec<Object>)sinkToPersistPortMeta.getValue(PortContext.STREAM_CODEC)
-        : (StreamCodec<Object>)sinkToPersistPortMeta.getPortObject().getStreamCodec();
+          ? (StreamCodec<Object>)sinkToPersistPortMeta.getValue(PortContext.STREAM_CODEC)
+          : (StreamCodec<Object>)sinkToPersistPortMeta.getPortObject().getStreamCodec();
       if (inputStreamCodec != null) {
         Map<InputPortMeta, StreamCodec<Object>> codecs = new HashMap<>();
         codecs.put(sinkToPersistPortMeta, inputStreamCodec);
         InputPortMeta persistOperatorPortMeta = assertGetPortMeta(port);
         StreamCodec<Object> specifiedCodecForPersistOperator = (persistOperatorPortMeta.getValue(PortContext.STREAM_CODEC) != null)
-          ? (StreamCodec<Object>)persistOperatorPortMeta.getValue(PortContext.STREAM_CODEC)
-          : (StreamCodec<Object>)port.getStreamCodec();
+            ? (StreamCodec<Object>)persistOperatorPortMeta.getValue(PortContext.STREAM_CODEC)
+            : (StreamCodec<Object>)port.getStreamCodec();
         StreamCodecWrapperForPersistance<Object> codec = new StreamCodecWrapperForPersistance<Object>(codecs, specifiedCodecForPersistOperator);
         setInputPortAttribute(port, PortContext.STREAM_CODEC, codec);
       }
@@ -930,13 +930,13 @@ public class LogicalPlan implements Serializable, DAG
             metricNames.add(field.getName());
 
             if (field.getType() == int.class || field.getType() == Integer.class ||
-              field.getType() == long.class || field.getType() == Long.class) {
+                field.getType() == long.class || field.getType() == Long.class) {
               if (defAggregator == null) {
                 defAggregator = new MetricsAggregator();
               }
               defAggregator.addAggregators(field.getName(), new SingleMetricAggregator[]{new LongSumAggregator()});
             } else if (field.getType() == float.class || field.getType() == Float.class ||
-              field.getType() == double.class || field.getType() == Double.class) {
+                field.getType() == double.class || field.getType() == Double.class) {
               if (defAggregator == null) {
                 defAggregator = new MetricsAggregator();
               }
@@ -957,7 +957,7 @@ public class LogicalPlan implements Serializable, DAG
                 }
 
                 if (readMethod.getReturnType() == int.class || readMethod.getReturnType() == Integer.class ||
-                  readMethod.getReturnType() == long.class || readMethod.getReturnType() == Long.class) {
+                    readMethod.getReturnType() == long.class || readMethod.getReturnType() == Long.class) {
 
                   if (defAggregator == null) {
                     defAggregator = new MetricsAggregator();
@@ -965,7 +965,7 @@ public class LogicalPlan implements Serializable, DAG
                   defAggregator.addAggregators(propName, new SingleMetricAggregator[]{new LongSumAggregator()});
 
                 } else if (readMethod.getReturnType() == float.class || readMethod.getReturnType() == Float.class ||
-                  readMethod.getReturnType() == double.class || readMethod.getReturnType() == Double.class) {
+                    readMethod.getReturnType() == double.class || readMethod.getReturnType() == Double.class) {
 
                   if (defAggregator == null) {
                     defAggregator = new MetricsAggregator();
@@ -1405,7 +1405,7 @@ public class LogicalPlan implements Serializable, DAG
       OperatorMeta operatorMetaNew = this.getMeta(op);
       operatorMetaNew.copyAttributesFrom(operatorMeta);
       operatorMetaNew.setModuleName(operatorMeta.getModuleName() == null ? subDAGName :
-        subDAGName + MODULE_NAMESPACE_SEPARATOR + operatorMeta.getModuleName());
+          subDAGName + MODULE_NAMESPACE_SEPARATOR + operatorMeta.getModuleName());
     }
 
     for (StreamMeta streamMeta : subDag.getAllStreams()) {
@@ -1681,7 +1681,7 @@ public class LogicalPlan implements Serializable, DAG
 
           // Check if the operator implements Partitioner
           if (n.getValue(OperatorContext.PARTITIONER) != null
-            || n.attributes != null && !n.attributes.contains(OperatorContext.PARTITIONER) && Partitioner.class.isAssignableFrom(n.getOperator().getClass())) {
+              || n.attributes != null && !n.attributes.contains(OperatorContext.PARTITIONER) && Partitioner.class.isAssignableFrom(n.getOperator().getClass())) {
             throw new ValidationException("Operator " + n.getName() + " provides partitioning capabilities but the annotation on the operator class declares it non partitionable!");
           }
         }
@@ -2092,7 +2092,7 @@ public class LogicalPlan implements Serializable, DAG
       // validation fail as each input stream should be OIO
       if (sm.locality != Locality.THREAD_LOCAL) {
         String msg = String.format("Locality %s invalid for operator %s with multiple input streams as at least one of the input streams is not %s",
-          Locality.THREAD_LOCAL, om, Locality.THREAD_LOCAL);
+            Locality.THREAD_LOCAL, om, Locality.THREAD_LOCAL);
         throw new ValidationException(msg);
       }
 
@@ -2106,7 +2106,7 @@ public class LogicalPlan implements Serializable, DAG
       // validation fail as each input stream should have a common OIO root
       if (om.oioRoot != null && oioStreamRoot != om.oioRoot) {
         String msg = String.format("Locality %s invalid for operator %s with multiple input streams as at least one of the input streams is not originating from common OIO owner node",
-          Locality.THREAD_LOCAL, om, Locality.THREAD_LOCAL);
+            Locality.THREAD_LOCAL, om, Locality.THREAD_LOCAL);
         throw new ValidationException(msg);
       }
 
@@ -2248,7 +2248,7 @@ public class LogicalPlan implements Serializable, DAG
           // Check whether all downstream operators are already visited in the path
           if (successor != null && !stack.contains(successor)) {
             LOG.debug("detected DelayOperator does not immediately output to a visited operator {}.{}->{}.{}",
-              om.getName(), downStream.getSource().getPortName(), successor.getName(), sink.getPortName());
+                om.getName(), downStream.getSource().getPortName(), successor.getName(), sink.getPortName());
             invalidDelays.add(Arrays.asList(om.getName(), successor.getName()));
           }
         } else {
@@ -2291,7 +2291,7 @@ public class LogicalPlan implements Serializable, DAG
            * If the source processing mode is EXACTLY_ONCE and the processing mode for the sink is not AT_MOST_ONCE throw a validation error
            */
           if ((Operator.ProcessingMode.AT_MOST_ONCE.equals(pm) && (sinkPm != pm))
-            || (Operator.ProcessingMode.EXACTLY_ONCE.equals(pm) && !Operator.ProcessingMode.AT_MOST_ONCE.equals(sinkPm))) {
+              || (Operator.ProcessingMode.EXACTLY_ONCE.equals(pm) && !Operator.ProcessingMode.AT_MOST_ONCE.equals(sinkPm))) {
             String msg = String.format("Processing mode %s/%s not valid for source %s/%s", sinkOm.getName(), sinkPm, om.getName(), pm);
             throw new ValidationException(msg);
           }
