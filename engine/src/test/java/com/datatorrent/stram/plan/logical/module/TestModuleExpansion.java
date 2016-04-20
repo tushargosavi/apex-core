@@ -18,24 +18,39 @@
  */
 package com.datatorrent.stram.plan.logical.module;
 
-import com.datatorrent.api.*;
+import java.io.IOException;
+import java.io.InputStream;
+import java.io.Serializable;
+import java.io.StringWriter;
+import java.util.ArrayList;
+import java.util.Collection;
+import java.util.List;
+import java.util.Map;
+import java.util.Properties;
+import java.util.Random;
+
+import org.codehaus.jettison.json.JSONObject;
+import org.junit.Assert;
+import org.junit.Test;
+
+import org.apache.commons.io.IOUtils;
+import org.apache.hadoop.conf.Configuration;
+
+import com.datatorrent.api.Attribute;
+import com.datatorrent.api.Context;
+import com.datatorrent.api.DAG;
+import com.datatorrent.api.DefaultInputPort;
+import com.datatorrent.api.DefaultOutputPort;
+import com.datatorrent.api.InputOperator;
+import com.datatorrent.api.Module;
+import com.datatorrent.api.Partitioner;
+import com.datatorrent.api.StreamingApplication;
 import com.datatorrent.api.annotation.InputPortFieldAnnotation;
 import com.datatorrent.api.annotation.OutputPortFieldAnnotation;
 import com.datatorrent.common.util.BaseOperator;
 import com.datatorrent.stram.engine.OperatorContext;
 import com.datatorrent.stram.plan.logical.LogicalPlan;
 import com.datatorrent.stram.plan.logical.LogicalPlanConfiguration;
-import org.apache.commons.io.IOUtils;
-import org.apache.hadoop.conf.Configuration;
-import org.codehaus.jettison.json.JSONObject;
-import org.junit.Assert;
-import org.junit.Test;
-
-import java.io.IOException;
-import java.io.InputStream;
-import java.io.Serializable;
-import java.io.StringWriter;
-import java.util.*;
 
 public class TestModuleExpansion
 {
@@ -669,7 +684,7 @@ public class TestModuleExpansion
     }
     props.load(is);
     LogicalPlanConfiguration pb = new LogicalPlanConfiguration(new Configuration(false))
-            .addFromProperties(props, null);
+        .addFromProperties(props, null);
 
     LogicalPlan dag = new LogicalPlan();
     pb.populateDAG(dag);
