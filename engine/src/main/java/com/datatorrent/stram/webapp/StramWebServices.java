@@ -788,7 +788,7 @@ public class StramWebServices
       if (logicalModule == null) {
         throw new NotFoundException();
       }
-      operatorProperties = LogicalPlanConfiguration.getObjectProperties(logicalModule.getModule());
+      operatorProperties = LogicalPlanConfiguration.getObjectProperties(logicalModule.getOperator());
     } else {
       operatorProperties = LogicalPlanConfiguration.getObjectProperties(logicalOperator.getOperator());
     }
@@ -850,7 +850,7 @@ public class StramWebServices
   {
     init();
     return new JSONObject(objectMapper.writeValueAsString(LogicalPlanSerializer.convertToMap(
-        dagManager.getLogicalPlan(), includeModules != null)));
+        dagManager.getLogicalPlan(), includeModules != null && includeModules.equals("[true]"))));
   }
 
   @POST // not supported by WebAppProxyServlet, can only be called directly

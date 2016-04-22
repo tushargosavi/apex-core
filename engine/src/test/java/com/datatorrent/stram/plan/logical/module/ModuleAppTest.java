@@ -115,10 +115,10 @@ public class ModuleAppTest
   /*
    * Module Definition
    */
-  static class TestModule implements Module
+  static class TestModule extends BaseOperator implements Module
   {
 
-    public transient ProxyInputPort<Integer> moduleInput = new Module.ProxyInputPort<Integer>();
+    public transient ProxyInputPort<Integer> moduleInput = new ProxyInputPort<Integer>();
     public transient ProxyOutputPort<Integer> moduleOutput = new Module.ProxyOutputPort<Integer>();
 
     @Override
