@@ -19,8 +19,8 @@
 package com.datatorrent.stram.plan.logical.requests;
 
 import com.datatorrent.api.Operator;
+import com.datatorrent.api.plan.PlanModifier;
 import com.datatorrent.stram.StramUtils;
-import com.datatorrent.stram.plan.physical.PlanModifier;
 
 /**
  * <p>CreateOperatorRequest class.</p>

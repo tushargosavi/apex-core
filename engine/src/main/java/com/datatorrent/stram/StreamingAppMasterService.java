@@ -742,6 +742,7 @@ public class StreamingAppMasterService extends CompositeService
         YarnConfiguration.DEFAULT_RM_ADDRESS,
         YarnConfiguration.DEFAULT_RM_PORT);
 
+    boolean firstTime = true;
     while (!appDone) {
       loopCounter++;
       final long currentTimeMillis = System.currentTimeMillis();
@@ -756,10 +757,15 @@ public class StreamingAppMasterService extends CompositeService
         nodeReportUpdateTime = currentTimeMillis + UPDATE_NODE_REPORTS_INTERVAL;
       }
 
+
       Runnable r;
       while ((r = this.pendingTasks.poll()) != null) {
         r.run();
+        if (firstTime) {
+          LOG.info("running pending task " + r);
+        }
       }
+      firstTime  = false;
 
       // log current state
       /*
@@ -1134,13 +1140,13 @@ public class StreamingAppMasterService extends CompositeService
     @Override
     public void onContainerStopped(ContainerId containerId)
     {
-      LOG.debug("Succeeded to stop Container {}", containerId);
+      LOG.info("Succeeded to stop Container {}", containerId);
     }
 
     @Override
     public void onContainerStatusReceived(ContainerId containerId, ContainerStatus containerStatus)
     {
-      LOG.debug("Container Status: id={}, status={}", containerId, containerStatus);
+      LOG.info("Container Status: id={}, status={}", containerId, containerStatus);
       if (containerStatus.getState() != ContainerState.RUNNING) {
         recoverContainer(containerId);
       }
@@ -1149,7 +1155,7 @@ public class StreamingAppMasterService extends CompositeService
     @Override
     public void onContainerStarted(ContainerId containerId, Map<String, ByteBuffer> allServiceResponse)
     {
-      LOG.debug("Succeeded to start Container {}", containerId);
+      LOG.info("Succeeded to start Container {}", containerId);
     }
 
     @Override

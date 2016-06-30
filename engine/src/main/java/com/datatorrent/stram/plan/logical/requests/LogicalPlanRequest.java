@@ -22,14 +22,15 @@ import java.io.IOException;
 
 import org.codehaus.jackson.map.ObjectMapper;
 
-import com.datatorrent.stram.plan.physical.PlanModifier;
+import com.datatorrent.api.plan.LogicalPlanChange;
+import com.datatorrent.api.plan.PlanModifier;
 
 /**
  * <p>Abstract LogicalPlanRequest class.</p>
  *
  * @since 0.3.2
  */
-public abstract class LogicalPlanRequest
+public abstract class LogicalPlanRequest implements LogicalPlanChange
 {
   public String getRequestType()
   {

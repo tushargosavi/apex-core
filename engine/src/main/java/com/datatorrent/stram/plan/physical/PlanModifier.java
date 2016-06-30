@@ -44,7 +44,7 @@ import com.datatorrent.stram.plan.logical.Operators.PortContextPair;
  *
  * @since 0.3.2
  */
-public class PlanModifier
+public class PlanModifier implements com.datatorrent.api.plan.PlanModifier
 {
 
   private final LogicalPlan logicalPlan;

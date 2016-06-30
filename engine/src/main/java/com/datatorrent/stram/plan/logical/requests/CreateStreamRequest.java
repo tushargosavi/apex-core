@@ -18,7 +18,7 @@
  */
 package com.datatorrent.stram.plan.logical.requests;
 
-import com.datatorrent.stram.plan.physical.PlanModifier;
+import com.datatorrent.api.plan.PlanModifier;
 
 /**
  * <p>CreateStreamRequest class.</p>
