@@ -22,8 +22,10 @@ import java.io.IOException;
 
 import org.codehaus.jackson.map.ObjectMapper;
 
+import com.datatorrent.api.DAG;
 import com.datatorrent.api.plan.LogicalPlanChange;
 import com.datatorrent.api.plan.PlanModifier;
+import com.datatorrent.stram.plan.logical.LogicalPlan;
 
 /**
  * <p>Abstract LogicalPlanRequest class.</p>
@@ -49,4 +51,7 @@ public abstract class LogicalPlanRequest implements LogicalPlanChange
 
   public abstract void execute(PlanModifier pm);
 
+  public static DAG getDag() {
+    return new LogicalPlan();
+  }
 }

@@ -145,6 +145,8 @@ public interface StatsListener
      */
     public List<? extends OperatorCommand> operatorCommands;
 
+    public DAG dag;
+
     private static final long serialVersionUID = 201401201506L;
   }
 
