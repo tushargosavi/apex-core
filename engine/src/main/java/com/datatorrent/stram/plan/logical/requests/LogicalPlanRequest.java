@@ -51,7 +51,8 @@ public abstract class LogicalPlanRequest implements LogicalPlanChange
 
   public abstract void execute(PlanModifier pm);
 
-  public static DAG getDag() {
+  public static DAG getDag()
+  {
     return new LogicalPlan();
   }
 }
