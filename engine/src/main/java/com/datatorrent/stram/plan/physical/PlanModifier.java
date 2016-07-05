@@ -7,7 +7,7 @@
  * "License"); you may not use this file except in compliance
  * with the License.  You may obtain a copy of the License at
  *
- *   http://www.apache.org/licenses/LICENSE-2.0
+ * http://www.apache.org/licenses/LICENSE-2.0
  *
  * Unless required by applicable law or agreed to in writing,
  * software distributed under the License is distributed on an
@@ -18,12 +18,18 @@
  */
 package com.datatorrent.stram.plan.physical;
 
+import java.util.Collection;
 import java.util.Collections;
+import java.util.List;
 import java.util.Map;
 
 import javax.validation.ValidationException;
 
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
+
 import com.datatorrent.api.Context.DAGContext;
+import com.datatorrent.api.DAG;
 import com.datatorrent.api.Operator;
 import com.datatorrent.api.Operator.InputPort;
 import com.datatorrent.api.Operator.OutputPort;
@@ -36,6 +42,7 @@ import com.datatorrent.stram.plan.logical.LogicalPlan.StreamMeta;
 import com.datatorrent.stram.plan.logical.LogicalPlanConfiguration;
 import com.datatorrent.stram.plan.logical.Operators;
 import com.datatorrent.stram.plan.logical.Operators.PortContextPair;
+import com.datatorrent.stram.plan.logical.mod.DAGChangeSetImpl;
 
 /**
  * Modification of the query plan on running application. Will first apply
@@ -46,12 +53,13 @@ import com.datatorrent.stram.plan.logical.Operators.PortContextPair;
  */
 public class PlanModifier
 {
-
+  private static final Logger LOG = LoggerFactory.getLogger(PlanModifier.class);
   private final LogicalPlan logicalPlan;
   private final PhysicalPlan physicalPlan;
 
   /**
    * For dry run on logical plan only
+   *
    * @param logicalPlan
    */
   public PlanModifier(LogicalPlan logicalPlan)
@@ -63,6 +71,7 @@ public class PlanModifier
 
   /**
    * For modification of physical plan
+   *
    * @param plan
    */
   public PlanModifier(PhysicalPlan plan)
@@ -176,6 +185,7 @@ public class PlanModifier
 
   /**
    * Remove the named stream. Ignored when stream does not exist.
+   *
    * @param streamName
    */
   public void removeStream(String streamName)
@@ -195,6 +205,7 @@ public class PlanModifier
 
   /**
    * Add operator to logical plan.
+   *
    * @param name
    */
   public void addOperator(String name, Operator operator)
@@ -209,6 +220,7 @@ public class PlanModifier
 
   /**
    * Remove named operator and any outgoing streams.
+   *
    * @param name
    */
   public void removeOperator(String name)
@@ -280,4 +292,123 @@ public class PlanModifier
     physicalPlan.deployChanges();
   }
 
+  public void applyDagChangeSet(DAGChangeSetImpl dag)
+  {
+    List<OperatorMeta> orderedOperators = dag.getOperatorsInOrder();
+    for (OperatorMeta om : orderedOperators) {
+      LOG.info("Modifier Adding operator {}", om.getName());
+      logicalPlan.addOperator(om.getName(), om.getOperator());
+      OperatorMeta newMeta = logicalPlan.getMeta(om.getOperator());
+      newMeta.copyAttributesFrom(om);
+    }
+
+    for (StreamMeta streamMeta : dag.getAllStreams()) {
+      LOG.info("Modifier Adding stream {}", streamMeta.getName());
+      StreamMeta sm = logicalPlan.getStream(streamMeta.getName());
+      if (sm == null) {
+        sm = logicalPlan.addStream(streamMeta.getName());
+      }
+      sm.setSource(streamMeta.getSource().getPortObject());
+      for (InputPortMeta sink : streamMeta.getSinks()) {
+        sm.addSink(sink.getPortObject());
+      }
+      sm.setLocality(streamMeta.getLocality());
+    }
+
+    /**
+     * Add streams which are exended
+     */
+    for (DAG.StreamMeta sm : dag.getExtendStreams().values()) {
+      LOG.debug("Processing extend streams {}", sm.getName());
+      StreamMeta origStreamMeta = null;
+      Collection<InputPort> inputPorts = null;
+
+      if (sm instanceof DAGChangeSetImpl.StreamExtendBySource) {
+        DAGChangeSetImpl.StreamExtendBySource sm1 = (DAGChangeSetImpl.StreamExtendBySource)sm;
+        LOG.info("process StreamExtendBySource name {} operator {} port {}", sm1.getName(), sm1.getOperatorName(), sm1.getPortName());
+        origStreamMeta = getSteramBySource(sm1.getOperatorName(), sm1.getPortName());
+        // If stream is not present in original dagChanges, then add it.
+        if (origStreamMeta == null) {
+          origStreamMeta = logicalPlan.addStream(sm.getName());
+          origStreamMeta.setSource(getPortObject(sm1.getOperatorName(), sm1.getPortName()));
+        }
+        inputPorts = sm1.getSinkPorts();
+      }
+
+      if (sm instanceof DAGChangeSetImpl.ExtendStreamMeta) {
+        DAGChangeSetImpl.ExtendStreamMeta esm = (DAGChangeSetImpl.ExtendStreamMeta)sm;
+        origStreamMeta = logicalPlan.getStream(esm.getName());
+        if (sm == null) {
+          throw new RuntimeException("The stream to extend does not belong to origin DAG");
+        }
+        inputPorts = esm.getSinkPorts();
+      }
+
+      if (origStreamMeta != null && inputPorts != null) {
+        LOG.info("populating stream {} with sinks {}", sm.getName(), inputPorts.size());
+        for (InputPort port : inputPorts) {
+          origStreamMeta.addSink(port);
+        }
+      }
+    }
+
+    if (physicalPlan != null) {
+
+      // start physical plan change
+      for (OperatorMeta om : orderedOperators) {
+        OperatorMeta newMeta = logicalPlan.getOperatorMeta(om.getName());
+        LOG.info("Adding logical operator {}", newMeta.getName());
+        physicalPlan.addLogicalOperator(newMeta);
+      }
+
+      for (StreamMeta streamMeta : logicalPlan.getAllStreams()) {
+        for (InputPortMeta ipm : streamMeta.getSinks()) {
+          LOG.info("Modifier connecting input stream {} operator {} port {}", streamMeta.getName(), ipm.getOperatorWrapper().getName(), ipm.getPortName());
+          physicalPlan.connectInput(ipm);
+        }
+      }
+    }
+
+    for (String name : dag.getRemovedStreams()) {
+      LOG.info("Removing stream {}", name);
+      removeStream(name);
+    }
+
+    for (String name : dag.getRemovedOperators()) {
+      LOG.info("Removing operator {}", name);
+      removeOperator(name);
+    }
+
+    if (physicalPlan != null) {
+      LOG.info("Modifier deploying changes to the DAG");
+      physicalPlan.deployChanges();
+    }
+  }
+
+  StreamMeta getSteramBySource(String operatorName, String portName)
+  {
+    for (OperatorMeta om : logicalPlan.getAllOperators()) {
+      if (om.getName().equals(operatorName)) {
+        for (Map.Entry<LogicalPlan.OutputPortMeta, LogicalPlan.StreamMeta> entry : om.getOutputStreams().entrySet()) {
+          if (entry.getKey().getPortName().equals(portName)) {
+            return entry.getValue();
+          }
+        }
+      }
+    }
+    return null;
+  }
+
+  OutputPort<?> getPortObject(String operatorName, String portName)
+  {
+    for (OperatorMeta om : logicalPlan.getAllOperators()) {
+      if (om.getName().equals(operatorName)) {
+        Operators.PortMappingDescriptor descriptor = new Operators.PortMappingDescriptor();
+        Operators.describe(om.getOperator(), descriptor);
+        PortContextPair<OutputPort<?>> port = descriptor.outputPorts.get(portName);
+        return port.component;
+      }
+    }
+    return null;
+  }
 }

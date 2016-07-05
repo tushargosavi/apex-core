@@ -1624,7 +1624,6 @@ public class PhysicalPlanTest
 
     LogicalPlan dag = new LogicalPlan();
 
-    //TestGeneratorInputOperator o1 = dag.addOperator("o1", TestGeneratorInputOperator.class);
     PartitioningTestOperator o1 = dag.addOperator("o1", PartitioningTestOperator.class);
     o1.partitionKeys = new Integer[] {0,1,2,3};
     o1.setPartitionCount(o1.partitionKeys.length);
@@ -1726,7 +1725,6 @@ public class PhysicalPlanTest
 
     LogicalPlan dag = new LogicalPlan();
 
-    //TestGeneratorInputOperator o1 = dag.addOperator("o1", TestGeneratorInputOperator.class);
     PartitioningTestOperator o1 = dag.addOperator("o1", PartitioningTestOperator.class);
     o1.partitionKeys = new Integer[]{0, 1, 2, 3};
     o1.setPartitionCount(3);

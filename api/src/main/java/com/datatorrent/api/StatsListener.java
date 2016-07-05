@@ -125,6 +125,10 @@ public interface StatsListener
   interface StatsListenerContext
   {
     String getOperatorName(int id);
+
+    Operator getOperator(String name);
+
+    DAG createDAG();
   }
 
   /**
@@ -168,6 +172,9 @@ public interface StatsListener
     public List<? extends OperatorCommand> operatorCommands;
 
     private static final long serialVersionUID = 201401201506L;
+
+    // The dagChanges to be started.
+    public DAG.DAGChangeSet dagChanges;
   }
 
   /**

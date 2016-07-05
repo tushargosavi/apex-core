@@ -56,6 +56,7 @@ import com.datatorrent.api.Context;
 import com.datatorrent.api.Context.DAGContext;
 import com.datatorrent.api.Context.OperatorContext;
 import com.datatorrent.api.Context.PortContext;
+import com.datatorrent.api.DAG;
 import com.datatorrent.api.DAG.Locality;
 import com.datatorrent.api.DefaultPartition;
 import com.datatorrent.api.Operator;
@@ -82,6 +83,7 @@ import com.datatorrent.stram.plan.logical.LogicalPlan.OperatorPair;
 import com.datatorrent.stram.plan.logical.LogicalPlan.OutputPortMeta;
 import com.datatorrent.stram.plan.logical.LogicalPlan.StreamMeta;
 import com.datatorrent.stram.plan.logical.StreamCodecWrapperForPersistance;
+import com.datatorrent.stram.plan.logical.mod.DAGChangeSetImpl;
 import com.datatorrent.stram.plan.physical.PTOperator.HostOperatorSet;
 import com.datatorrent.stram.plan.physical.PTOperator.PTInput;
 import com.datatorrent.stram.plan.physical.PTOperator.PTOutput;
@@ -132,7 +134,7 @@ public class PhysicalPlan implements Serializable
   private final LocalityPrefs inlinePrefs = new LocalityPrefs();
 
   final Set<PTOperator> deployOpers = Sets.newHashSet();
-  final Map<PTOperator, Operator> newOpers = Maps.newHashMap();
+  final transient Map<PTOperator, Operator> newOpers = Maps.newHashMap();
   final Set<PTOperator> undeployOpers = Sets.newHashSet();
   final ConcurrentMap<Integer, PTOperator> allOperators = Maps.newConcurrentMap();
   private final ConcurrentMap<OperatorMeta, OperatorMeta> pendingRepartition = Maps.newConcurrentMap();
@@ -191,6 +193,8 @@ public class PhysicalPlan implements Serializable
     void writeJournal(Recoverable operation);
 
     void addOperatorRequest(PTOperator oper, StramToNodeRequest request);
+
+    void addDagChangeRequests(DAG dag);
   }
 
   private static class StatsListenerProxy implements StatsListener, Serializable, ContextAwareStatsListener
@@ -389,7 +393,10 @@ public class PhysicalPlan implements Serializable
         addLogicalOperator(n);
       }
     }
+  }
 
+  private AffinityRulesSet applyAffinityRules(LogicalPlan dag)
+  {
     // Add inlinePrefs and localityPrefs for affinity rules
     AffinityRulesSet affinityRuleSet = dag.getAttributes().get(DAGContext.AFFINITY_RULES_SET);
     if (affinityRuleSet != null && affinityRuleSet.getAffinityRules() != null) {
@@ -510,6 +517,7 @@ public class PhysicalPlan implements Serializable
     this.newOpers.clear();
     this.deployOpers.clear();
     this.undeployOpers.clear();
+    return affinityRuleSet;
   }
 
   public void setAntiAffinityForContainers(LogicalPlan dag, Collection<AffinityRule> affinityRules, Map<PTOperator, PTContainer> operatorContainerMap)
@@ -1541,11 +1549,17 @@ public class PhysicalPlan implements Serializable
    */
   public List<PTOperator> getOperators(OperatorMeta logicalOperator)
   {
+    if (this.logicalToPTOperator.get(logicalOperator) == null) {
+      return null;
+    }
     return this.logicalToPTOperator.get(logicalOperator).partitions;
   }
 
   public Collection<PTOperator> getAllOperators(OperatorMeta logicalOperator)
   {
+    if (this.logicalToPTOperator.get(logicalOperator) == null) {
+      return null;
+    }
     return this.logicalToPTOperator.get(logicalOperator).getAllOperators();
   }
 
@@ -1553,7 +1567,10 @@ public class PhysicalPlan implements Serializable
   {
     List<PTOperator> operators = new ArrayList<>();
     for (OperatorMeta opMeta : dag.getLeafOperators()) {
-      operators.addAll(getAllOperators(opMeta));
+      Collection<PTOperator> allOpers = getAllOperators(opMeta);
+      if (allOpers != null) {
+        operators.addAll(getAllOperators(opMeta));
+      }
     }
     return operators;
   }
@@ -1650,6 +1667,7 @@ public class PhysicalPlan implements Serializable
    */
   public final void addLogicalOperator(OperatorMeta om)
   {
+    LOG.info("addLogicalOperator called {}", om.getName());
     PMapping pnodes = new PMapping(om);
     String host = pnodes.logicalOperator.getValue(OperatorContext.LOCALITY_HOST);
     localityPrefs.add(pnodes, host);
@@ -1693,7 +1711,25 @@ public class PhysicalPlan implements Serializable
     } else {
       initPartitioning(pnodes, 0);
     }
+    updateUpstreamsOutputMappings(om, null);
     updateStreamMappings(pnodes);
+  }
+
+  private void updateUpstreamsOutputMappings(OperatorMeta om, InputPortMeta ipm)
+  {
+    for (Map.Entry<InputPortMeta, StreamMeta> entry : om.getInputStreams().entrySet()) {
+      if (ipm == null || entry.getKey() == ipm) {
+        for (Map.Entry<LogicalPlan.OutputPortMeta, StreamMeta> outputEntry : entry.getValue().getSource().getOperatorMeta().getOutputStreams().entrySet()) {
+          PMapping sourceOpers = this.logicalToPTOperator.get(outputEntry.getKey().getOperatorMeta());
+          for (PTOperator oper : sourceOpers.partitions) {
+            LOG.info("updating source operators {}", oper);
+            setupOutput(sourceOpers, oper, outputEntry); // idempotent
+            undeployOpers.add(oper);
+            deployOpers.add(oper);
+          }
+        }
+      }
+    }
   }
 
   /**
@@ -1759,6 +1795,7 @@ public class PhysicalPlan implements Serializable
         for (Map.Entry<LogicalPlan.OutputPortMeta, StreamMeta> outputEntry : inputEntry.getValue().getSource().getOperatorMeta().getOutputStreams().entrySet()) {
           PMapping sourceOpers = this.logicalToPTOperator.get(outputEntry.getKey().getOperatorMeta());
           for (PTOperator oper : sourceOpers.partitions) {
+            LOG.info("updating source operators {}", oper);
             setupOutput(sourceOpers, oper, outputEntry); // idempotent
             undeployOpers.add(oper);
             deployOpers.add(oper);
@@ -1809,7 +1846,7 @@ public class PhysicalPlan implements Serializable
     this.availableMemoryMB = memoryMB;
   }
 
-  public void onStatusUpdate(PTOperator oper)
+  public void onStatusUpdate(final PTOperator oper)
   {
     for (StatsListener l : oper.statsListeners) {
       final StatsListener.Response rsp = l.processStats(oper.stats);
@@ -1856,6 +1893,9 @@ public class PhysicalPlan implements Serializable
             request.cmd = converter;
             ctx.addOperatorRequest(oper, request);
           }
+        }
+        if (rsp.dagChanges != null) {
+          ctx.addDagChangeRequests(rsp.dagChanges);
         }
       }
     }
@@ -1929,6 +1969,18 @@ public class PhysicalPlan implements Serializable
         return operator.getName();
       }
       return null;
+    }
+
+    @Override
+    public Operator getOperator(String name)
+    {
+      return getLogicalPlan().getOperatorMeta(name).getOperator();
+    }
+
+    @Override
+    public DAG createDAG()
+    {
+      return new DAGChangeSetImpl();
     }
   }
 

@@ -103,6 +103,7 @@ import com.datatorrent.api.AutoMetric;
 import com.datatorrent.api.Component;
 import com.datatorrent.api.Context;
 import com.datatorrent.api.Context.OperatorContext;
+import com.datatorrent.api.DAG;
 import com.datatorrent.api.Operator;
 import com.datatorrent.api.Operator.InputPort;
 import com.datatorrent.api.Operator.OutputPort;
@@ -148,6 +149,7 @@ import com.datatorrent.stram.plan.logical.LogicalPlan.OutputPortMeta;
 import com.datatorrent.stram.plan.logical.LogicalPlanConfiguration;
 import com.datatorrent.stram.plan.logical.Operators;
 import com.datatorrent.stram.plan.logical.Operators.PortContextPair;
+import com.datatorrent.stram.plan.logical.mod.DAGChangeSetImpl;
 import com.datatorrent.stram.plan.logical.requests.LogicalPlanRequest;
 import com.datatorrent.stram.plan.physical.OperatorStatus;
 import com.datatorrent.stram.plan.physical.OperatorStatus.PortStatus;
@@ -2887,6 +2889,7 @@ public class StreamingContainerManager implements PlanContext
     return plan.getLogicalPlan();
   }
 
+
   /**
    * Asynchronously process the logical, physical plan and execution layer changes.
    * Caller can use the returned future to block until processing is complete.
@@ -2904,6 +2907,17 @@ public class StreamingContainerManager implements PlanContext
     return future;
   }
 
+  private LogicalPlan cloneLogicalPlan() throws IOException, ClassNotFoundException
+  {
+    LogicalPlan lp = plan.getLogicalPlan();
+    ByteArrayOutputStream bos = new ByteArrayOutputStream();
+    LogicalPlan.write(lp, bos);
+    bos.flush();
+    ByteArrayInputStream bis = new ByteArrayInputStream(bos.toByteArray());
+    lp = LogicalPlan.read(bis);
+    return lp;
+  }
+
   private class LogicalPlanChangeRunnable implements java.util.concurrent.Callable<Object>
   {
     final List<LogicalPlanRequest> requests;
@@ -2918,13 +2932,7 @@ public class StreamingContainerManager implements PlanContext
     {
       // clone logical plan, for dry run and validation
       LOG.info("Begin plan changes: {}", requests);
-      LogicalPlan lp = plan.getLogicalPlan();
-      ByteArrayOutputStream bos = new ByteArrayOutputStream();
-      LogicalPlan.write(lp, bos);
-      bos.flush();
-      ByteArrayInputStream bis = new ByteArrayInputStream(bos.toByteArray());
-      lp = LogicalPlan.read(bis);
-
+      LogicalPlan lp = cloneLogicalPlan();
       PlanModifier pm = new PlanModifier(lp);
       for (LogicalPlanRequest request : requests) {
         LOG.debug("Dry run plan change: {}", request);
@@ -3208,10 +3216,63 @@ public class StreamingContainerManager implements PlanContext
     return null;
   }
 
+  private class AddDAGRunnable implements Callable<Object>
+  {
+    private final transient DAGChangeSetImpl request;
+
+    public AddDAGRunnable(DAGChangeSetImpl changes)
+    {
+      request = changes;
+    }
+
+    @Override
+    public Object call() throws Exception
+    {
+      if (request == null) {
+        return null;
+      }
+
+      try {
+        LOG.info("starting plan change ");
+        LogicalPlan lp = cloneLogicalPlan();
+        PlanModifier pm = new PlanModifier(lp);
+        pm.applyDagChangeSet(request);
+        lp.validate();
+
+        LOG.info("validated logical plan, now making actual change");
+        pm = new PlanModifier(plan);
+        pm.applyDagChangeSet(request);
+        LOG.info("making physical plan change");
+        LOG.info("plan change done");
+        return null;
+      } catch (Exception ex) {
+        LOG.error("Exception occured {}", ex);
+        throw ex;
+      }
+    }
+  }
+
   @VisibleForTesting
   protected Object getLogicalCounter(String operatorName)
   {
     return latestLogicalCounters.get(operatorName);
+  }
+
+  public FutureTask<Object> logicalPlanModification(DAGChangeSetImpl dag) throws Exception
+  {
+    FutureTask<Object> future = new FutureTask<>(new AddDAGRunnable(dag));
+    dispatch(future);
+    return future;
+  }
+
+  @Override
+  public void addDagChangeRequests(DAG dag)
+  {
+    try {
+      logicalPlanModification((DAGChangeSetImpl)dag);
+    } catch (Exception ex) {
+      // pass
+    }
   }
 
 }
