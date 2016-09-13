@@ -1,5 +1,9 @@
 package com.datatorrent.stram.plan.physical;
 
+import java.io.ByteArrayInputStream;
+import java.io.ByteArrayOutputStream;
+import java.io.IOException;
+
 import org.junit.Assert;
 import org.junit.Rule;
 import org.junit.Test;
@@ -52,7 +56,7 @@ public class PhysicalPlanExtendTests
   }
 
   @Test
-  public void extendPhysicalPlanSameDag()
+  public void extendPhysicalPlanSameDag() throws IOException, ClassNotFoundException
   {
     LogicalPlan dag = StramTestSupport.createDAG(testMeta);
     InputOperatorTest.EvenOddIntegerGeneratorInputOperator o1 = dag.addOperator("o1", new InputOperatorTest.EvenOddIntegerGeneratorInputOperator());
@@ -85,6 +89,8 @@ public class PhysicalPlanExtendTests
     for (String opr : new String[]{"o2", "o3"}) {
       removeSet.removeOperator(opr);
     }
+    cloneLogicalPlan(dag);
+
     pm = new PlanModifier(plan);
     pm.applyDagChangeSet(removeSet);
     plan.getLogicalPlan().validate();
@@ -94,7 +100,8 @@ public class PhysicalPlanExtendTests
   @Test
   public void understandTest()
   {
-    LogicalPlan dag = new LogicalPlan();
+    LogicalPlan dag = StramTestSupport.createDAG(testMeta);
+    dag.setAttribute(Context.OperatorContext.STORAGE_AGENT, new TestPlanContext());
     TestGeneratorInputOperator o1 = dag.addOperator("o1", new TestGeneratorInputOperator());
     GenericTestOperator o2 = dag.addOperator("o2", new GenericTestOperator());
     dag.addStream("s1", o1.outport, o2.inport1);
@@ -104,4 +111,15 @@ public class PhysicalPlanExtendTests
 
     System.out.println("hey there");
   }
+
+  private LogicalPlan cloneLogicalPlan(LogicalPlan lp) throws IOException, ClassNotFoundException
+  {
+    ByteArrayOutputStream bos = new ByteArrayOutputStream();
+    LogicalPlan.write(lp, bos);
+    bos.flush();
+    ByteArrayInputStream bis = new ByteArrayInputStream(bos.toByteArray());
+    lp = LogicalPlan.read(bis);
+    return lp;
+  }
+
 }

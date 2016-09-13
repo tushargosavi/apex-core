@@ -14,6 +14,11 @@ import com.datatorrent.api.DAG.DAGChangeSet;
 import com.datatorrent.api.Operator;
 import com.datatorrent.stram.plan.logical.LogicalPlan;
 
+/**
+ * An implementation for DAGChangeSet. Instance of this object will be provided
+ * to StatsListener through context, stat listener can use this object to modify
+ * existing DAG and return modified DAG to engine.
+ */
 public class DAGChangeSetImpl extends LogicalPlan implements DAGChangeSet
 {
   List<String> removedOperators = new ArrayList<>();
@@ -81,15 +86,14 @@ public class DAGChangeSetImpl extends LogicalPlan implements DAGChangeSet
   }
 
   /**
-   * command to extend stream, based on its name, or source port.
-   * source port is identified as (operatorName, portName). As
-   * the specifier do not have direct reference to the object of
-   * operator and port.
+   * Base class for StreamMeta object which modify existing stream or
+   * add new stream to the DAG with one end point in the existing stream.
    */
   public static class ExtendStreamMeta implements DAG.StreamMeta
   {
-
+    /** stream to change */
     String name;
+    /** new additional sinks to add in stream */
     private Set<Operator.InputPort> sinkPorts = new HashSet<>();
 
     public ExtendStreamMeta(String id)
@@ -103,21 +107,12 @@ public class DAGChangeSetImpl extends LogicalPlan implements DAGChangeSet
       return name;
     }
 
-    /**
-     * this will be referenced later, we don't the locality yet
-     */
     @Override
     public Locality getLocality()
     {
       throw new UnsupportedOperationException("Can not get locality ");
     }
 
-    /**
-     * we can't change locality of existing stream
-     *
-     * @param locality
-     * @return
-     */
     public DAG.StreamMeta setLocality(Locality locality)
     {
       throw new UnsupportedOperationException("Can not change locality of existing stream");
@@ -221,6 +216,9 @@ public class DAGChangeSetImpl extends LogicalPlan implements DAGChangeSet
     return sm;
   }
 
+  /**
+   * Extend stream present in original DAG with new Sinks.
+   */
   @Override
   public DAG.StreamMeta extendStream(String id, Operator.InputPort... ports)
   {
@@ -231,6 +229,10 @@ public class DAGChangeSetImpl extends LogicalPlan implements DAGChangeSet
     return sm;
   }
 
+  /**
+   * Add stream to existing DAG which one end-point belong to operator already existing in
+   * original DAG.
+   */
   @Override
   public DAG.StreamMeta addStream(String id, String operatorName, String portName, Operator.InputPort... ports)
   {

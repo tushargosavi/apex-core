@@ -2907,6 +2907,7 @@ public class StreamingContainerManager implements PlanContext
     return future;
   }
 
+  @VisibleForTesting
   private LogicalPlan cloneLogicalPlan() throws IOException, ClassNotFoundException
   {
     LogicalPlan lp = plan.getLogicalPlan();
@@ -3216,11 +3217,11 @@ public class StreamingContainerManager implements PlanContext
     return null;
   }
 
-  private class AddDAGRunnable implements Callable<Object>
+  private class ChangeDAGRunnable implements Callable<Object>
   {
     private final transient DAGChangeSetImpl request;
 
-    public AddDAGRunnable(DAGChangeSetImpl changes)
+    public ChangeDAGRunnable(DAGChangeSetImpl changes)
     {
       request = changes;
     }
@@ -3260,7 +3261,7 @@ public class StreamingContainerManager implements PlanContext
 
   public FutureTask<Object> logicalPlanModification(DAGChangeSetImpl dag) throws Exception
   {
-    FutureTask<Object> future = new FutureTask<>(new AddDAGRunnable(dag));
+    FutureTask<Object> future = new FutureTask<>(new ChangeDAGRunnable(dag));
     dispatch(future);
     return future;
   }

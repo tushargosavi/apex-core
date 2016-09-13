@@ -393,10 +393,7 @@ public class PhysicalPlan implements Serializable
         addLogicalOperator(n);
       }
     }
-  }
 
-  private AffinityRulesSet applyAffinityRules(LogicalPlan dag)
-  {
     // Add inlinePrefs and localityPrefs for affinity rules
     AffinityRulesSet affinityRuleSet = dag.getAttributes().get(DAGContext.AFFINITY_RULES_SET);
     if (affinityRuleSet != null && affinityRuleSet.getAffinityRules() != null) {
@@ -517,7 +514,6 @@ public class PhysicalPlan implements Serializable
     this.newOpers.clear();
     this.deployOpers.clear();
     this.undeployOpers.clear();
-    return affinityRuleSet;
   }
 
   public void setAntiAffinityForContainers(LogicalPlan dag, Collection<AffinityRule> affinityRules, Map<PTOperator, PTContainer> operatorContainerMap)
