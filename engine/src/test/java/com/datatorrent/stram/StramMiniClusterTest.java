@@ -45,7 +45,6 @@ import org.slf4j.LoggerFactory;
 
 import org.apache.commons.lang.StringUtils;
 import org.apache.hadoop.conf.Configuration;
-import org.apache.hadoop.util.JarFinder;
 import org.apache.hadoop.yarn.api.ApplicationMasterProtocol;
 import org.apache.hadoop.yarn.api.protocolrecords.AllocateRequest;
 import org.apache.hadoop.yarn.api.protocolrecords.AllocateResponse;
@@ -87,6 +86,7 @@ import com.datatorrent.stram.engine.TestGeneratorInputOperator;
 import com.datatorrent.stram.plan.logical.LogicalPlan;
 import com.datatorrent.stram.plan.logical.LogicalPlanConfiguration;
 import com.datatorrent.stram.support.StramTestSupport;
+import com.datatorrent.stram.util.JarHelper;
 import com.datatorrent.stram.webapp.StramWebServices;
 
 import static java.lang.Thread.sleep;
@@ -192,9 +192,9 @@ public class StramMiniClusterTest
       LOG.info("Number containers: {}", nr.getNumContainers());
     }
 
-    String appMasterJar = JarFinder.getJar(StreamingAppMaster.class);
+    String appMasterJar = JarHelper.getJar(StreamingAppMaster.class);
     LOG.info("appmaster jar: " + appMasterJar);
-    String testJar = JarFinder.getJar(StramMiniClusterTest.class);
+    String testJar = JarHelper.getJar(StramMiniClusterTest.class);
     LOG.info("testJar: " + testJar);
 
     // create test application

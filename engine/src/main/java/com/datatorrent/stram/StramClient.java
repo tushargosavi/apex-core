@@ -51,7 +51,6 @@ import org.apache.hadoop.io.DataOutputBuffer;
 import org.apache.hadoop.security.Credentials;
 import org.apache.hadoop.security.UserGroupInformation;
 import org.apache.hadoop.security.token.Token;
-import org.apache.hadoop.util.JarFinder;
 import org.apache.hadoop.yarn.api.ApplicationConstants;
 import org.apache.hadoop.yarn.api.records.ApplicationId;
 import org.apache.hadoop.yarn.api.records.ApplicationReport;
@@ -84,6 +83,7 @@ import com.datatorrent.stram.client.StramClientUtils;
 import com.datatorrent.stram.client.StramClientUtils.ClientRMHelper;
 import com.datatorrent.stram.engine.StreamingContainer;
 import com.datatorrent.stram.plan.logical.LogicalPlan;
+import com.datatorrent.stram.util.JarHelper;
 
 /**
  * Submits application to YARN<p>
@@ -207,22 +207,10 @@ public class StramClient
     HashMap<String, String> sourceToJar = new HashMap<>();
 
     for (Class<?> jarClass : jarClasses) {
-      if (jarClass.getProtectionDomain().getCodeSource() == null) {
-        // system class
-        continue;
+      String jar = JarHelper.getJar(jarClass);
+      if (jar != null) {
+        localJarFiles.add(jar);
       }
-      String sourceLocation = jarClass.getProtectionDomain().getCodeSource().getLocation().toString();
-      String jar = sourceToJar.get(sourceLocation);
-      if (jar == null) {
-        // don't create jar file from folders multiple times
-        jar = JarFinder.getJar(jarClass);
-        sourceToJar.put(sourceLocation, jar);
-        LOG.debug("added sourceLocation {} as {}", sourceLocation, jar);
-      }
-      if (jar == null) {
-        throw new AssertionError("Cannot resolve jar file for " + jarClass);
-      }
-      localJarFiles.add(jar);
     }
 
     String libJarsPath = dag.getValue(Context.DAGContext.LIBRARY_JARS);
