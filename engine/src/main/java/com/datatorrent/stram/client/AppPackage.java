@@ -41,6 +41,7 @@ import org.apache.commons.io.FileUtils;
 import org.apache.commons.lang.exception.ExceptionUtils;
 import org.apache.commons.lang3.StringUtils;
 import org.apache.hadoop.conf.Configuration;
+import org.apache.hadoop.yarn.conf.YarnConfiguration;
 
 import com.datatorrent.stram.client.StramAppLauncher.AppFactory;
 import com.datatorrent.stram.plan.logical.LogicalPlan;
@@ -83,7 +84,7 @@ public class AppPackage extends JarFile
   private final Set<String> requiredProperties = new TreeSet<>();
   private final Map<String, String> defaultProperties = new TreeMap<>();
   private final Set<String> configs = new TreeSet<>();
-
+  private Configuration config;
   private final File resourcesDirectory;
   private final boolean cleanOnClose;
 
@@ -133,6 +134,7 @@ public class AppPackage extends JarFile
   {
     super(file);
 
+    config = StramClientUtils.addDTSiteResources(new YarnConfiguration());
     if (contentFolder != null) {
       FileUtils.forceMkdir(contentFolder);
       cleanOnClose = false;
@@ -168,6 +170,8 @@ public class AppPackage extends JarFile
 
     File propertiesXml = new File(directory, "META-INF/properties.xml");
     if (propertiesXml.exists()) {
+      LOG.info("Adding configuration file from {}", propertiesXml.getAbsolutePath());
+      config.addResource(propertiesXml.getAbsolutePath());
       processPropertiesXml(propertiesXml, null);
     }
 
@@ -327,8 +331,6 @@ public class AppPackage extends JarFile
     File dir = new File(directory, "app");
     applications.clear();
 
-    Configuration config = new Configuration();
-
     List<String> absClassPath = new ArrayList<>(classPath);
     for (int i = 0; i < absClassPath.size(); i++) {
       String path = absClassPath.get(i);
@@ -354,6 +356,7 @@ public class AppPackage extends JarFile
             AppInfo appInfo = new AppInfo(appName, entry.getName(), "class");
             appInfo.displayName = appFactory.getDisplayName();
             try {
+              LOG.info("appfactory instance is name {} {}", appInfo.displayName, appFactory.getClass().getName());
               appInfo.dag = appFactory.createApp(stramAppLauncher.getLogicalPlanConfiguration());
               appInfo.dag.validate();
             } catch (Throwable ex) {
@@ -423,12 +426,15 @@ public class AppPackage extends JarFile
 
   private void processPropertiesXml(File file, AppInfo app)
   {
-    DTConfiguration config = new DTConfiguration();
+    LOG.info("processProperteis called ");
+    DTConfiguration dtconfig = new DTConfiguration();
     try {
-      config.loadFile(file);
-      for (Map.Entry<String, String> entry : config) {
+      dtconfig.loadFile(file);
+      for (Map.Entry<String, String> entry : dtconfig) {
+        LOG.info("property key {} value {}", entry.getKey(), entry.getValue());
         String key = entry.getKey();
         String value = entry.getValue();
+        config.set(key, value);
         if (value == null) {
           if (app == null) {
             requiredProperties.add(key);

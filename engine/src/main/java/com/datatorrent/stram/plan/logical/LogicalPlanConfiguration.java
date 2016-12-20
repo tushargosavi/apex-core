@@ -182,6 +182,13 @@ public class LogicalPlanConfiguration
       return velement;
     }
 
+    @Override
+    public String toString()
+    {
+      return "StramElement{" +
+          "value='" + value + '\'' +
+          "} " + super.toString();
+    }
   }
 
   /**
@@ -1639,6 +1646,9 @@ public class LogicalPlanConfiguration
   public LogicalPlanConfiguration(Configuration conf)
   {
     this.conf = conf;
+    for (Map.Entry<String, String> e : conf) {
+      LOG.info("LogicalPlanConfiguration conf key {} val {}", e.getKey(), e.getValue());
+    }
     this.addFromConfiguration(conf);
   }
 
@@ -1648,6 +1658,11 @@ public class LogicalPlanConfiguration
    */
   public final void addFromConfiguration(Configuration conf)
   {
+    Properties props = toProperties(conf, StreamingApplication.DT_PREFIX);
+    LOG.info("toProperties returned {} number of properties", props.size());
+    for (String key : props.stringPropertyNames()) {
+      LOG.info("addFromConfiguration key {} val {}", key, props.getProperty(key));
+    }
     addFromProperties(toProperties(conf, StreamingApplication.DT_PREFIX), null);
   }
 
@@ -1659,6 +1674,7 @@ public class LogicalPlanConfiguration
       Entry<String, String> e = it.next();
       // filter relevant entries
       if (e.getKey().startsWith(prefix)) {
+        LOG.info("toProperties including property {} {}", e.getKey(), e.getValue());
         props.put(e.getKey(), e.getValue());
       }
     }
@@ -1794,11 +1810,13 @@ public class LogicalPlanConfiguration
    */
   public LogicalPlanConfiguration addFromProperties(Properties props, Configuration conf)
   {
+    LOG.info("addFromProperties called props {} conf {}", props, conf);
     if (conf != null) {
       StramClientUtils.evalProperties(props, conf);
     }
     for (final String propertyName : props.stringPropertyNames()) {
       String propertyValue = props.getProperty(propertyName);
+      LOG.info("parsing property key {} value {}", propertyName, propertyValue);
       this.properties.setProperty(propertyName, propertyValue);
       if (propertyName.startsWith(StreamingApplication.DT_PREFIX)) {
         String[] keyComps = propertyName.split(KEY_SEPARATOR_SPLIT_REGEX);
@@ -1824,6 +1842,7 @@ public class LogicalPlanConfiguration
       if ((element == null) && conf.ignoreUnknownChildren()) {
         return;
       }
+      LOG.info("StramElement {}", element);
       if ((element == StramElement.APPLICATION) || (element == StramElement.OPERATOR) || (element == StramElement.STREAM)
           || (element == StramElement.PORT) || (element == StramElement.INPUT_PORT) || (element == StramElement.OUTPUT_PORT)
           || (element == StramElement.TEMPLATE)) {
@@ -1970,6 +1989,7 @@ public class LogicalPlanConfiguration
    */
   private void parsePropertyElement(StramElement element, String[] keys, int index, Conf conf, String propertyValue, String propertyName)
   {
+    LOG.info("parser operator element called {} {} key {} val {}", element, keys, propertyName, propertyValue);
     // Currently opProps are only supported on operators and streams
     // Supporting current implementation where property can be directly specified under operator
     String prop;
@@ -2228,6 +2248,7 @@ public class LogicalPlanConfiguration
     String appAlias = getAppAlias(name);
     String appName = appAlias == null ? name : appAlias;
     List<AppConf> appConfs = stramConf.getMatchingChildConf(appName, StramElement.APPLICATION);
+    LOG.info("Total number of applications for {} size {}", appName, appConfs.size());
     setApplicationConfiguration(dag, appConfs, app);
     if (dag.getAttributes().get(Context.DAGContext.APPLICATION_NAME) == null) {
       dag.setAttribute(Context.DAGContext.APPLICATION_NAME, appName);
@@ -2293,6 +2314,10 @@ public class LogicalPlanConfiguration
    */
   private Map<String, String> getProperties(PropertyArgs pa, List<OperatorConf> opConfs, String appName)
   {
+    LOG.info("getProperties called for opConf ");
+    for (OperatorConf oconf : opConfs) {
+      LOG.info("operator config config {}", oconf);
+    }
     Map<String, String> opProps = Maps.newHashMap();
     Map<String, TemplateConf> templates = stramConf.getChildren(StramElement.TEMPLATE);
     // list of all templates that match operator, ordered by priority
@@ -2434,6 +2459,10 @@ public class LogicalPlanConfiguration
   public void setModuleProperties(LogicalPlan dag, String applicationName)
   {
     List<AppConf> appConfs = stramConf.getMatchingChildConf(applicationName, StramElement.APPLICATION);
+    LOG.info("setModuleProperties appName {} size {}", applicationName, appConfs.size());
+    for (AppConf app : appConfs) {
+      LOG.info("Application conf {}", app);
+    }
     setModuleConfiguration(dag, appConfs, applicationName);
   }
 
@@ -2499,7 +2528,12 @@ public class LogicalPlanConfiguration
   {
     for (final ModuleMeta mw : dag.getAllModules()) {
       List<OperatorConf> opConfs = getMatchingChildConf(appConfs, mw.getName(), StramElement.OPERATOR);
+      LOG.info("setModuleConfiguration reading module conf {} size {}", mw.getFullName(), opConfs.size());
+      for (OperatorConf oconf : opConfs) {
+        LOG.info("OperatorConf {}", oconf);
+      }
       Map<String, String> opProps = getProperties(getPropertyArgs(mw), opConfs, appName);
+      LOG.info("setting operator/module properties {} props {}", mw.getFullName(), opProps);
       setOperatorProperties(mw.getGenericOperator(), opProps);
     }
   }

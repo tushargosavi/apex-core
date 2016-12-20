@@ -468,6 +468,7 @@ public class StramAppLauncher
             public LogicalPlan createApp(LogicalPlanConfiguration planConfig)
             {
               // load class from current context class loader
+              LOG.info("createApp called with name {} clazz {} config {}", classFileName, clazz, planConfig);
               Class<? extends StreamingApplication> c = StramUtils.classForName(className, StreamingApplication.class);
               StreamingApplication app = StramUtils.newInstance(c);
               return super.createApp(app, planConfig);
