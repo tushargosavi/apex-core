@@ -1655,6 +1655,9 @@ public class LogicalPlan implements Serializable, DAG
    */
   public void validate() throws ConstraintViolationException
   {
+    /* process all visitors before final validation is performed */
+    processVisitors();
+
     ValidatorFactory factory = Validation.buildDefaultValidatorFactory();
     Validator validator = factory.getValidator();
 
@@ -1811,8 +1814,6 @@ public class LogicalPlan implements Serializable, DAG
     }
 
     validateAffinityRules();
-
-    processVisitors();
   }
 
   /**
