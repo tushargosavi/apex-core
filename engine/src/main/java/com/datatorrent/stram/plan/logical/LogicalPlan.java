@@ -504,7 +504,8 @@ public class LogicalPlan implements Serializable, DAG
       return this;
     }
 
-    public List<InputPortMeta> getSinks()
+    @Override
+    public Collection<InputPortMeta> getSinks()
     {
       return sinks;
     }
@@ -1810,6 +1811,8 @@ public class LogicalPlan implements Serializable, DAG
     }
 
     validateAffinityRules();
+
+    processVisitors();
   }
 
   /**
@@ -2396,4 +2399,41 @@ public class LogicalPlan implements Serializable, DAG
     return result;
   }
 
+  @Override
+  public Collection<OperatorMeta> getOperators()
+  {
+    return Collections.unmodifiableCollection(operators.values());
+  }
+
+  @Override
+  public Collection<StreamMeta> getStreams()
+  {
+    return Collections.unmodifiableCollection(streams.values());
+  }
+
+  /** This list is not needed at runtime, hence making it transient */
+  private transient List<DAGVisitor> visitors = new ArrayList<>();
+
+  @Override
+  public void addVisitor(DAGVisitor visitor)
+  {
+    visitors.add(visitor);
+  }
+
+  private void processVisitors()
+  {
+    for (DAGVisitor visitor : visitors) {
+      visitor.startDAG(this);
+
+      for (OperatorMeta ometa : operators.values()) {
+        visitor.visitOperator(ometa);
+      }
+
+      for (StreamMeta smeta : streams.values()) {
+        visitor.visitStream(smeta);
+      }
+
+      visitor.endDAG();
+    }
+  }
 }
