@@ -143,7 +143,7 @@ public class LogicalPlanConfigurationTest
     assertEquals("rootNode out is operator2 in", n1n2, operator1.getOutputStreams().get(operator1.getMeta(((TestGeneratorInputOperator)operator1.getOperator()).outport)));
     assertEquals("n1n2 source", operator1, n1n2.getSource().getOperatorMeta());
     Assert.assertEquals("n1n2 targets", 1, n1n2.getSinks().size());
-    Assert.assertEquals("n1n2 target", operator2, n1n2.getSinks().get(0).getOperatorWrapper());
+    Assert.assertEquals("n1n2 target", operator2, n1n2.getSinks().iterator().next().getOperatorWrapper());
 
     assertEquals("stream name", "n1n2", n1n2.getName());
     Assert.assertEquals("n1n2 not inline (default)", null, n1n2.getLocality());

@@ -19,6 +19,7 @@
 package com.datatorrent.api;
 
 import java.io.Serializable;
+import java.util.Collection;
 
 import org.apache.hadoop.classification.InterfaceStability;
 
@@ -41,10 +42,13 @@ public interface DAG extends DAGContext, Serializable
 {
   interface InputPortMeta extends Serializable, PortContext
   {
+    Operator.InputPort<?> getPortObject();
   }
 
   interface OutputPortMeta extends Serializable, PortContext
   {
+    Operator.OutputPort<?> getPortObject();
+
     OperatorMeta getUnifierMeta();
   }
 
@@ -110,6 +114,12 @@ public interface DAG extends DAGContext, Serializable
     public StreamMeta setSource(Operator.OutputPort<?> port);
 
     public StreamMeta addSink(Operator.InputPort<?> port);
+
+    /* get port for source */
+    public <T extends OutputPortMeta> T getSource();
+
+    /* get port for sink */
+    public <T extends InputPortMeta> Collection<T> getSinks();
 
     /**
      * Persist entire stream using operator passed.
@@ -279,6 +289,43 @@ public interface DAG extends DAGContext, Serializable
    * <p>getMeta.</p>
    */
   public abstract OperatorMeta getMeta(Operator operator);
+
+  /**
+   * get list of operators in the DAG
+   * @return
+   */
+  public abstract <T extends OperatorMeta> Collection<T> getOperators();
+
+  /**
+   * get list of stream in the DAG
+   * @return
+   */
+  public abstract <T extends StreamMeta> Collection<T> getStreams();
+
+  public interface DAGVisitor
+  {
+    void startDAG(DAG dag);
+
+    void visitOperator(OperatorMeta ometa);
+
+    void visitStream(StreamMeta smeta);
+
+    void endDAG();
+  }
+
+  /**
+   * Register a DAG visitor.
+   *
+   * Implementation of {@see DAG} is expected to call all visitors registered
+   * after whole DAG is populated by the application. Implementation is free to
+   * perform other transformations before calling this API. Each visitor should
+   * get called in the order they are registered one after the other. i.e only
+   * after one visitor has examine the DAG, the next visitor can start examining
+   * the DAG.
+   *
+   * @param visitor
+   */
+  public void addVisitor(DAGVisitor visitor);
 
   /**
    * Marker interface for the Node in the DAG. Any object which can be added as a Node in the DAG
