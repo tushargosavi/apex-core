@@ -369,6 +369,9 @@ public interface Context
      * If using the built-in transport, please use an AutoMetricBuiltInTransport object
      */
     Attribute<AutoMetric.Transport> METRICS_TRANSPORT = new Attribute<>(Object2String.<AutoMetric.Transport>getInstance());
+
+    Attribute<Collection<Object>> USER_SERVICES = new Attribute<>(Collection2String.getInstance(",", Object2String.<Object>getInstance(":")));
+
     /**
      * Application instance identifier. An application with the same name can run in multiple instances, each with a
      * unique identifier. The identifier is set by the client that submits the application and can be used in operators
@@ -530,6 +533,8 @@ public interface Context
      * and child containers.
      */
     Attribute<String> LIBRARY_JARS = new Attribute<>(String2String.getInstance());
+
+    Attribute<Collection<StatsHandler>> STATS_HANDLERS = new Attribute<>(Collection2String.getInstance(",", Object2String.<StatsHandler>getInstance(":")));
 
     @SuppressWarnings(value = "FieldNameHidesFieldInSuperclass")
     long serialVersionUID = AttributeMap.AttributeInitializer.initialize(DAGContext.class);

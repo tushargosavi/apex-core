@@ -140,6 +140,7 @@ import com.datatorrent.stram.api.StreamingContainerUmbilicalProtocol.StreamingCo
 import com.datatorrent.stram.engine.OperatorResponse;
 import com.datatorrent.stram.engine.StreamingContainer;
 import com.datatorrent.stram.engine.WindowGenerator;
+import com.datatorrent.stram.extensions.api.ApexServiceProcessor;
 import com.datatorrent.stram.plan.logical.LogicalOperatorStatus;
 import com.datatorrent.stram.plan.logical.LogicalPlan;
 import com.datatorrent.stram.plan.logical.LogicalPlan.InputPortMeta;
@@ -225,6 +226,7 @@ public class StreamingContainerManager implements PlanContext
   private final AtomicBoolean deployChangeInProgress = new AtomicBoolean();
   private int deployChangeCnt;
   private MBassador<StramEvent> eventBus; // event bus for publishing stram events
+  private MBassador<?> statsBus; // bus for stats from an container
   private final Journal journal;
   private RecoveryHandler recoveryHandler;
   // window id to node id to end window stats
@@ -244,7 +246,6 @@ public class StreamingContainerManager implements PlanContext
   private final Cache<Long, Object> commandResponse = CacheBuilder.newBuilder().expireAfterWrite(1, TimeUnit.MINUTES).build();
   private transient ExecutorService poolExecutor;
   private FileContext fileContext;
-
   //logic operator name to a queue of logical metrics. this gets cleared periodically
   private final Map<String, Queue<Pair<Long, Map<String, Object>>>> logicalMetrics = Maps.newConcurrentMap();
   //logical operator name to latest logical metrics.
@@ -252,6 +253,7 @@ public class StreamingContainerManager implements PlanContext
 
   //logical operator name to latest counters. exists for backward compatibility.
   private final Map<String, Object> latestLogicalCounters = Maps.newHashMap();
+  public transient ApexServiceProcessor apexServiceProcessor;
 
   private final LinkedHashMap<String, ContainerInfo> completedContainers = new LinkedHashMap<String, ContainerInfo>()
   {
@@ -1093,6 +1095,8 @@ public class StreamingContainerManager implements PlanContext
       }
     }
 
+    LOG.info("avg latency for processing heartbeat is {} total {} count {}", heartbeatProcessingTime.get(),
+        heartbeatProcessingTime.val.get(), heartbeatProcessingTime.count.get());
     return count;
   }
 
@@ -1794,7 +1798,32 @@ public class StreamingContainerManager implements PlanContext
     rsp.stackTraceRequired = sca.stackTraceRequested;
     sca.stackTraceRequested = false;
 
+    heartbeatProcessingTime.add(System.currentTimeMillis() - currentTimeMillis);
+    apexServiceProcessor.handleHeartbeat(heartbeat);
     return rsp;
+  }
+
+  AvgMetric heartbeatProcessingTime = new AvgMetric();
+
+  static class AvgMetric
+  {
+    AtomicLong val = new AtomicLong(0);
+    AtomicLong count = new AtomicLong(0);
+
+    void add(long v)
+    {
+      val.addAndGet(v);
+      count.incrementAndGet();
+    }
+
+    double get()
+    {
+      if (count.get() > 0) {
+        return ((double)val.get()) / count.get();
+      } else {
+        return 0.0;
+      }
+    }
   }
 
   static class UpdateOperatorLatencyContext
@@ -2386,6 +2415,13 @@ public class StreamingContainerManager implements PlanContext
   @Override
   public void recordEventAsync(StramEvent ev)
   {
+    /* During physical plan generation, apexServiceProcessor is not set
+     * TODO: cache generated events and replay them when apexServiceProcessor
+     * is set.
+     */
+    if (apexServiceProcessor != null) {
+      apexServiceProcessor.handleEvent(ev);
+    }
     if (eventBus != null) {
       eventBus.publishAsync(ev);
     }

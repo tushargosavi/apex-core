@@ -83,9 +83,6 @@ public class VisitorApiTests
     @Override
     public void validate() throws ValidationException
     {
-      if (!out.isConnected()) {
-        throw new ValidationException("Output port needs to be connected");
-      }
     }
   }
 
