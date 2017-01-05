@@ -62,7 +62,6 @@ import javax.annotation.Nullable;
 import org.codehaus.jettison.json.JSONArray;
 import org.codehaus.jettison.json.JSONException;
 import org.codehaus.jettison.json.JSONObject;
-import org.jctools.queues.atomic.SpscLinkedAtomicQueue;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
@@ -141,6 +140,7 @@ import com.datatorrent.stram.api.StreamingContainerUmbilicalProtocol.StreamingCo
 import com.datatorrent.stram.engine.OperatorResponse;
 import com.datatorrent.stram.engine.StreamingContainer;
 import com.datatorrent.stram.engine.WindowGenerator;
+import com.datatorrent.stram.extensions.api.ApexServiceProcessor;
 import com.datatorrent.stram.plan.logical.LogicalOperatorStatus;
 import com.datatorrent.stram.plan.logical.LogicalPlan;
 import com.datatorrent.stram.plan.logical.LogicalPlan.InputPortMeta;
@@ -246,7 +246,6 @@ public class StreamingContainerManager implements PlanContext
   private final Cache<Long, Object> commandResponse = CacheBuilder.newBuilder().expireAfterWrite(1, TimeUnit.MINUTES).build();
   private transient ExecutorService poolExecutor;
   private FileContext fileContext;
-  private SpscLinkedAtomicQueue heartbeatQueue = new SpscLinkedAtomicQueue();
   //logic operator name to a queue of logical metrics. this gets cleared periodically
   private final Map<String, Queue<Pair<Long, Map<String, Object>>>> logicalMetrics = Maps.newConcurrentMap();
   //logical operator name to latest logical metrics.
@@ -254,6 +253,7 @@ public class StreamingContainerManager implements PlanContext
 
   //logical operator name to latest counters. exists for backward compatibility.
   private final Map<String, Object> latestLogicalCounters = Maps.newHashMap();
+  public transient ApexServiceProcessor apexServiceProcessor;
 
   private final LinkedHashMap<String, ContainerInfo> completedContainers = new LinkedHashMap<String, ContainerInfo>()
   {
@@ -1107,8 +1107,8 @@ public class StreamingContainerManager implements PlanContext
       }
     }
 
-    LOG.info("avg latency for processing heartbeat is {} count {}", heartbeatProcessingTime.get(),
-        heartbeatProcessingTime.count.get());
+    LOG.info("avg latency for processing heartbeat is {} total {} count {}", heartbeatProcessingTime.get(),
+        heartbeatProcessingTime.val.get(), heartbeatProcessingTime.count.get());
     return count;
   }
 
@@ -1811,6 +1811,7 @@ public class StreamingContainerManager implements PlanContext
     sca.stackTraceRequested = false;
 
     heartbeatProcessingTime.add(System.currentTimeMillis() - currentTimeMillis);
+    apexServiceProcessor.handleHeartbeat(heartbeat);
     return rsp;
   }
 

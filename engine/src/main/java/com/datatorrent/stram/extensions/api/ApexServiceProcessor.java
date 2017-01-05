@@ -19,69 +19,123 @@
 package com.datatorrent.stram.extensions.api;
 
 import java.util.Collection;
-import java.util.concurrent.BlockingQueue;
+import java.util.concurrent.ExecutorService;
+import java.util.concurrent.Executors;
 
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
-import org.apache.hadoop.service.AbstractService;
+import org.apache.hadoop.service.CompositeService;
 
 import com.google.common.collect.Lists;
 
+import com.datatorrent.stram.StramAppContext;
+import com.datatorrent.stram.StreamingContainerManager;
+import com.datatorrent.stram.api.StramEvent;
 import com.datatorrent.stram.api.StreamingContainerUmbilicalProtocol.ContainerHeartbeat;
 
-public class ApexServiceProcessor<QueueType extends BlockingQueue<? extends ContainerHeartbeat>> extends AbstractService
+/**
+ * A top level ApexServiceProcessor which will handle multiple requests through
+ * a thread pool.
+ * TODO: allow user to configure the thread-pool size.
+ */
+public class ApexServiceProcessor extends CompositeService implements ApexService
 {
   private static final Logger LOG = LoggerFactory.getLogger(ApexServiceProcessor.class);
-  final QueueType queue;
-  private Thread thread;
-  private volatile boolean stopped = false;
-  Collection<ApexService> userServices = Lists.newArrayList();
+  private Collection<ApexService> userServices = Lists.newArrayList();
+  private ExecutorService poolExecutor;
+  private final StramAppContext appContext;
+  private final StreamingContainerManager dmgr;
 
-  public ApexServiceProcessor(QueueType queue)
+  public ApexServiceProcessor(StramAppContext context, StreamingContainerManager dmgr)
   {
-    super("ApexServiceProcessor");
-    this.queue = queue;
+    super(ApexServiceProcessor.class.getName());
+    this.appContext = context;
+    this.dmgr = dmgr;
+    LOG.info("Creating appex service ");
+  }
+
+  public void addUserService(ApexService service)
+  {
+    service.setAppContext(appContext);
+    service.setDagManager(dmgr);
+    userServices.add(service);
+    LOG.info("Adding user service {}", service.getName());
+    addService(service);
+  }
+
+  @Override
+  public void setAppContext(StramAppContext context)
+  {
+
+  }
+
+  @Override
+  public void setDagManager(StreamingContainerManager manager)
+  {
+
+  }
+
+  @Override
+  public void handleHeartbeat(ContainerHeartbeat hb)
+  {
+    poolExecutor.submit(new HeartbeatDeliveryTask(hb));
+  }
+
+  @Override
+  public void tick()
+  {
+    poolExecutor.submit(new TickTask());
+  }
+
+  @Override
+  public void handleEvent(StramEvent event)
+  {
+
   }
 
   @Override
   protected void serviceStart() throws Exception
   {
     super.serviceStart();
-    thread = new QueueProcessorThread();
-    thread.start();
-  }
-
-  class QueueProcessorThread extends Thread
-  {
-    @Override
-    public void run()
-    {
-      ContainerHeartbeat heartbeat = null;
-      while (!stopped) {
-        try {
-          heartbeat = queue.take();
-        } catch (InterruptedException e) {
-          if (stopped) {
-            break;
-          } else {
-            LOG.info("error while taking from queue");
-          }
-        }
-      }
-
-      for (ApexService service : userServices) {
-        service.handleHeartbeat(heartbeat);
-      }
-    }
+    poolExecutor = Executors.newCachedThreadPool();
   }
 
   @Override
   protected void serviceStop() throws Exception
   {
     super.serviceStop();
-    stopped = true;
-    thread.interrupt();
-    thread.join();
+    if (poolExecutor != null) {
+      poolExecutor.shutdown();
+    }
+  }
+
+  private class HeartbeatDeliveryTask implements Runnable
+  {
+    private final ContainerHeartbeat hb;
+
+    public HeartbeatDeliveryTask(ContainerHeartbeat hb)
+    {
+      this.hb = hb;
+    }
+
+    @Override
+    public void run()
+    {
+      for (ApexService service : userServices) {
+        service.handleHeartbeat(hb);
+      }
+    }
+  }
+
+  private class TickTask implements Runnable
+  {
+    @Override
+    public void run()
+    {
+      for (ApexService service : userServices) {
+        service.tick();
+      }
+    }
   }
 }

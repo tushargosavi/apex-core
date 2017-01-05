@@ -44,7 +44,6 @@ import org.apache.hadoop.service.AbstractService;
 
 import com.datatorrent.api.AutoMetric;
 import com.datatorrent.api.Context.DAGContext;
-import com.datatorrent.api.StatsListener;
 import com.datatorrent.common.metric.AutoMetricBuiltInTransport;
 import com.datatorrent.common.util.Pair;
 import com.datatorrent.stram.PubSubWebSocketMetricTransport;
@@ -110,12 +109,6 @@ public class AppDataPushAgent extends AbstractService implements ApexService
 
   @Override
   public void handleEvent(StramEvent event)
-  {
-
-  }
-
-  @Override
-  public void handleStats(StatsListener.BatchedOperatorStats stats)
   {
 
   }
@@ -356,4 +349,9 @@ public class AppDataPushAgent extends AbstractService implements ApexService
 
   }
 
+  @Override
+  public void tick()
+  {
+
+  }
 }

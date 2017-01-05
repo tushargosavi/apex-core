@@ -100,6 +100,8 @@ import com.datatorrent.stram.appdata.AppDataPushAgent;
 import com.datatorrent.stram.client.StramClientUtils;
 import com.datatorrent.stram.engine.StreamingContainer;
 import com.datatorrent.stram.extensions.api.ApexService;
+import com.datatorrent.stram.extensions.api.ApexServiceProcessor;
+import com.datatorrent.stram.extensions.api.DebugApexService;
 import com.datatorrent.stram.plan.logical.LogicalPlan;
 import com.datatorrent.stram.plan.physical.OperatorStatus.PortStatus;
 import com.datatorrent.stram.plan.physical.PTContainer;
@@ -160,6 +162,7 @@ public class StreamingAppMasterService extends CompositeService
   private StramDelegationTokenManager delegationTokenManager = null;
   private AppDataPushAgent appDataPushAgent;
   private final List<Service> userServices = new ArrayList<>();
+  private ApexServiceProcessor apexServiceProcesssor;
 
   public StreamingAppMasterService(ApplicationAttemptId appAttemptID)
   {
@@ -579,23 +582,36 @@ public class StreamingAppMasterService extends CompositeService
     this.heartbeatListener = new StreamingContainerParent(this.getClass().getName(), dnmgr, delegationTokenManager, rpcListenerCount);
     addService(heartbeatListener);
 
-    Collection<Object> services = dag.getValue(LogicalPlan.USER_SERVICES);
+    addApexServices();
+
+    // Initialize all services added above
+    super.serviceInit(conf);
+  }
+
+  private void addApexServices()
+  {
+    List<Object> services = new ArrayList<>();
+
+    Collection<Object> plugins = dag.getValue(LogicalPlan.USER_SERVICES);
+    if (plugins != null) {
+      services.addAll(plugins);
+    }
 
     // add pre configured services
     AutoMetric.Transport appDataPushTransport = dag.getValue(LogicalPlan.METRICS_TRANSPORT);
     if (appDataPushTransport != null) {
-      services.add(appDataPushTransport);
+      services.add(new AppDataPushAgent());
     }
+    services.add(new DebugApexService());
 
+    apexServiceProcesssor = new ApexServiceProcessor(appContext, dnmgr);
     for (Object obj : services) {
       if (obj != null && obj instanceof ApexService) {
-        userServices.add((ApexService)obj);
-        addService((Service)obj);
+        apexServiceProcesssor.addUserService((ApexService)obj);
       }
     }
-
-    // initialize all services added above
-    super.serviceInit(conf);
+    addService(apexServiceProcesssor);
+    dnmgr.apexServiceProcessor = apexServiceProcesssor;
   }
 
   @Override
