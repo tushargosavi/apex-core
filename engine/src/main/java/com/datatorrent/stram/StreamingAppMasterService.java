@@ -1059,6 +1059,7 @@ public class StreamingAppMasterService extends CompositeService
 
       // monitor child containers
       dnmgr.monitorHeartbeat();
+      apexServiceProcesssor.tick();
     }
 
     finishApplication(finalStatus, numTotalContainers);

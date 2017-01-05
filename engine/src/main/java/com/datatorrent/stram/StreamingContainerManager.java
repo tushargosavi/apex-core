@@ -107,7 +107,6 @@ import com.datatorrent.api.Operator;
 import com.datatorrent.api.Operator.InputPort;
 import com.datatorrent.api.Operator.OutputPort;
 import com.datatorrent.api.Stats.OperatorStats;
-import com.datatorrent.api.StatsHandler;
 import com.datatorrent.api.StatsListener;
 import com.datatorrent.api.StorageAgent;
 import com.datatorrent.api.StreamCodec;
@@ -278,7 +277,6 @@ public class StreamingContainerManager implements PlanContext
   private FSJsonLineFile operatorFile;
 
   private final long startTime = System.currentTimeMillis();
-  private transient ArrayList<StatsHandler> statsHandlers = new ArrayList<>();
 
   static class EndWindowStats
   {
@@ -803,19 +801,8 @@ public class StreamingContainerManager implements PlanContext
 
     committedWindowId = updateCheckpoints(false);
     calculateEndWindowStats();
-    if (!statsHandlers.isEmpty()) {
-      handleStats(currentTms);
-    }
     if (this.vars.enableStatsRecording) {
       recordStats(currentTms);
-    }
-  }
-
-  private void handleStats(long currentTms)
-  {
-    List<OperatorInfo> lst = getOperatorInfoList();
-    for (StatsHandler handler : statsHandlers) {
-      handler.handleStats(lst, currentTms);
     }
   }
 
@@ -2419,6 +2406,13 @@ public class StreamingContainerManager implements PlanContext
   @Override
   public void recordEventAsync(StramEvent ev)
   {
+    /* During physical plan generation, apexServiceProcessor is not set
+     * TODO: cache generated events and replay them when apexServiceProcessor
+     * is set.
+     */
+    if (apexServiceProcessor != null) {
+      apexServiceProcessor.handleEvent(ev);
+    }
     if (eventBus != null) {
       eventBus.publishAsync(ev);
     }
@@ -3128,7 +3122,6 @@ public class StreamingContainerManager implements PlanContext
         // restore checkpoint info
         plan.syncCheckpoints(scm.vars.windowStartMillis, scm.clock.getTime());
         scm.committedWindowId = scm.updateCheckpoints(true);
-        scm.extractHandlers();
 
         // at this point the physical plan has been fully restored
         // populate container agents for existing containers
@@ -3149,12 +3142,6 @@ public class StreamingContainerManager implements PlanContext
     } catch (IOException e) {
       throw new IllegalStateException("Failed to read checkpointed state", e);
     }
-  }
-
-
-  private void extractHandlers()
-  {
-    statsHandlers = Lists.newArrayList(plan.getLogicalPlan().getAttributes().get(Context.DAGContext.STATS_HANDLERS));
   }
 
   private static class FinalVars implements java.io.Serializable

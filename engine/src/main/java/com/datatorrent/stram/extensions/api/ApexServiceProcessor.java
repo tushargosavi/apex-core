@@ -91,7 +91,7 @@ public class ApexServiceProcessor extends CompositeService implements ApexServic
   @Override
   public void handleEvent(StramEvent event)
   {
-
+    poolExecutor.submit(new EventDiliveryTask(event));
   }
 
   @Override
@@ -135,6 +135,23 @@ public class ApexServiceProcessor extends CompositeService implements ApexServic
     {
       for (ApexService service : userServices) {
         service.tick();
+      }
+    }
+  }
+
+  private class EventDiliveryTask implements Runnable
+  {
+    private final StramEvent event;
+    public EventDiliveryTask(StramEvent event)
+    {
+      this.event = event;
+    }
+
+    @Override
+    public void run()
+    {
+      for (ApexService service : userServices) {
+        service.handleEvent(event);
       }
     }
   }

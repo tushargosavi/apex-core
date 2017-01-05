@@ -64,6 +64,6 @@ public class DebugApexService extends AbstractService implements ApexService
   @Override
   public void handleEvent(StramEvent event)
   {
-
+    LOG.info("StramEvent occured {} reason {}", event, event.getReason());
   }
 }
