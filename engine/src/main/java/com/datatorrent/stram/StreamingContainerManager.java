@@ -62,6 +62,7 @@ import javax.annotation.Nullable;
 import org.codehaus.jettison.json.JSONArray;
 import org.codehaus.jettison.json.JSONException;
 import org.codehaus.jettison.json.JSONObject;
+import org.jctools.queues.atomic.SpscLinkedAtomicQueue;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
@@ -225,6 +226,7 @@ public class StreamingContainerManager implements PlanContext
   private final AtomicBoolean deployChangeInProgress = new AtomicBoolean();
   private int deployChangeCnt;
   private MBassador<StramEvent> eventBus; // event bus for publishing stram events
+  private MBassador<?> statsBus; // bus for stats from an container
   private final Journal journal;
   private RecoveryHandler recoveryHandler;
   // window id to node id to end window stats
@@ -244,7 +246,7 @@ public class StreamingContainerManager implements PlanContext
   private final Cache<Long, Object> commandResponse = CacheBuilder.newBuilder().expireAfterWrite(1, TimeUnit.MINUTES).build();
   private transient ExecutorService poolExecutor;
   private FileContext fileContext;
-
+  private SpscLinkedAtomicQueue heartbeatQueue = new SpscLinkedAtomicQueue();
   //logic operator name to a queue of logical metrics. this gets cleared periodically
   private final Map<String, Queue<Pair<Long, Map<String, Object>>>> logicalMetrics = Maps.newConcurrentMap();
   //logical operator name to latest logical metrics.
@@ -1827,7 +1829,11 @@ public class StreamingContainerManager implements PlanContext
 
     double get()
     {
-      return ((double)val.get()) / count.get();
+      if (count.get() > 0) {
+        return ((double)val.get()) / count.get();
+      } else {
+        return 0.0;
+      }
     }
   }
 
