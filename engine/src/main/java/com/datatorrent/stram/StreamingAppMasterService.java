@@ -41,6 +41,7 @@ import javax.xml.bind.annotation.XmlElement;
 
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
+
 import org.apache.commons.io.FileUtils;
 import org.apache.commons.lang.StringUtils;
 import org.apache.commons.lang3.tuple.MutablePair;
@@ -51,6 +52,7 @@ import org.apache.hadoop.security.Credentials;
 import org.apache.hadoop.security.UserGroupInformation;
 import org.apache.hadoop.security.token.Token;
 import org.apache.hadoop.service.CompositeService;
+import org.apache.hadoop.service.Service;
 import org.apache.hadoop.yarn.api.ApplicationConstants;
 import org.apache.hadoop.yarn.api.protocolrecords.AllocateResponse;
 import org.apache.hadoop.yarn.api.protocolrecords.FinishApplicationMasterRequest;
@@ -97,6 +99,7 @@ import com.datatorrent.stram.api.StramEvent;
 import com.datatorrent.stram.appdata.AppDataPushAgent;
 import com.datatorrent.stram.client.StramClientUtils;
 import com.datatorrent.stram.engine.StreamingContainer;
+import com.datatorrent.stram.extensions.api.ApexService;
 import com.datatorrent.stram.plan.logical.LogicalPlan;
 import com.datatorrent.stram.plan.physical.OperatorStatus.PortStatus;
 import com.datatorrent.stram.plan.physical.PTContainer;
@@ -156,6 +159,7 @@ public class StreamingAppMasterService extends CompositeService
   private final ClusterAppStats stats = new ClusterAppStats();
   private StramDelegationTokenManager delegationTokenManager = null;
   private AppDataPushAgent appDataPushAgent;
+  private final List<Service> userServices = new ArrayList<>();
 
   public StreamingAppMasterService(ApplicationAttemptId appAttemptID)
   {
@@ -575,11 +579,21 @@ public class StreamingAppMasterService extends CompositeService
     this.heartbeatListener = new StreamingContainerParent(this.getClass().getName(), dnmgr, delegationTokenManager, rpcListenerCount);
     addService(heartbeatListener);
 
+    Collection<Object> services = dag.getValue(LogicalPlan.USER_SERVICES);
+
+    // add pre configured services
     AutoMetric.Transport appDataPushTransport = dag.getValue(LogicalPlan.METRICS_TRANSPORT);
     if (appDataPushTransport != null) {
-      this.appDataPushAgent = new AppDataPushAgent(dnmgr, appContext);
-      addService(this.appDataPushAgent);
+      services.add(appDataPushTransport);
     }
+
+    for (Object obj : services) {
+      if (obj != null && obj instanceof ApexService) {
+        userServices.add((ApexService)obj);
+        addService((Service)obj);
+      }
+    }
+
     // initialize all services added above
     super.serviceInit(conf);
   }

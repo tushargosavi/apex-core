@@ -28,6 +28,7 @@ import javax.xml.bind.annotation.XmlAccessType;
 import javax.xml.bind.annotation.XmlAccessorType;
 import javax.xml.bind.annotation.XmlRootElement;
 
+import com.datatorrent.api.StatsHandler;
 import com.datatorrent.api.annotation.RecordField;
 
 /**
@@ -47,7 +48,7 @@ import com.datatorrent.api.annotation.RecordField;
  */
 @XmlRootElement(name = "node")
 @XmlAccessorType(XmlAccessType.FIELD)
-public class OperatorInfo
+public class OperatorInfo implements StatsHandler.OperatorInfo
 {
   @RecordField(type = "meta")
   public String id;
@@ -109,5 +110,4 @@ public class OperatorInfo
   {
     return Collections.unmodifiableCollection(ports);
   }
-
 }
