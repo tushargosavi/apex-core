@@ -2437,4 +2437,13 @@ public class LogicalPlan implements Serializable, DAG
     return result;
   }
 
+  StreamMeta getStreamBySource(OutputPort<?> source) {
+    for (StreamMeta smeta : streams.values()) {
+      if (smeta.getSource().getPortObject() == source) {
+        return smeta;
+      }
+    }
+    return null;
+  }
+
 }
