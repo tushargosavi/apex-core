@@ -38,6 +38,7 @@ import java.util.ArrayList;
 import java.util.Arrays;
 import java.util.Collection;
 import java.util.Collections;
+import java.util.ConcurrentModificationException;
 import java.util.HashMap;
 import java.util.HashSet;
 import java.util.LinkedHashMap;
@@ -193,7 +194,7 @@ public class LogicalPlan implements Serializable, DAG
   }
 
   private final Map<String, StreamMeta> streams = new HashMap<>();
-  private final Map<String, OperatorMeta> operators = new HashMap<>();
+  protected final Map<String, OperatorMeta> operators = new HashMap<>();
   public final Map<String, ModuleMeta> modules = new LinkedHashMap<>();
   private final List<OperatorMeta> rootOperators = new ArrayList<>();
   private final List<OperatorMeta> leafOperators = new ArrayList<>();
@@ -1514,7 +1515,7 @@ public class LogicalPlan implements Serializable, DAG
     this.getMeta(operator).attributes.put(key, value);
   }
 
-  private OutputPortMeta assertGetPortMeta(Operator.OutputPort<?> port)
+  OutputPortMeta getPortMeta(Operator.OutputPort<?> port)
   {
     for (OperatorMeta o : getAllOperators()) {
       OutputPortMeta opm = o.getPortMapping().outPortMap.get(port);
@@ -1522,10 +1523,19 @@ public class LogicalPlan implements Serializable, DAG
         return opm;
       }
     }
-    throw new IllegalArgumentException("Port is not associated to any operator in the DAG: " + port);
+    return null;
   }
 
-  private InputPortMeta assertGetPortMeta(Operator.InputPort<?> port)
+  private OutputPortMeta assertGetPortMeta(Operator.OutputPort<?> port)
+  {
+    OutputPortMeta meta = getPortMeta(port);
+    if (meta == null) {
+      throw new IllegalArgumentException("Port is not associated to any operator in the DAG: " + port);
+    }
+    return meta;
+  }
+
+  InputPortMeta getPortMeta(InputPort<?> port)
   {
     for (OperatorMeta o : getAllOperators()) {
       InputPortMeta opm = o.getPortMapping().inPortMap.get(port);
@@ -1533,7 +1543,16 @@ public class LogicalPlan implements Serializable, DAG
         return opm;
       }
     }
-    throw new IllegalArgumentException("Port is not associated to any operator in the DAG: " + port);
+    return null;
+  }
+
+  private InputPortMeta assertGetPortMeta(Operator.InputPort<?> port)
+  {
+    InputPortMeta meta = getPortMeta(port);
+    if (meta == null) {
+      throw new IllegalArgumentException("Port is not associated to any operator in the DAG: " + port);
+    }
+    return meta;
   }
 
   @Override
@@ -2446,4 +2465,38 @@ public class LogicalPlan implements Serializable, DAG
     return null;
   }
 
+  AtomicInteger version = new AtomicInteger(0);
+
+  WrappedLogicalPlan startTransaction()
+  {
+    return new WrappedLogicalPlan(this, version.incrementAndGet());
+  }
+
+  public synchronized void commit(WrappedLogicalPlan plan)
+  {
+    if (this.version.get() != plan.parentVersion) {
+      throw new ConcurrentModificationException("Dag modified in between");
+    }
+
+    // validate if changing plan does not cause any issues.
+    plan.validate();
+    version.incrementAndGet();
+
+    // make changes to actual plan.
+
+  }
+
+  void abort()
+  {
+    // nothing to do.
+  }
+
+  /** this is required for runtime dag change */
+  private transient CommitHandler commitHandler;
+
+  static interface CommitHandler {
+    public void addOperator(OperatorMeta ometa);
+    public void addStream(StreamMeta smeta);
+    public void extendStream(StreamMeta smeta);
+  }
 }
