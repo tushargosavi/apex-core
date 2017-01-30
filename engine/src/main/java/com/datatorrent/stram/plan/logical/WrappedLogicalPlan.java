@@ -18,9 +18,14 @@
  */
 package com.datatorrent.stram.plan.logical;
 
+import java.util.ArrayList;
 import java.util.Collection;
+import java.util.List;
 import java.util.Map;
 
+import javax.validation.ConstraintViolationException;
+
+import com.google.common.collect.Lists;
 import com.google.common.collect.Maps;
 
 import com.datatorrent.api.Attribute;
@@ -32,13 +37,18 @@ import sun.reflect.generics.reflectiveObjects.NotImplementedException;
 
 public class WrappedLogicalPlan extends LogicalPlan implements DAG
 {
+  final int parentVersion;
   /* The original snapshot of logical plan */
   private LogicalPlan parent;
 
-  Map<String, LogicalPlan.OperatorMeta> operators = Maps.newHashMap();
+  List<LogicalPlan.OperatorMeta> removedOperators = Lists.newArrayList();
+  Map<String, LogicalPlan.OperatorMeta> newOperators = Maps.newHashMap();
+  Map<String, LogicalPlan.StreamMeta> newStreams = Maps.newHashMap();
+  Map<String, WrappedStreamMeta> changedStreams = Maps.newHashMap();
 
-  public WrappedLogicalPlan(LogicalPlan plan) {
+  public WrappedLogicalPlan(LogicalPlan plan, int version) {
     parent = plan;
+    this.parentVersion = version;
   }
 
   @Override
@@ -65,7 +75,6 @@ public class WrappedLogicalPlan extends LogicalPlan implements DAG
     // not implemented.
   }
 
-
   @Override
   public <T extends Operator> T addOperator(String name, Class<T> clazz)
   {
@@ -88,8 +97,10 @@ public class WrappedLogicalPlan extends LogicalPlan implements DAG
 
   private void assertExistingOpeartor(String name)
   {
-    if (parent.getOperatorMeta(name) != null || operators.containsKey(name)) {
-      throw new IllegalArgumentException("duplicate operator id: " + operators.get(name));
+    if (parent.getOperatorMeta(name) != null || super.operators.containsKey(name)) {
+      LogicalPlan.OperatorMeta ometa  = parent.getOperatorMeta(name) != null?
+          parent.getOperatorMeta(name) : operators.get(name);
+      throw new IllegalArgumentException("duplicate operator id: " + ometa.getName());
     }
   }
 
@@ -108,6 +119,7 @@ public class WrappedLogicalPlan extends LogicalPlan implements DAG
   @Override
   public LogicalPlan.StreamMeta addStream(String id)
   {
+    assertExistingStream(id);
     return super.addStream(id);
   }
 
@@ -201,5 +213,104 @@ public class WrappedLogicalPlan extends LogicalPlan implements DAG
   {
     assertExistingPort(port);
     super.setInputPortAttribute(port, key, value);
+  }
+
+  public void commit() {
+    parent.commit(this);
+  }
+
+  /**
+   * update current dag from parent. This is require for performing a final
+   * validation.
+   */
+  void updateFromParent() {
+
+    // update operators
+    for (LogicalPlan.OperatorMeta ometa : parent.getAllOperators()) {
+      super.addOperator(ometa.getName(), ometa.getOperator());
+    }
+
+    // add streams from existing operators here.
+    for (LogicalPlan.StreamMeta psmeta : parent.getAllStreams()) {
+      LogicalPlan.StreamMeta smeta = super.addStream(psmeta.getName());
+      smeta.setSource(psmeta.getSource().getPortObject());
+      for (LogicalPlan.InputPortMeta ip : psmeta.getSinks()) {
+        smeta.addSink(ip.getPortObject());
+      }
+      smeta.setLocality(psmeta.getLocality());
+    }
+
+  }
+
+  /**
+   * A wrapper class to track stream extension. A stream can be extended by adding more
+   * sink to it.
+   */
+  private class WrappedStreamMeta implements DAG.StreamMeta {
+
+    /* the original stream meta */
+    final LogicalPlan.StreamMeta parent;
+    private List<Operator.InputPort<?>> newSinks = new ArrayList<>();
+
+    public WrappedStreamMeta(LogicalPlan.StreamMeta parent)
+    {
+      this.parent = parent;
+    }
+
+    @Override
+    public String getName()
+    {
+      return parent.getName();
+    }
+
+    @Override
+    public Locality getLocality()
+    {
+      return parent.getLocality();
+    }
+
+    @Override
+    public DAG.StreamMeta setLocality(Locality locality)
+    {
+      throw new UnsupportedOperationException("Can not set locality of existing stream");
+    }
+
+    @Override
+    public DAG.StreamMeta setSource(Operator.OutputPort<?> port)
+    {
+      throw new UnsupportedOperationException("Can not set source of existing stream");
+    }
+
+    @Override
+    public DAG.StreamMeta addSink(Operator.InputPort<?> port)
+    {
+      newSinks.add(port);
+      return this;
+    }
+
+    @Override
+    public DAG.StreamMeta persistUsing(String name, Operator persistOperator, Operator.InputPort<?> persistOperatorInputPort)
+    {
+      throw new UnsupportedOperationException();
+    }
+
+    @Override
+    public DAG.StreamMeta persistUsing(String name, Operator persistOperator)
+    {
+      throw new UnsupportedOperationException();
+    }
+
+    @Override
+    public DAG.StreamMeta persistUsing(String name, Operator persistOperator, Operator.InputPort<?> persistOperatorInputPort, Operator.InputPort<?> sinkToPersist)
+    {
+      throw new UnsupportedOperationException();
+    }
+  }
+
+  public void validate() throws ConstraintViolationException
+  {
+    // bring back changes from logical plan to itself
+    updateFromParent();
+    super.validate();
   }
 }
