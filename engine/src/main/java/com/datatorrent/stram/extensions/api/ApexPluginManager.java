@@ -27,6 +27,7 @@ import java.util.concurrent.Executors;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
+import org.apache.hadoop.conf.Configuration;
 import org.apache.hadoop.service.CompositeService;
 
 import com.google.common.collect.Lists;
@@ -48,23 +49,20 @@ public class ApexPluginManager extends CompositeService implements PluginManager
   private transient ExecutorService poolExecutor;
   private final StramAppContext appContext;
   private final StreamingContainerManager dmgr;
+  private final PluginLocator locator;
 
-  public ApexPluginManager(StramAppContext context, StreamingContainerManager dmgr)
+  public ApexPluginManager(PluginLocator locator, StramAppContext context, StreamingContainerManager dmgr)
   {
     super(ApexPluginManager.class.getName());
+    this.locator = locator;
     this.appContext = context;
     this.dmgr = dmgr;
     LOG.info("Creating appex service ");
   }
 
-  public void addUserService(ApexPlugin service)
-  {
-    userServices.add(service);
-    LOG.info("Adding user service {}", service.getClass().getName());
-  }
-
   public void dispatchStats(ContainerHeartbeat hb)
   {
+    LOG.info("heartbeat received {}", hb);
   }
 
   public void dispatchEvent(StramEvent event)
@@ -73,8 +71,16 @@ public class ApexPluginManager extends CompositeService implements PluginManager
   }
 
   @Override
-  protected void serviceStart() throws Exception
+  protected void serviceInit(Configuration conf) throws Exception
   {
+    super.serviceInit(conf);
+    if (locator != null) {
+      Collection<ApexPlugin> plugins = locator.discoverPlugins();
+      if (plugins != null) {
+        userServices.addAll(plugins);
+      }
+    }
+    LOG.info("ApexPluginManager called ");
     super.serviceStart();
     for (ApexPlugin plugin : userServices) {
       plugin.init(this);
@@ -90,7 +96,7 @@ public class ApexPluginManager extends CompositeService implements PluginManager
       poolExecutor.shutdown();
     }
   }
-  
+
   List<StatsListener> statsListeners = new ArrayList<>();
 
   @Override
@@ -134,6 +140,11 @@ public class ApexPluginManager extends CompositeService implements PluginManager
   public void shutdown()
   {
 
+  }
+
+  public void addPlugin(ApexPlugin obj)
+  {
+    userServices.add(obj);
   }
 
   private class EventDiliveryTask implements Runnable

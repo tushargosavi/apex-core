@@ -606,14 +606,15 @@ public class StreamingAppMasterService extends CompositeService
     // add pre configured services
     services.add(new DebugApexService());
 
-    apexPluginManager = new ApexPluginManager(appContext, dnmgr);
+    PluginLocator locator = new DefaultPluginLocator(appContext);
+    apexPluginManager = new ApexPluginManager(locator, appContext, dnmgr);
     for (Object obj : services) {
       if (obj != null && obj instanceof ApexPlugin) {
-        apexPluginManager.addUserService((ApexPlugin)obj);
+        apexPluginManager.addPlugin((ApexPlugin)obj);
       }
     }
     addService(apexPluginManager);
-    dnmgr.apexServiceProcessor = apexPluginManager;
+    dnmgr.apexPluginManager = apexPluginManager;
   }
 
   @Override

@@ -253,7 +253,7 @@ public class StreamingContainerManager implements PlanContext
 
   //logical operator name to latest counters. exists for backward compatibility.
   private final Map<String, Object> latestLogicalCounters = Maps.newHashMap();
-  public transient ApexPluginManager apexServiceProcessor;
+  public transient ApexPluginManager apexPluginManager;
 
   private final LinkedHashMap<String, ContainerInfo> completedContainers = new LinkedHashMap<String, ContainerInfo>()
   {
@@ -1799,7 +1799,7 @@ public class StreamingContainerManager implements PlanContext
     sca.stackTraceRequested = false;
 
     heartbeatProcessingTime.add(System.currentTimeMillis() - currentTimeMillis);
-    apexServiceProcessor.dispatchStats(heartbeat);
+    apexPluginManager.dispatchStats(heartbeat);
     return rsp;
   }
 
@@ -2415,12 +2415,12 @@ public class StreamingContainerManager implements PlanContext
   @Override
   public void recordEventAsync(StramEvent ev)
   {
-    /* During physical plan generation, apexServiceProcessor is not set
-     * TODO: cache generated events and replay them when apexServiceProcessor
+    /* During physical plan generation, apexPluginManager is not set
+     * TODO: cache generated events and replay them when apexPluginManager
      * is set.
      */
-    if (apexServiceProcessor != null) {
-      apexServiceProcessor.dispatchEvent(ev);
+    if (apexPluginManager != null) {
+      apexPluginManager.dispatchEvent(ev);
     }
     if (eventBus != null) {
       eventBus.publishAsync(ev);
@@ -3327,4 +3327,8 @@ public class StreamingContainerManager implements PlanContext
     return latestLogicalCounters.get(operatorName);
   }
 
+  public void setApexPluginManager(ApexPluginManager manager)
+  {
+    this.apexPluginManager = manager;
+  }
 }

@@ -31,6 +31,7 @@ public interface ApexPlugin
   interface PluginContext
   {
     String getOperatorName(int id);
+
     int getNumPartitions(String operatorName);
   }
 

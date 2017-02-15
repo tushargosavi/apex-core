@@ -21,5 +21,6 @@ package com.datatorrent.stram.extensions.api;
 public interface PluginContext
 {
   String getOperatorName(int id);
+
   int getNumPartitions(String operatorName);
 }

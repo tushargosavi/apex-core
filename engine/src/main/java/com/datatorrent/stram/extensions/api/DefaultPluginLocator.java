@@ -18,6 +18,7 @@
  */
 package com.datatorrent.stram.extensions.api;
 
+import java.util.ArrayList;
 import java.util.Collection;
 
 import org.slf4j.Logger;
@@ -41,9 +42,15 @@ public class DefaultPluginLocator implements PluginLocator
   public Collection<ApexPlugin> discoverPlugins()
   {
     Collection<Object> plugins = context.getAttributes().get(LogicalPlan.APEX_LISTENERS);
-    for (Object plugin : plugins) {
-      LOG.info("found plugin {}", plugin);
+    Collection<ApexPlugin> detected = new ArrayList<>();
+    if (plugins != null) {
+      for (Object plugin : plugins) {
+        if (plugin instanceof ApexPlugin) {
+          LOG.info("found plugin {}", plugin);
+          detected.add((ApexPlugin)plugin);
+        }
+      }
     }
-    return null;
+    return detected;
   }
 }
