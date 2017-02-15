@@ -49,9 +49,6 @@ import com.datatorrent.common.util.Pair;
 import com.datatorrent.stram.PubSubWebSocketMetricTransport;
 import com.datatorrent.stram.StramAppContext;
 import com.datatorrent.stram.StreamingContainerManager;
-import com.datatorrent.stram.api.StramEvent;
-import com.datatorrent.stram.api.StreamingContainerUmbilicalProtocol;
-import com.datatorrent.stram.extensions.api.ApexService;
 import com.datatorrent.stram.plan.logical.LogicalPlan;
 import com.datatorrent.stram.plan.logical.MetricAggregatorMeta;
 import com.datatorrent.stram.webapp.LogicalOperatorInfo;
@@ -61,14 +58,14 @@ import com.datatorrent.stram.webapp.LogicalOperatorInfo;
  *
  * @since 3.0.0
  */
-public class AppDataPushAgent extends AbstractService implements ApexService
+public class AppDataPushAgent extends AbstractService
 {
   private static final String METRICS_SCHEMA = "metricsSchema";
   private static final String METRICS_SCHEMA_VERSION = "1.0";
   private static final String DATA = "data";
   private static final Logger LOG = LoggerFactory.getLogger(AppDataPushAgent.class);
-  private StreamingContainerManager dnmgr;
-  private StramAppContext appContext;
+  private final StreamingContainerManager dnmgr;
+  private final StramAppContext appContext;
   private final AppDataPushThread appDataPushThread = new AppDataPushThread();
   private AutoMetric.Transport metricsTransport;
   private final Map<Class<?>, List<Field>> cacheFields = new HashMap<>();
@@ -82,35 +79,6 @@ public class AppDataPushAgent extends AbstractService implements ApexService
     super(AppDataPushAgent.class.getName());
     this.dnmgr = dnmgr;
     this.appContext = appContext;
-  }
-
-  public AppDataPushAgent()
-  {
-    super(AppDataPushAgent.class.getName());
-  }
-
-  @Override
-  public void setAppContext(StramAppContext context)
-  {
-    this.appContext = context;
-  }
-
-  @Override
-  public void setDagManager(StreamingContainerManager manager)
-  {
-    this.dnmgr = manager;
-  }
-
-  @Override
-  public void handleHeartbeat(StreamingContainerUmbilicalProtocol.ContainerHeartbeat heartbeat)
-  {
-
-  }
-
-  @Override
-  public void handleEvent(StramEvent event)
-  {
-
   }
 
   @Override
@@ -349,9 +317,4 @@ public class AppDataPushAgent extends AbstractService implements ApexService
 
   }
 
-  @Override
-  public void tick()
-  {
-
-  }
 }

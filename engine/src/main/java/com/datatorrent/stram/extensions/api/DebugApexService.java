@@ -21,49 +21,48 @@ package com.datatorrent.stram.extensions.api;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
-import org.apache.hadoop.service.AbstractService;
-
-import com.datatorrent.stram.StramAppContext;
-import com.datatorrent.stram.StreamingContainerManager;
+import com.datatorrent.api.Stats;
+import com.datatorrent.api.StatsListener;
 import com.datatorrent.stram.api.StramEvent;
-import com.datatorrent.stram.api.StreamingContainerUmbilicalProtocol;
 
-public class DebugApexService extends AbstractService implements ApexService
+/**
+ * A s
+ */
+public class DebugApexService implements ApexPlugin
 {
   private static final Logger LOG = LoggerFactory.getLogger(DebugApexService.class);
 
-  public DebugApexService()
+  @Override
+  public void init(PluginManager manager)
   {
-    super(DebugApexService.class.getName());
+    manager.registerEventListener(new DebugEventListener());
+    manager.registerStatsListener(new DebugStatsListener());
   }
 
   @Override
-  public void setAppContext(StramAppContext context)
-  {
-
-  }
-
-  @Override
-  public void setDagManager(StreamingContainerManager manager)
+  public void shutdown()
   {
 
   }
 
-  @Override
-  public void handleHeartbeat(StreamingContainerUmbilicalProtocol.ContainerHeartbeat heartbeat)
+  class DebugStatsListener implements StatsListener
   {
-    LOG.info("heartbeat request received {}", heartbeat);
+    @Override
+    public Response processStats(BatchedOperatorStats stats)
+    {
+      for (Stats.OperatorStats ostats : stats.getLastWindowedStats()) {
+        LOG.info("received stats {}", ostats);
+      }
+      return null;
+    }
   }
 
-  @Override
-  public void tick()
+  class DebugEventListener implements ApexPlugin.EventListener
   {
-    LOG.info("tick called ");
-  }
-
-  @Override
-  public void handleEvent(StramEvent event)
-  {
-    LOG.info("StramEvent occured {} reason {}", event, event.getReason());
+    @Override
+    public void handleEvent(StramEvent event)
+    {
+      LOG.info("StramEvent occured {} reason {}", event, event.getReason());
+    }
   }
 }

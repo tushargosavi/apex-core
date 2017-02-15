@@ -18,7 +18,9 @@
  */
 package com.datatorrent.stram.extensions.api;
 
+import java.util.ArrayList;
 import java.util.Collection;
+import java.util.List;
 import java.util.concurrent.ExecutorService;
 import java.util.concurrent.Executors;
 
@@ -29,67 +31,43 @@ import org.apache.hadoop.service.CompositeService;
 
 import com.google.common.collect.Lists;
 
+import com.datatorrent.api.StatsListener;
 import com.datatorrent.stram.StramAppContext;
 import com.datatorrent.stram.StreamingContainerManager;
 import com.datatorrent.stram.api.StramEvent;
 import com.datatorrent.stram.api.StreamingContainerUmbilicalProtocol.ContainerHeartbeat;
 
 /**
- * A top level ApexServiceProcessor which will handle multiple requests through
+ * A top level ApexPluginManager which will handle multiple requests through
  * a thread pool.
- * TODO: allow user to configure the thread-pool size.
  */
-public class ApexServiceProcessor extends CompositeService implements ApexService
+public class ApexPluginManager extends CompositeService implements PluginManager
 {
-  private static final Logger LOG = LoggerFactory.getLogger(ApexServiceProcessor.class);
-  private Collection<ApexService> userServices = Lists.newArrayList();
-  private ExecutorService poolExecutor;
+  private static final Logger LOG = LoggerFactory.getLogger(ApexPluginManager.class);
+  private Collection<ApexPlugin> userServices = Lists.newArrayList();
+  private transient ExecutorService poolExecutor;
   private final StramAppContext appContext;
   private final StreamingContainerManager dmgr;
 
-  public ApexServiceProcessor(StramAppContext context, StreamingContainerManager dmgr)
+  public ApexPluginManager(StramAppContext context, StreamingContainerManager dmgr)
   {
-    super(ApexServiceProcessor.class.getName());
+    super(ApexPluginManager.class.getName());
     this.appContext = context;
     this.dmgr = dmgr;
     LOG.info("Creating appex service ");
   }
 
-  public void addUserService(ApexService service)
+  public void addUserService(ApexPlugin service)
   {
-    service.setAppContext(appContext);
-    service.setDagManager(dmgr);
     userServices.add(service);
-    LOG.info("Adding user service {}", service.getName());
-    addService(service);
+    LOG.info("Adding user service {}", service.getClass().getName());
   }
 
-  @Override
-  public void setAppContext(StramAppContext context)
+  public void dispatchStats(ContainerHeartbeat hb)
   {
-
   }
 
-  @Override
-  public void setDagManager(StreamingContainerManager manager)
-  {
-
-  }
-
-  @Override
-  public void handleHeartbeat(ContainerHeartbeat hb)
-  {
-    poolExecutor.submit(new HeartbeatDeliveryTask(hb));
-  }
-
-  @Override
-  public void tick()
-  {
-    poolExecutor.submit(new TickTask());
-  }
-
-  @Override
-  public void handleEvent(StramEvent event)
+  public void dispatchEvent(StramEvent event)
   {
     poolExecutor.submit(new EventDiliveryTask(event));
   }
@@ -98,6 +76,9 @@ public class ApexServiceProcessor extends CompositeService implements ApexServic
   protected void serviceStart() throws Exception
   {
     super.serviceStart();
+    for (ApexPlugin plugin : userServices) {
+      plugin.init(this);
+    }
     poolExecutor = Executors.newCachedThreadPool();
   }
 
@@ -109,34 +90,50 @@ public class ApexServiceProcessor extends CompositeService implements ApexServic
       poolExecutor.shutdown();
     }
   }
+  
+  List<StatsListener> statsListeners = new ArrayList<>();
 
-  private class HeartbeatDeliveryTask implements Runnable
+  @Override
+  public void registerStatsListener(StatsListener listner)
   {
-    private final ContainerHeartbeat hb;
-
-    public HeartbeatDeliveryTask(ContainerHeartbeat hb)
-    {
-      this.hb = hb;
-    }
-
-    @Override
-    public void run()
-    {
-      for (ApexService service : userServices) {
-        service.handleHeartbeat(hb);
-      }
-    }
+    statsListeners.add(listner);
   }
 
-  private class TickTask implements Runnable
+  List<ApexPlugin.EventListener> eventListeners = new ArrayList<>();
+
+  @Override
+  public void registerEventListener(ApexPlugin.EventListener listener)
   {
-    @Override
-    public void run()
-    {
-      for (ApexService service : userServices) {
-        service.tick();
-      }
-    }
+    eventListeners.add(listener);
+  }
+
+  @Override
+  public void submit(Runnable task)
+  {
+
+  }
+
+  @Override
+  public StramAppContext getApplicationContext()
+  {
+    return null;
+  }
+
+  @Override
+  public PluginContext getPluginContext()
+  {
+    return null;
+  }
+
+  @Override
+  public void setup()
+  {
+  }
+
+  @Override
+  public void shutdown()
+  {
+
   }
 
   private class EventDiliveryTask implements Runnable
@@ -150,8 +147,8 @@ public class ApexServiceProcessor extends CompositeService implements ApexServic
     @Override
     public void run()
     {
-      for (ApexService service : userServices) {
-        service.handleEvent(event);
+      for (ApexPlugin.EventListener elistener : eventListeners) {
+        elistener.handleEvent(event);
       }
     }
   }

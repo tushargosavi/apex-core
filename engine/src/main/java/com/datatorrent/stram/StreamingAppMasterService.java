@@ -99,9 +99,11 @@ import com.datatorrent.stram.api.StramEvent;
 import com.datatorrent.stram.appdata.AppDataPushAgent;
 import com.datatorrent.stram.client.StramClientUtils;
 import com.datatorrent.stram.engine.StreamingContainer;
-import com.datatorrent.stram.extensions.api.ApexService;
-import com.datatorrent.stram.extensions.api.ApexServiceProcessor;
+import com.datatorrent.stram.extensions.api.ApexPlugin;
+import com.datatorrent.stram.extensions.api.ApexPluginManager;
 import com.datatorrent.stram.extensions.api.DebugApexService;
+import com.datatorrent.stram.extensions.api.DefaultPluginLocator;
+import com.datatorrent.stram.extensions.api.PluginLocator;
 import com.datatorrent.stram.plan.logical.LogicalPlan;
 import com.datatorrent.stram.plan.physical.OperatorStatus.PortStatus;
 import com.datatorrent.stram.plan.physical.PTContainer;
@@ -162,7 +164,7 @@ public class StreamingAppMasterService extends CompositeService
   private StramDelegationTokenManager delegationTokenManager = null;
   private AppDataPushAgent appDataPushAgent;
   private final List<Service> userServices = new ArrayList<>();
-  private ApexServiceProcessor apexServiceProcesssor;
+  private ApexPluginManager apexPluginManager;
 
   public StreamingAppMasterService(ApplicationAttemptId appAttemptID)
   {
@@ -539,6 +541,7 @@ public class StreamingAppMasterService extends CompositeService
     }
   }
 
+
   @Override
   protected void serviceInit(Configuration conf) throws Exception
   {
@@ -582,36 +585,35 @@ public class StreamingAppMasterService extends CompositeService
     this.heartbeatListener = new StreamingContainerParent(this.getClass().getName(), dnmgr, delegationTokenManager, rpcListenerCount);
     addService(heartbeatListener);
 
-    addApexServices();
+    addApexListeners();
 
     // Initialize all services added above
     super.serviceInit(conf);
   }
 
-  private void addApexServices()
+  private PluginLocator plocator;
+
+  private void addApexListeners()
   {
     List<Object> services = new ArrayList<>();
 
-    Collection<Object> plugins = dag.getValue(LogicalPlan.USER_SERVICES);
+    plocator = new DefaultPluginLocator(appContext);
+    Collection<Object> plugins = dag.getValue(LogicalPlan.APEX_LISTENERS);
     if (plugins != null) {
       services.addAll(plugins);
     }
 
     // add pre configured services
-    AutoMetric.Transport appDataPushTransport = dag.getValue(LogicalPlan.METRICS_TRANSPORT);
-    if (appDataPushTransport != null) {
-      services.add(new AppDataPushAgent());
-    }
     services.add(new DebugApexService());
 
-    apexServiceProcesssor = new ApexServiceProcessor(appContext, dnmgr);
+    apexPluginManager = new ApexPluginManager(appContext, dnmgr);
     for (Object obj : services) {
-      if (obj != null && obj instanceof ApexService) {
-        apexServiceProcesssor.addUserService((ApexService)obj);
+      if (obj != null && obj instanceof ApexPlugin) {
+        apexPluginManager.addUserService((ApexPlugin)obj);
       }
     }
-    addService(apexServiceProcesssor);
-    dnmgr.apexServiceProcessor = apexServiceProcesssor;
+    addService(apexPluginManager);
+    dnmgr.apexServiceProcessor = apexPluginManager;
   }
 
   @Override
@@ -1059,7 +1061,6 @@ public class StreamingAppMasterService extends CompositeService
 
       // monitor child containers
       dnmgr.monitorHeartbeat();
-      apexServiceProcesssor.tick();
     }
 
     finishApplication(finalStatus, numTotalContainers);

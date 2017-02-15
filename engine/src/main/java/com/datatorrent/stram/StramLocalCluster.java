@@ -53,6 +53,7 @@ import com.datatorrent.stram.engine.Node;
 import com.datatorrent.stram.engine.OperatorContext;
 import com.datatorrent.stram.engine.StreamingContainer;
 import com.datatorrent.stram.engine.WindowGenerator;
+import com.datatorrent.stram.extensions.api.ApexPluginManager;
 import com.datatorrent.stram.plan.logical.LogicalPlan;
 import com.datatorrent.stram.plan.logical.LogicalPlan.OperatorMeta;
 import com.datatorrent.stram.plan.physical.PTOperator;
@@ -312,6 +313,7 @@ public class StramLocalCluster implements Runnable, Controller
       dag.setAttribute(OperatorContext.STORAGE_AGENT, new AsyncFSStorageAgent(new Path(pathUri, LogicalPlan.SUBDIR_CHECKPOINTS).toString(), null));
     }
     this.dnmgr = new StreamingContainerManager(dag);
+    ApexPluginManager manager = new ApexPluginManager(null, dnmgr);
     this.umbilical = new UmbilicalProtocolLocalImpl();
   }
 

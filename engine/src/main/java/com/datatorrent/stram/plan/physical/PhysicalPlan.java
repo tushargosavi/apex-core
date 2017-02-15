@@ -63,6 +63,7 @@ import com.datatorrent.api.Operator.InputPort;
 import com.datatorrent.api.Partitioner;
 import com.datatorrent.api.Partitioner.Partition;
 import com.datatorrent.api.Partitioner.PartitionKeys;
+import com.datatorrent.api.Stats;
 import com.datatorrent.api.StatsListener;
 import com.datatorrent.api.StatsListener.OperatorRequest;
 import com.datatorrent.api.StorageAgent;
@@ -73,6 +74,7 @@ import com.datatorrent.stram.Journal.Recoverable;
 import com.datatorrent.stram.api.Checkpoint;
 import com.datatorrent.stram.api.StramEvent;
 import com.datatorrent.stram.api.StreamingContainerUmbilicalProtocol.StramToNodeRequest;
+import com.datatorrent.stram.plan.logical.LogicalOperatorStatus;
 import com.datatorrent.stram.plan.logical.LogicalPlan;
 import com.datatorrent.stram.plan.logical.LogicalPlan.InputPortMeta;
 import com.datatorrent.stram.plan.logical.LogicalPlan.OperatorMeta;
@@ -149,6 +151,34 @@ public class PhysicalPlan implements Serializable
       }
     }
     return containers.get(index);
+  }
+
+  /**
+   * Readonly interface to the opeartors.
+   */
+  public interface PlanInfo
+  {
+    /**
+     * get name of the operator
+     * @param id
+     * @return
+     */
+    String getOperatorName(int id);
+
+    /**
+     * get number of partitions for the given operator
+     */
+    int getPartitions(String name);
+
+    /**
+     *
+     */
+    LogicalOperatorStatus getOperatorStatus(String name);
+
+    /**
+     * get operator status.
+     */
+    OperatorStatus getOperatorStatus(int id);
   }
 
   /**

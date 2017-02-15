@@ -140,7 +140,7 @@ import com.datatorrent.stram.api.StreamingContainerUmbilicalProtocol.StreamingCo
 import com.datatorrent.stram.engine.OperatorResponse;
 import com.datatorrent.stram.engine.StreamingContainer;
 import com.datatorrent.stram.engine.WindowGenerator;
-import com.datatorrent.stram.extensions.api.ApexServiceProcessor;
+import com.datatorrent.stram.extensions.api.ApexPluginManager;
 import com.datatorrent.stram.plan.logical.LogicalOperatorStatus;
 import com.datatorrent.stram.plan.logical.LogicalPlan;
 import com.datatorrent.stram.plan.logical.LogicalPlan.InputPortMeta;
@@ -253,7 +253,7 @@ public class StreamingContainerManager implements PlanContext
 
   //logical operator name to latest counters. exists for backward compatibility.
   private final Map<String, Object> latestLogicalCounters = Maps.newHashMap();
-  public transient ApexServiceProcessor apexServiceProcessor;
+  public transient ApexPluginManager apexServiceProcessor;
 
   private final LinkedHashMap<String, ContainerInfo> completedContainers = new LinkedHashMap<String, ContainerInfo>()
   {
@@ -1799,7 +1799,7 @@ public class StreamingContainerManager implements PlanContext
     sca.stackTraceRequested = false;
 
     heartbeatProcessingTime.add(System.currentTimeMillis() - currentTimeMillis);
-    apexServiceProcessor.handleHeartbeat(heartbeat);
+    apexServiceProcessor.dispatchStats(heartbeat);
     return rsp;
   }
 
@@ -2420,7 +2420,7 @@ public class StreamingContainerManager implements PlanContext
      * is set.
      */
     if (apexServiceProcessor != null) {
-      apexServiceProcessor.handleEvent(ev);
+      apexServiceProcessor.dispatchEvent(ev);
     }
     if (eventBus != null) {
       eventBus.publishAsync(ev);
