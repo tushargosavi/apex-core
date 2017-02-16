@@ -20,39 +20,29 @@ package com.datatorrent.stram.extensions.api;
 
 import java.util.ArrayList;
 import java.util.Collection;
+import java.util.List;
 
-import org.slf4j.Logger;
-import org.slf4j.LoggerFactory;
-
-import com.datatorrent.stram.StramAppContext;
-import com.datatorrent.stram.plan.logical.LogicalPlan;
-
-public class DefaultPluginLocator implements PluginLocator
+public class ChainedPluginLocator implements PluginLocator
 {
-  private static final Logger LOG = LoggerFactory.getLogger(DefaultPluginLocator.class);
+  List<PluginLocator> locators = new ArrayList<>();
 
-  private final StramAppContext context;
-
-  public DefaultPluginLocator(StramAppContext appContext)
+  public ChainedPluginLocator(PluginLocator... locators)
   {
-    this.context = appContext;
+    for (PluginLocator locator : locators) {
+      this.locators.add(locator);
+    }
   }
 
   @Override
   public Collection<ApexPlugin> discoverPlugins()
   {
-    Collection<Object> plugins = context.getAttributes().get(LogicalPlan.APEX_LISTENERS);
-    Collection<ApexPlugin> detected = new ArrayList<>();
-    if (plugins != null) {
-      for (Object plugin : plugins) {
-        if (plugin instanceof ApexPlugin) {
-          LOG.info("found plugin {}", plugin);
-          detected.add((ApexPlugin)plugin);
-        }
-      }
+    List<ApexPlugin> plugins = new ArrayList<>();
+
+    for (PluginLocator locator : locators) {
+      Collection<ApexPlugin> currentPlugins = locator.discoverPlugins();
+      plugins.addAll(currentPlugins);
     }
 
-    // try to use Service loader to load additional plugins
-    return detected;
+    return plugins;
   }
 }

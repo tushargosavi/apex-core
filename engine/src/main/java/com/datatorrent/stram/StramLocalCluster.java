@@ -38,7 +38,12 @@ import org.apache.hadoop.conf.Configuration;
 import org.apache.hadoop.fs.FileContext;
 import org.apache.hadoop.fs.Path;
 import org.apache.hadoop.ipc.ProtocolSignature;
+import org.apache.hadoop.yarn.api.records.ApplicationAttemptId;
+import org.apache.hadoop.yarn.api.records.ApplicationId;
+import org.apache.hadoop.yarn.api.records.impl.pb.ApplicationIdPBImpl;
+import org.apache.hadoop.yarn.util.Clock;
 
+import com.datatorrent.api.Attribute;
 import com.datatorrent.api.DAG;
 import com.datatorrent.api.LocalMode.Controller;
 import com.datatorrent.api.Operator;
@@ -47,6 +52,8 @@ import com.datatorrent.bufferserver.storage.DiskStorage;
 import com.datatorrent.common.util.AsyncFSStorageAgent;
 import com.datatorrent.stram.StreamingContainerAgent.ContainerStartRequest;
 import com.datatorrent.stram.StreamingContainerManager.ContainerResource;
+import com.datatorrent.stram.api.AppDataSource;
+import com.datatorrent.stram.api.BaseContext;
 import com.datatorrent.stram.api.StreamingContainerUmbilicalProtocol;
 import com.datatorrent.stram.api.StreamingContainerUmbilicalProtocol.ContainerHeartbeatResponse;
 import com.datatorrent.stram.api.StreamingContainerUmbilicalProtocol.StreamingContainerContext;
@@ -55,11 +62,14 @@ import com.datatorrent.stram.engine.OperatorContext;
 import com.datatorrent.stram.engine.StreamingContainer;
 import com.datatorrent.stram.engine.WindowGenerator;
 import com.datatorrent.stram.extensions.api.ApexPluginManager;
+import com.datatorrent.stram.extensions.api.ChainedPluginLocator;
 import com.datatorrent.stram.extensions.api.DefaultPluginLocator;
 import com.datatorrent.stram.extensions.api.PluginLocator;
+import com.datatorrent.stram.extensions.api.ServiceLoaderBasedPluginLocator;
 import com.datatorrent.stram.plan.logical.LogicalPlan;
 import com.datatorrent.stram.plan.logical.LogicalPlan.OperatorMeta;
 import com.datatorrent.stram.plan.physical.PTOperator;
+import com.datatorrent.stram.webapp.AppInfo;
 
 /**
  * Launcher for topologies in embedded mode within a single process.
@@ -316,7 +326,8 @@ public class StramLocalCluster implements Runnable, Controller
       dag.setAttribute(OperatorContext.STORAGE_AGENT, new AsyncFSStorageAgent(new Path(pathUri, LogicalPlan.SUBDIR_CHECKPOINTS).toString(), null));
     }
     this.dnmgr = new StreamingContainerManager(dag);
-    PluginLocator locator = new DefaultPluginLocator(null);
+    PluginLocator locator = new DefaultPluginLocator(new LocalClusterAppContext(dag.getAttributes()));
+    locator = new ChainedPluginLocator(locator, new ServiceLoaderBasedPluginLocator());
     ApexPluginManager manager = new ApexPluginManager(locator,null, dnmgr);
     dnmgr.setApexPluginManager(manager);
     manager.init(new Configuration());
@@ -548,4 +559,97 @@ public class StramLocalCluster implements Runnable, Controller
     }
   }
 
+
+  static class LocalClusterAppContext extends BaseContext implements StramAppContext
+  {
+
+    public LocalClusterAppContext(Attribute.AttributeMap attributes)
+    {
+      super(attributes, null);
+    }
+
+    @Override
+    public ApplicationId getApplicationID()
+    {
+      return new ApplicationIdPBImpl();
+    }
+
+    @Override
+    public ApplicationAttemptId getApplicationAttemptId()
+    {
+      return null;
+    }
+
+    @Override
+    public String getApplicationName()
+    {
+      return null;
+    }
+
+    @Override
+    public String getApplicationDocLink()
+    {
+      return null;
+    }
+
+    @Override
+    public long getStartTime()
+    {
+      return 0;
+    }
+
+    @Override
+    public String getApplicationPath()
+    {
+      return null;
+    }
+
+    @Override
+    public String getAppMasterTrackingUrl()
+    {
+      return null;
+    }
+
+    @Override
+    public CharSequence getUser()
+    {
+      return null;
+    }
+
+    @Override
+    public Clock getClock()
+    {
+      return null;
+    }
+
+    @Override
+    public AppInfo.AppStats getStats()
+    {
+      return null;
+    }
+
+    @Override
+    public String getGatewayAddress()
+    {
+      return null;
+    }
+
+    @Override
+    public boolean isGatewayConnected()
+    {
+      return false;
+    }
+
+    @Override
+    public List<AppDataSource> getAppDataSources()
+    {
+      return null;
+    }
+
+    @Override
+    public Map<String, Object> getMetrics()
+    {
+      return null;
+    }
+  }
 }

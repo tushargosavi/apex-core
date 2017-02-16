@@ -32,10 +32,12 @@ import org.apache.hadoop.service.CompositeService;
 
 import com.google.common.collect.Lists;
 
+import com.datatorrent.api.Stats;
 import com.datatorrent.api.StatsListener;
 import com.datatorrent.stram.StramAppContext;
 import com.datatorrent.stram.StreamingContainerManager;
 import com.datatorrent.stram.api.StramEvent;
+import com.datatorrent.stram.api.StreamingContainerUmbilicalProtocol;
 import com.datatorrent.stram.api.StreamingContainerUmbilicalProtocol.ContainerHeartbeat;
 
 /**
@@ -63,6 +65,16 @@ public class ApexPluginManager extends CompositeService implements PluginManager
   public void dispatchStats(ContainerHeartbeat hb)
   {
     LOG.info("heartbeat received {}", hb);
+    StreamingContainerUmbilicalProtocol.ContainerStats cs = hb.getContainerStats();
+    for (StreamingContainerUmbilicalProtocol.OperatorHeartbeat ohb : cs.operators) {
+      int id = ohb.getNodeId();
+      StreamingContainerUmbilicalProtocol.OperatorHeartbeat.DeployState state = ohb.getState();
+      for (Stats.OperatorStats os : ohb.getOperatorStatsContainer()) {
+        for (StatsListener sl : statsListeners) {
+          LOG.info("operator heartbeat received {}", id);
+        }
+      }
+    }
   }
 
   public void dispatchEvent(StramEvent event)

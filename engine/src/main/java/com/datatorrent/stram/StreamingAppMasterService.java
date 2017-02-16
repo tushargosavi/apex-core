@@ -101,9 +101,10 @@ import com.datatorrent.stram.client.StramClientUtils;
 import com.datatorrent.stram.engine.StreamingContainer;
 import com.datatorrent.stram.extensions.api.ApexPlugin;
 import com.datatorrent.stram.extensions.api.ApexPluginManager;
-import com.datatorrent.stram.extensions.api.DebugApexService;
+import com.datatorrent.stram.extensions.api.ChainedPluginLocator;
 import com.datatorrent.stram.extensions.api.DefaultPluginLocator;
 import com.datatorrent.stram.extensions.api.PluginLocator;
+import com.datatorrent.stram.extensions.api.ServiceLoaderBasedPluginLocator;
 import com.datatorrent.stram.plan.logical.LogicalPlan;
 import com.datatorrent.stram.plan.physical.OperatorStatus.PortStatus;
 import com.datatorrent.stram.plan.physical.PTContainer;
@@ -591,22 +592,19 @@ public class StreamingAppMasterService extends CompositeService
     super.serviceInit(conf);
   }
 
-  private PluginLocator plocator;
-
   private void addApexListeners()
   {
     List<Object> services = new ArrayList<>();
 
-    plocator = new DefaultPluginLocator(appContext);
     Collection<Object> plugins = dag.getValue(LogicalPlan.APEX_LISTENERS);
     if (plugins != null) {
       services.addAll(plugins);
     }
 
     // add pre configured services
-    services.add(new DebugApexService());
+    //services.add(new DebugApexService());
 
-    PluginLocator locator = new DefaultPluginLocator(appContext);
+    PluginLocator locator = new ChainedPluginLocator(new DefaultPluginLocator(appContext), new ServiceLoaderBasedPluginLocator());
     apexPluginManager = new ApexPluginManager(locator, appContext, dnmgr);
     for (Object obj : services) {
       if (obj != null && obj instanceof ApexPlugin) {
