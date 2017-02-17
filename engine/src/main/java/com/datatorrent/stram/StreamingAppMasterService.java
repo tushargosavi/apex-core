@@ -41,16 +41,19 @@ import javax.xml.bind.annotation.XmlElement;
 
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
+
 import org.apache.commons.io.FileUtils;
 import org.apache.commons.lang.StringUtils;
 import org.apache.commons.lang3.tuple.MutablePair;
 import org.apache.hadoop.conf.Configuration;
+import org.apache.hadoop.fs.Path;
 import org.apache.hadoop.io.Text;
 import org.apache.hadoop.net.NetUtils;
 import org.apache.hadoop.security.Credentials;
 import org.apache.hadoop.security.UserGroupInformation;
 import org.apache.hadoop.security.token.Token;
 import org.apache.hadoop.service.CompositeService;
+import org.apache.hadoop.service.Service;
 import org.apache.hadoop.yarn.api.ApplicationConstants;
 import org.apache.hadoop.yarn.api.protocolrecords.AllocateResponse;
 import org.apache.hadoop.yarn.api.protocolrecords.FinishApplicationMasterRequest;
@@ -94,9 +97,13 @@ import com.datatorrent.stram.StreamingContainerManager.ContainerResource;
 import com.datatorrent.stram.api.AppDataSource;
 import com.datatorrent.stram.api.BaseContext;
 import com.datatorrent.stram.api.StramEvent;
+import com.datatorrent.stram.api.extensions.ApexPlugin;
+import com.datatorrent.stram.api.extensions.PluginLocator;
 import com.datatorrent.stram.appdata.AppDataPushAgent;
 import com.datatorrent.stram.client.StramClientUtils;
 import com.datatorrent.stram.engine.StreamingContainer;
+import com.datatorrent.stram.extensions.api.ApexPluginManager;
+import com.datatorrent.stram.extensions.api.ServiceLoaderBasedPluginLocator;
 import com.datatorrent.stram.plan.logical.LogicalPlan;
 import com.datatorrent.stram.plan.physical.OperatorStatus.PortStatus;
 import com.datatorrent.stram.plan.physical.PTContainer;
@@ -156,6 +163,7 @@ public class StreamingAppMasterService extends CompositeService
   private final ClusterAppStats stats = new ClusterAppStats();
   private StramDelegationTokenManager delegationTokenManager = null;
   private AppDataPushAgent appDataPushAgent;
+  private ApexPluginManager apexPluginManager;
 
   public StreamingAppMasterService(ApplicationAttemptId appAttemptID)
   {
@@ -532,6 +540,7 @@ public class StreamingAppMasterService extends CompositeService
     }
   }
 
+
   @Override
   protected void serviceInit(Configuration conf) throws Exception
   {
@@ -552,7 +561,6 @@ public class StreamingAppMasterService extends CompositeService
     this.dnmgr = StreamingContainerManager.getInstance(recoveryHandler, dag, true);
     dag = this.dnmgr.getLogicalPlan();
     this.appContext = new ClusterAppContextImpl(dag.getAttributes());
-
     Map<Class<?>, Class<? extends StringCodec<?>>> codecs = dag.getAttributes().get(DAG.STRING_CODECS);
     StringCodecs.loadConverters(codecs);
 
@@ -575,13 +583,25 @@ public class StreamingAppMasterService extends CompositeService
     this.heartbeatListener = new StreamingContainerParent(this.getClass().getName(), dnmgr, delegationTokenManager, rpcListenerCount);
     addService(heartbeatListener);
 
-    AutoMetric.Transport appDataPushTransport = dag.getValue(LogicalPlan.METRICS_TRANSPORT);
-    if (appDataPushTransport != null) {
-      this.appDataPushAgent = new AppDataPushAgent(dnmgr, appContext);
-      addService(this.appDataPushAgent);
-    }
-    // initialize all services added above
+    addApexListeners();
+
+    // Initialize all services added above
     super.serviceInit(conf);
+  }
+
+  private void addApexListeners()
+  {
+    List<Object> services = new ArrayList<>();
+
+    PluginLocator locator = new ServiceLoaderBasedPluginLocator();
+    apexPluginManager = new ApexPluginManager(locator, appContext, dnmgr);
+    for (Object obj : services) {
+      if (obj != null && obj instanceof ApexPlugin) {
+        apexPluginManager.addPlugin((ApexPlugin)obj);
+      }
+    }
+    addService(apexPluginManager);
+    dnmgr.apexPluginManager = apexPluginManager;
   }
 
   @Override

@@ -140,6 +140,7 @@ import com.datatorrent.stram.api.StreamingContainerUmbilicalProtocol.StreamingCo
 import com.datatorrent.stram.engine.OperatorResponse;
 import com.datatorrent.stram.engine.StreamingContainer;
 import com.datatorrent.stram.engine.WindowGenerator;
+import com.datatorrent.stram.extensions.api.ApexPluginManager;
 import com.datatorrent.stram.plan.logical.LogicalOperatorStatus;
 import com.datatorrent.stram.plan.logical.LogicalPlan;
 import com.datatorrent.stram.plan.logical.LogicalPlan.InputPortMeta;
@@ -244,7 +245,6 @@ public class StreamingContainerManager implements PlanContext
   private final Cache<Long, Object> commandResponse = CacheBuilder.newBuilder().expireAfterWrite(1, TimeUnit.MINUTES).build();
   private transient ExecutorService poolExecutor;
   private FileContext fileContext;
-
   //logic operator name to a queue of logical metrics. this gets cleared periodically
   private final Map<String, Queue<Pair<Long, Map<String, Object>>>> logicalMetrics = Maps.newConcurrentMap();
   //logical operator name to latest logical metrics.
@@ -252,6 +252,7 @@ public class StreamingContainerManager implements PlanContext
 
   //logical operator name to latest counters. exists for backward compatibility.
   private final Map<String, Object> latestLogicalCounters = Maps.newHashMap();
+  public transient ApexPluginManager apexPluginManager;
 
   private final LinkedHashMap<String, ContainerInfo> completedContainers = new LinkedHashMap<String, ContainerInfo>()
   {
@@ -431,6 +432,7 @@ public class StreamingContainerManager implements PlanContext
     this.journal = new Journal(this);
     init(enableEventRecording);
   }
+
 
   private void init(boolean enableEventRecording)
   {
@@ -1794,6 +1796,7 @@ public class StreamingContainerManager implements PlanContext
     rsp.stackTraceRequired = sca.stackTraceRequested;
     sca.stackTraceRequested = false;
 
+    apexPluginManager.dispatchStats(heartbeat);
     return rsp;
   }
 
@@ -2386,6 +2389,13 @@ public class StreamingContainerManager implements PlanContext
   @Override
   public void recordEventAsync(StramEvent ev)
   {
+    /* During physical plan generation, apexPluginManager is not set
+     * TODO: cache generated events and replay them when apexPluginManager
+     * is set.
+     */
+    if (apexPluginManager != null) {
+      apexPluginManager.dispatchEvent(ev);
+    }
     if (eventBus != null) {
       eventBus.publishAsync(ev);
     }
@@ -3291,4 +3301,8 @@ public class StreamingContainerManager implements PlanContext
     return latestLogicalCounters.get(operatorName);
   }
 
+  public void setApexPluginManager(ApexPluginManager manager)
+  {
+    this.apexPluginManager = manager;
+  }
 }
