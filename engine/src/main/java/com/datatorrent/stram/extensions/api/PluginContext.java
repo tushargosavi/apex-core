@@ -18,9 +18,30 @@
  */
 package com.datatorrent.stram.extensions.api;
 
+import java.util.List;
+import java.util.Map;
+import java.util.Queue;
+
+import org.apache.hadoop.conf.Configuration;
+
+import com.datatorrent.api.DAG;
+import com.datatorrent.api.StatsListener.BatchedOperatorStats;
+import com.datatorrent.common.util.Pair;
+import com.datatorrent.stram.webapp.LogicalOperatorInfo;
+
 public interface PluginContext
 {
-  String getOperatorName(int id);
+  public DAG getDAG();
 
-  int getNumPartitions(String operatorName);
+  public String getOperatorName(int id);
+
+  public Configuration getLaunchConfig();
+
+  public BatchedOperatorStats getPhysicalOperatorStats(int id);
+
+  public List<LogicalOperatorInfo> getLogicalOperatorInfoList();
+
+  public Queue<Pair<Long, Map<String, Object>>> getWindowMetrics(String operatorName);
+
+  public long windowIdToMillis(long windowId);
 }

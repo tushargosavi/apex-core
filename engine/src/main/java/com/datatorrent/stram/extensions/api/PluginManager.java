@@ -18,12 +18,11 @@
  */
 package com.datatorrent.stram.extensions.api;
 
-import com.datatorrent.api.StatsListener;
 import com.datatorrent.stram.StramAppContext;
 
 public interface PluginManager
 {
-  void registerStatsListener(StatsListener listner);
+  void registerHeartbeatListener(ApexPlugin.HeartbeatListener listener);
 
   void registerEventListener(ApexPlugin.EventListener listener);
 

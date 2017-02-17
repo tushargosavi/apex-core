@@ -18,9 +18,13 @@
  */
 package com.datatorrent.stram.extensions.api;
 
+import java.io.IOException;
+import java.net.URI;
 import java.util.ArrayList;
 import java.util.Collection;
 import java.util.List;
+import java.util.Map;
+import java.util.Queue;
 import java.util.concurrent.ExecutorService;
 import java.util.concurrent.Executors;
 
@@ -28,17 +32,24 @@ import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
 import org.apache.hadoop.conf.Configuration;
+import org.apache.hadoop.fs.FSDataInputStream;
+import org.apache.hadoop.fs.FileContext;
+import org.apache.hadoop.fs.Path;
 import org.apache.hadoop.service.CompositeService;
+import org.apache.hadoop.yarn.conf.YarnConfiguration;
 
 import com.google.common.collect.Lists;
 
-import com.datatorrent.api.Stats;
-import com.datatorrent.api.StatsListener;
+import com.datatorrent.api.DAG;
+import com.datatorrent.api.StatsListener.BatchedOperatorStats;
+import com.datatorrent.common.util.Pair;
 import com.datatorrent.stram.StramAppContext;
 import com.datatorrent.stram.StreamingContainerManager;
 import com.datatorrent.stram.api.StramEvent;
-import com.datatorrent.stram.api.StreamingContainerUmbilicalProtocol;
 import com.datatorrent.stram.api.StreamingContainerUmbilicalProtocol.ContainerHeartbeat;
+import com.datatorrent.stram.plan.logical.LogicalPlan;
+import com.datatorrent.stram.plan.physical.PTOperator;
+import com.datatorrent.stram.webapp.LogicalOperatorInfo;
 
 /**
  * A top level ApexPluginManager which will handle multiple requests through
@@ -52,6 +63,8 @@ public class ApexPluginManager extends CompositeService implements PluginManager
   private final StramAppContext appContext;
   private final StreamingContainerManager dmgr;
   private final PluginLocator locator;
+  private transient Configuration launchConfig;
+  private FileContext fileContext;
 
   public ApexPluginManager(PluginLocator locator, StramAppContext context, StreamingContainerManager dmgr)
   {
@@ -64,22 +77,25 @@ public class ApexPluginManager extends CompositeService implements PluginManager
 
   public void dispatchStats(ContainerHeartbeat hb)
   {
-    LOG.info("heartbeat received {}", hb);
-    StreamingContainerUmbilicalProtocol.ContainerStats cs = hb.getContainerStats();
-    for (StreamingContainerUmbilicalProtocol.OperatorHeartbeat ohb : cs.operators) {
-      int id = ohb.getNodeId();
-      StreamingContainerUmbilicalProtocol.OperatorHeartbeat.DeployState state = ohb.getState();
-      for (Stats.OperatorStats os : ohb.getOperatorStatsContainer()) {
-        for (StatsListener sl : statsListeners) {
-          LOG.info("operator heartbeat received {}", id);
-        }
-      }
-    }
+    poolExecutor.submit(new HeartbeatDiliveryTask(hb));
   }
 
   public void dispatchEvent(StramEvent event)
   {
     poolExecutor.submit(new EventDiliveryTask(event));
+  }
+
+  private Configuration readLaunchConfiguration() throws IOException
+  {
+    LOG.info("Reading configuration information ");
+    Path appPath = new Path(appContext.getApplicationPath());
+    URI uri = appPath.toUri();
+    Configuration config = new YarnConfiguration();
+    fileContext = uri.getScheme() == null ? FileContext.getFileContext(config) : FileContext.getFileContext(uri, config);
+    FSDataInputStream is = fileContext.open(new Path(appPath, LogicalPlan.LAUNCH_CONFIG_FILE_NAME));
+    config.addResource(is);
+    LOG.info("read launch configuration ");
+    return config;
   }
 
   @Override
@@ -97,6 +113,7 @@ public class ApexPluginManager extends CompositeService implements PluginManager
     for (ApexPlugin plugin : userServices) {
       plugin.init(this);
     }
+    this.launchConfig = readLaunchConfiguration();
     poolExecutor = Executors.newCachedThreadPool();
   }
 
@@ -109,12 +126,12 @@ public class ApexPluginManager extends CompositeService implements PluginManager
     }
   }
 
-  List<StatsListener> statsListeners = new ArrayList<>();
+  List<ApexPlugin.HeartbeatListener> heartbeatListeners = new ArrayList<>();
 
   @Override
-  public void registerStatsListener(StatsListener listner)
+  public void registerHeartbeatListener(ApexPlugin.HeartbeatListener listner)
   {
-    statsListeners.add(listner);
+    heartbeatListeners.add(listner);
   }
 
   List<ApexPlugin.EventListener> eventListeners = new ArrayList<>();
@@ -159,6 +176,23 @@ public class ApexPluginManager extends CompositeService implements PluginManager
     userServices.add(obj);
   }
 
+  private class HeartbeatDiliveryTask implements Runnable
+  {
+    private final ContainerHeartbeat heartbeat;
+    public HeartbeatDiliveryTask(ContainerHeartbeat hb)
+    {
+      this.heartbeat = hb;
+    }
+
+    @Override
+    public void run()
+    {
+      for (ApexPlugin.HeartbeatListener listener : heartbeatListeners) {
+        listener.handleHeartbeat(heartbeat);
+      }
+    }
+  }
+
   private class EventDiliveryTask implements Runnable
   {
     private final StramEvent event;
@@ -173,6 +207,50 @@ public class ApexPluginManager extends CompositeService implements PluginManager
       for (ApexPlugin.EventListener elistener : eventListeners) {
         elistener.handleEvent(event);
       }
+    }
+  }
+
+  class DefaultPluginContext implements PluginContext
+  {
+    @Override
+    public String getOperatorName(int id)
+    {
+      return null;
+    }
+
+    public DAG getDAG()
+    {
+      return dmgr.getLogicalPlan();
+    }
+
+    public BatchedOperatorStats getPhysicalOperatorStats(int id)
+    {
+      PTOperator operator = dmgr.getPhysicalPlan().getAllOperators().get(id);
+      if (operator != null) {
+        return operator.stats;
+      }
+      return null;
+    }
+
+    public List<LogicalOperatorInfo> getLogicalOperatorInfoList()
+    {
+      return dmgr.getLogicalOperatorInfoList();
+    }
+
+    public Queue<Pair<Long, Map<String, Object>>> getWindowMetrics(String operatorName)
+    {
+      return dmgr.getWindowMetrics(operatorName);
+    }
+
+    public long windowIdToMillis(long windowId)
+    {
+      return dmgr.windowIdToMillis(windowId);
+    }
+
+    @Override
+    public Configuration getLaunchConfig()
+    {
+      return launchConfig;
     }
   }
 }

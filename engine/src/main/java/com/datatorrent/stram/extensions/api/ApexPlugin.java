@@ -19,6 +19,7 @@
 package com.datatorrent.stram.extensions.api;
 
 import com.datatorrent.stram.api.StramEvent;
+import com.datatorrent.stram.api.StreamingContainerUmbilicalProtocol;
 
 public interface ApexPlugin
 {
@@ -28,11 +29,9 @@ public interface ApexPlugin
   // stop the plugin
   void shutdown();
 
-  interface PluginContext
+  interface HeartbeatListener
   {
-    String getOperatorName(int id);
-
-    int getNumPartitions(String operatorName);
+    void handleHeartbeat(StreamingContainerUmbilicalProtocol.ContainerHeartbeat heartbeat);
   }
 
   interface EventListener

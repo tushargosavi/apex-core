@@ -370,8 +370,6 @@ public interface Context
      */
     Attribute<AutoMetric.Transport> METRICS_TRANSPORT = new Attribute<>(Object2String.<AutoMetric.Transport>getInstance());
 
-    Attribute<Collection<Object>> APEX_LISTENERS = new Attribute<>(Collection2String.getInstance(",", Object2String.<Object>getInstance(":")));
-
     /**
      * Application instance identifier. An application with the same name can run in multiple instances, each with a
      * unique identifier. The identifier is set by the client that submits the application and can be used in operators

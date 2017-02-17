@@ -250,6 +250,7 @@ public class StreamingContainerManager implements PlanContext
   private final Map<String, Queue<Pair<Long, Map<String, Object>>>> logicalMetrics = Maps.newConcurrentMap();
   //logical operator name to latest logical metrics.
   private final Map<String, Map<String, Object>> latestLogicalMetrics = Maps.newHashMap();
+  private Configuration launchConfig;
 
   //logical operator name to latest counters. exists for backward compatibility.
   private final Map<String, Object> latestLogicalCounters = Maps.newHashMap();
@@ -433,6 +434,7 @@ public class StreamingContainerManager implements PlanContext
     this.journal = new Journal(this);
     init(enableEventRecording);
   }
+
 
   private void init(boolean enableEventRecording)
   {

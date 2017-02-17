@@ -46,6 +46,7 @@ import org.apache.commons.io.FileUtils;
 import org.apache.commons.lang.StringUtils;
 import org.apache.commons.lang3.tuple.MutablePair;
 import org.apache.hadoop.conf.Configuration;
+import org.apache.hadoop.fs.Path;
 import org.apache.hadoop.io.Text;
 import org.apache.hadoop.net.NetUtils;
 import org.apache.hadoop.security.Credentials;
@@ -101,8 +102,6 @@ import com.datatorrent.stram.client.StramClientUtils;
 import com.datatorrent.stram.engine.StreamingContainer;
 import com.datatorrent.stram.extensions.api.ApexPlugin;
 import com.datatorrent.stram.extensions.api.ApexPluginManager;
-import com.datatorrent.stram.extensions.api.ChainedPluginLocator;
-import com.datatorrent.stram.extensions.api.DefaultPluginLocator;
 import com.datatorrent.stram.extensions.api.PluginLocator;
 import com.datatorrent.stram.extensions.api.ServiceLoaderBasedPluginLocator;
 import com.datatorrent.stram.plan.logical.LogicalPlan;
@@ -563,7 +562,6 @@ public class StreamingAppMasterService extends CompositeService
     this.dnmgr = StreamingContainerManager.getInstance(recoveryHandler, dag, true);
     dag = this.dnmgr.getLogicalPlan();
     this.appContext = new ClusterAppContextImpl(dag.getAttributes());
-
     Map<Class<?>, Class<? extends StringCodec<?>>> codecs = dag.getAttributes().get(DAG.STRING_CODECS);
     StringCodecs.loadConverters(codecs);
 
@@ -592,19 +590,16 @@ public class StreamingAppMasterService extends CompositeService
     super.serviceInit(conf);
   }
 
+  private void readLaunchConfiguration()
+  {
+    Path launchConfigPath = new Path(LogicalPlan.LAUNCH_CONFIG_FILE_NAME);
+  }
+
   private void addApexListeners()
   {
     List<Object> services = new ArrayList<>();
 
-    Collection<Object> plugins = dag.getValue(LogicalPlan.APEX_LISTENERS);
-    if (plugins != null) {
-      services.addAll(plugins);
-    }
-
-    // add pre configured services
-    //services.add(new DebugApexService());
-
-    PluginLocator locator = new ChainedPluginLocator(new DefaultPluginLocator(appContext), new ServiceLoaderBasedPluginLocator());
+    PluginLocator locator = new ServiceLoaderBasedPluginLocator();
     apexPluginManager = new ApexPluginManager(locator, appContext, dnmgr);
     for (Object obj : services) {
       if (obj != null && obj instanceof ApexPlugin) {

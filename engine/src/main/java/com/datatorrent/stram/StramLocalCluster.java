@@ -33,6 +33,7 @@ import java.util.concurrent.atomic.AtomicInteger;
 
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
+
 import org.apache.commons.lang3.SerializationUtils;
 import org.apache.hadoop.conf.Configuration;
 import org.apache.hadoop.fs.FileContext;
@@ -62,8 +63,6 @@ import com.datatorrent.stram.engine.OperatorContext;
 import com.datatorrent.stram.engine.StreamingContainer;
 import com.datatorrent.stram.engine.WindowGenerator;
 import com.datatorrent.stram.extensions.api.ApexPluginManager;
-import com.datatorrent.stram.extensions.api.ChainedPluginLocator;
-import com.datatorrent.stram.extensions.api.DefaultPluginLocator;
 import com.datatorrent.stram.extensions.api.PluginLocator;
 import com.datatorrent.stram.extensions.api.ServiceLoaderBasedPluginLocator;
 import com.datatorrent.stram.plan.logical.LogicalPlan;
@@ -326,8 +325,7 @@ public class StramLocalCluster implements Runnable, Controller
       dag.setAttribute(OperatorContext.STORAGE_AGENT, new AsyncFSStorageAgent(new Path(pathUri, LogicalPlan.SUBDIR_CHECKPOINTS).toString(), null));
     }
     this.dnmgr = new StreamingContainerManager(dag);
-    PluginLocator locator = new DefaultPluginLocator(new LocalClusterAppContext(dag.getAttributes()));
-    locator = new ChainedPluginLocator(locator, new ServiceLoaderBasedPluginLocator());
+    PluginLocator locator = new ServiceLoaderBasedPluginLocator();
     ApexPluginManager manager = new ApexPluginManager(locator,null, dnmgr);
     dnmgr.setApexPluginManager(manager);
     manager.init(new Configuration());
