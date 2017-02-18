@@ -20,27 +20,19 @@ package com.datatorrent.stram.extensions.api;
 
 import java.util.ArrayList;
 import java.util.List;
-import java.util.Map;
-import java.util.Queue;
 
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
 import org.apache.hadoop.conf.Configuration;
 
-import com.datatorrent.api.DAG;
-import com.datatorrent.api.StatsListener.BatchedOperatorStats;
-import com.datatorrent.common.util.Pair;
 import com.datatorrent.netlet.util.CircularBuffer;
 import com.datatorrent.stram.StramAppContext;
 import com.datatorrent.stram.StreamingContainerManager;
 import com.datatorrent.stram.api.StramEvent;
 import com.datatorrent.stram.api.StreamingContainerUmbilicalProtocol.ContainerHeartbeat;
 import com.datatorrent.stram.api.extensions.ApexPlugin;
-import com.datatorrent.stram.api.extensions.PluginContext;
 import com.datatorrent.stram.api.extensions.PluginLocator;
-import com.datatorrent.stram.plan.physical.PTOperator;
-import com.datatorrent.stram.webapp.LogicalOperatorInfo;
 
 /**
  * A top level ApexPluginManager which will handle multiple requests through
@@ -131,50 +123,6 @@ public class ApexPluginManagerWithThreadPerPlugin extends AbstractApexPluginMana
           ctx.blockingQueue.offer(event);
         }
       }
-    }
-  }
-
-  class DefaultPluginContext implements PluginContext
-  {
-    @Override
-    public String getOperatorName(int id)
-    {
-      return null;
-    }
-
-    public DAG getDAG()
-    {
-      return dmgr.getLogicalPlan();
-    }
-
-    public BatchedOperatorStats getPhysicalOperatorStats(int id)
-    {
-      PTOperator operator = dmgr.getPhysicalPlan().getAllOperators().get(id);
-      if (operator != null) {
-        return operator.stats;
-      }
-      return null;
-    }
-
-    public List<LogicalOperatorInfo> getLogicalOperatorInfoList()
-    {
-      return dmgr.getLogicalOperatorInfoList();
-    }
-
-    public Queue<Pair<Long, Map<String, Object>>> getWindowMetrics(String operatorName)
-    {
-      return dmgr.getWindowMetrics(operatorName);
-    }
-
-    public long windowIdToMillis(long windowId)
-    {
-      return dmgr.windowIdToMillis(windowId);
-    }
-
-    @Override
-    public Configuration getLaunchConfig()
-    {
-      return launchConfig;
     }
   }
 

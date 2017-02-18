@@ -99,8 +99,8 @@ import com.datatorrent.stram.api.extensions.PluginLocator;
 import com.datatorrent.stram.appdata.AppDataPushAgent;
 import com.datatorrent.stram.client.StramClientUtils;
 import com.datatorrent.stram.engine.StreamingContainer;
-import com.datatorrent.stram.extensions.api.AbstractApexPluginManagerAllAsync;
 import com.datatorrent.stram.extensions.api.ApexPluginManager;
+import com.datatorrent.stram.extensions.api.PerPluginExecutorApexPluginManager;
 import com.datatorrent.stram.extensions.api.ServiceLoaderBasedPluginLocator;
 import com.datatorrent.stram.plan.logical.LogicalPlan;
 import com.datatorrent.stram.plan.physical.OperatorStatus.PortStatus;
@@ -590,7 +590,8 @@ public class StreamingAppMasterService extends CompositeService
   private void addApexListeners()
   {
     PluginLocator locator = new ServiceLoaderBasedPluginLocator();
-    apexPluginManager = new AbstractApexPluginManagerAllAsync(locator, appContext, dnmgr);
+    //apexPluginManager = new AbstractApexPluginManagerAllAsync(locator, appContext, dnmgr);
+    apexPluginManager = new PerPluginExecutorApexPluginManager(locator, appContext, dnmgr);
     dnmgr.apexPluginManager = apexPluginManager;
     addService(apexPluginManager);
   }
