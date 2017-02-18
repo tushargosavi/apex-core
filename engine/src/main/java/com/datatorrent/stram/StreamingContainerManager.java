@@ -1796,7 +1796,7 @@ public class StreamingContainerManager implements PlanContext
     rsp.stackTraceRequired = sca.stackTraceRequested;
     sca.stackTraceRequested = false;
 
-    apexPluginManager.dispatchStats(heartbeat);
+    apexPluginManager.dispatchHeartbeat(heartbeat);
     return rsp;
   }
 

@@ -32,7 +32,7 @@ public interface PluginManager
   RegistrationType<StramEvent> STRAM_EVENT = new RegistrationType<>();
   RegistrationType<Long> COMMIT_HANDLER = new RegistrationType<>();
 
-  <T> void register(RegistrationType<T> type, Handler<T> handler, ApexPlugin owner);
+  <T> void register(RegistrationType<T> type, Handler<T> handler);
 
   interface Handler<T>
   {
@@ -46,8 +46,4 @@ public interface PluginManager
 
   // get information about other things
   PluginContext getPluginContext();
-
-  void setup();
-
-  void shutdown();
 }

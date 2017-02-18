@@ -56,6 +56,7 @@ import com.datatorrent.stram.engine.Node;
 import com.datatorrent.stram.engine.OperatorContext;
 import com.datatorrent.stram.engine.StreamingContainer;
 import com.datatorrent.stram.engine.WindowGenerator;
+import com.datatorrent.stram.extensions.api.AbstractApexPluginManagerAllAsync;
 import com.datatorrent.stram.extensions.api.ApexPluginManager;
 import com.datatorrent.stram.extensions.api.ServiceLoaderBasedPluginLocator;
 import com.datatorrent.stram.plan.logical.LogicalPlan;
@@ -318,7 +319,7 @@ public class StramLocalCluster implements Runnable, Controller
     }
     this.dnmgr = new StreamingContainerManager(dag);
     PluginLocator locator = new ServiceLoaderBasedPluginLocator();
-    ApexPluginManager manager = new ApexPluginManager(locator,null, dnmgr);
+    ApexPluginManager manager = new AbstractApexPluginManagerAllAsync(locator,null, dnmgr);
     dnmgr.setApexPluginManager(manager);
     manager.init(new Configuration());
     this.umbilical = new UmbilicalProtocolLocalImpl();

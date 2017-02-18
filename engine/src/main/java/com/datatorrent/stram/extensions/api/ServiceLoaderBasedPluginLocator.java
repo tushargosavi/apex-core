@@ -37,7 +37,7 @@ public class ServiceLoaderBasedPluginLocator implements PluginLocator
   public Collection<ApexPlugin> discoverPlugins()
   {
     List<ApexPlugin> discovered = new ArrayList<>();
-    LOG.info("decteding plugins by {} locator", this.getClass().getName());
+    LOG.info("detecting plugins by {} locator", this.getClass().getName());
     ServiceLoader<ApexPlugin> loader = ServiceLoader.load(ApexPlugin.class);
     for (ApexPlugin plugin : loader) {
       LOG.info("found plugin {}", plugin);
