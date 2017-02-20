@@ -105,7 +105,7 @@ import com.datatorrent.stram.plan.physical.PTContainer;
 import com.datatorrent.stram.plan.physical.PTOperator;
 import com.datatorrent.stram.plugin.ApexPluginManager;
 import com.datatorrent.stram.plugin.PerPluginExecutorApexPluginManager;
-import com.datatorrent.stram.plugin.ServiceLoaderBasedPluginLocator;
+import com.datatorrent.stram.plugin.loaders.ServiceLoaderBasedPluginLocator;
 import com.datatorrent.stram.security.StramDelegationTokenIdentifier;
 import com.datatorrent.stram.security.StramDelegationTokenManager;
 import com.datatorrent.stram.security.StramUserLogin;

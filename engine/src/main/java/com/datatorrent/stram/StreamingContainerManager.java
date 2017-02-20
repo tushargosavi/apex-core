@@ -137,6 +137,7 @@ import com.datatorrent.stram.api.StreamingContainerUmbilicalProtocol.OperatorHea
 import com.datatorrent.stram.api.StreamingContainerUmbilicalProtocol.ShutdownType;
 import com.datatorrent.stram.api.StreamingContainerUmbilicalProtocol.StramToNodeRequest;
 import com.datatorrent.stram.api.StreamingContainerUmbilicalProtocol.StreamingContainerContext;
+import com.datatorrent.stram.api.plugin.PluginManager;
 import com.datatorrent.stram.engine.OperatorResponse;
 import com.datatorrent.stram.engine.StreamingContainer;
 import com.datatorrent.stram.engine.WindowGenerator;
@@ -1797,7 +1798,7 @@ public class StreamingContainerManager implements PlanContext
     rsp.stackTraceRequired = sca.stackTraceRequested;
     sca.stackTraceRequested = false;
 
-    apexPluginManager.dispatchHeartbeat(heartbeat);
+    apexPluginManager.dispatch(PluginManager.HEARTBEAT, heartbeat);
     return rsp;
   }
 
@@ -2390,12 +2391,8 @@ public class StreamingContainerManager implements PlanContext
   @Override
   public void recordEventAsync(StramEvent ev)
   {
-    /* During physical plan generation, apexPluginManager is not set
-     * TODO: cache generated events and replay them when apexPluginManager
-     * is set.
-     */
     if (apexPluginManager != null) {
-      apexPluginManager.dispatchEvent(ev);
+      apexPluginManager.dispatch(PluginManager.STRAM_EVENT, ev);
     }
     if (eventBus != null) {
       eventBus.publishAsync(ev);

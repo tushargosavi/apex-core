@@ -19,6 +19,7 @@
 package com.datatorrent.stram.plugin;
 
 import java.util.HashMap;
+import java.util.List;
 import java.util.Map;
 import java.util.NoSuchElementException;
 import java.util.concurrent.ArrayBlockingQueue;
@@ -33,18 +34,18 @@ import org.slf4j.LoggerFactory;
 
 import org.apache.hadoop.conf.Configuration;
 
+import com.datatorrent.common.util.NameableThreadFactory;
 import com.datatorrent.stram.StramAppContext;
 import com.datatorrent.stram.StreamingContainerManager;
-import com.datatorrent.stram.api.StramEvent;
-import com.datatorrent.stram.api.StreamingContainerUmbilicalProtocol.ContainerHeartbeat;
 import com.datatorrent.stram.api.plugin.ApexPlugin;
 import com.datatorrent.stram.api.plugin.PluginLocator;
+import com.datatorrent.stram.api.plugin.PluginManager;
 
 /**
  * A top level ApexPluginManager which will handle multiple requests through
  * a thread pool.
  */
-public class PerPluginExecutorApexPluginManager extends AbstractApexPluginManagerAllAsync
+public class PerPluginExecutorApexPluginManager extends AbstractApexPluginManager
 {
   private static final Logger LOG = LoggerFactory.getLogger(PerPluginExecutorApexPluginManager.class);
 
@@ -54,41 +55,33 @@ public class PerPluginExecutorApexPluginManager extends AbstractApexPluginManage
   }
 
   @Override
-  public void dispatchHeartbeat(final ContainerHeartbeat hb)
+  public <T> void dispatch(PluginManager.RegistrationType<T> registrationType, T data)
   {
     for (final PluginInfo pInfo : plugins.values()) {
-      if (pInfo.heartbeatHandler != null) {
+      final List<PluginManager.Handler<T>> handlers = pInfo.registrations.get(registrationType);
+      if (handlers != null) {
         PluginExecutionContext ctx = pluginExecutors.get(pInfo);
-        ctx.executorService.submit(new Runnable()
-        {
-          @Override
-          public void run()
-          {
-            pInfo.heartbeatHandler.handle(hb);
-          }
-        });
+        ctx.executorService.submit(new ProcessEvent<T>(handlers, data));
       }
     }
   }
 
-  @Override
-  public void dispatchEvent(final StramEvent event)
+  static class ProcessEvent<T> implements Runnable
   {
-    for (final PluginInfo pInfo : plugins.values()) {
-      if (pInfo.eventHandler != null) {
-        PluginExecutionContext ctx = pluginExecutors.get(pInfo);
-        if (ctx == null || ctx.executorService == null) {
-          LOG.warn("plugin context is set to null for plugin {}", pInfo.plugin);
-          continue;
-        }
-        ctx.executorService.submit(new Runnable()
-        {
-          @Override
-          public void run()
-          {
-            pInfo.eventHandler.handle(event);
-          }
-        });
+    final List<PluginManager.Handler<T>> handlers;
+    final T data;
+
+    public ProcessEvent(List<PluginManager.Handler<T>> handlers, T data)
+    {
+      this.handlers = handlers;
+      this.data = data;
+    }
+
+    @Override
+    public void run()
+    {
+      for (PluginManager.Handler<T> handlers : handlers) {
+        handlers.handle(data);
       }
     }
   }
@@ -146,7 +139,8 @@ public class PerPluginExecutorApexPluginManager extends AbstractApexPluginManage
         }
       };
 
-      executorService = new ThreadPoolExecutor(1, 1, 0, TimeUnit.SECONDS, blockingQueue, handler);
+      executorService = new ThreadPoolExecutor(1, 1, 0, TimeUnit.SECONDS,
+          blockingQueue, new NameableThreadFactory(pInfo.plugin.getClass().getName()), handler);
     }
 
     void stop() throws InterruptedException

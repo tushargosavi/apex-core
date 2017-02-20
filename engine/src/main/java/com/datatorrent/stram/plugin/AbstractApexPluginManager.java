@@ -20,11 +20,11 @@ package com.datatorrent.stram.plugin;
 
 import java.io.IOException;
 import java.net.URI;
+import java.util.ArrayList;
 import java.util.Collection;
 import java.util.HashMap;
-import java.util.HashSet;
+import java.util.List;
 import java.util.Map;
-import java.util.Set;
 
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
@@ -40,17 +40,11 @@ import com.google.common.collect.Lists;
 
 import com.datatorrent.stram.StramAppContext;
 import com.datatorrent.stram.StreamingContainerManager;
-import com.datatorrent.stram.api.StramEvent;
-import com.datatorrent.stram.api.StreamingContainerUmbilicalProtocol.ContainerHeartbeat;
 import com.datatorrent.stram.api.plugin.ApexPlugin;
 import com.datatorrent.stram.api.plugin.PluginContext;
 import com.datatorrent.stram.api.plugin.PluginLocator;
 import com.datatorrent.stram.api.plugin.PluginManager;
 import com.datatorrent.stram.plan.logical.LogicalPlan;
-
-import static com.datatorrent.stram.api.plugin.PluginManager.COMMIT_EVENT;
-import static com.datatorrent.stram.api.plugin.PluginManager.HEARTBEAT;
-import static com.datatorrent.stram.api.plugin.PluginManager.STRAM_EVENT;
 
 /**
  * A top level ApexPluginManager which will handle multiple requests through
@@ -96,7 +90,7 @@ public abstract class AbstractApexPluginManager extends AbstractService implemen
   {
     super.serviceInit(conf);
     this.launchConfig = readLaunchConfiguration();
-    pluginContext = new DefaultPluginContextImpl(dmgr, readLaunchConfiguration());
+    pluginContext = new DefaultPluginContextImpl(appContext, dmgr, readLaunchConfiguration());
     if (locator != null) {
       Collection<ApexPlugin> plugins = locator.discoverPlugins();
       if (plugins != null) {
@@ -113,11 +107,8 @@ public abstract class AbstractApexPluginManager extends AbstractService implemen
   class PluginInfo
   {
     final ApexPlugin plugin;
-    final Set<PluginManager.RegistrationType<?>> registrations = new HashSet<>();
-    PluginManager.Handler<ContainerHeartbeat> heartbeatHandler;
-    PluginManager.Handler<StramEvent> eventHandler;
-    public PluginManager.Handler<Long> commitHandler;
-
+    final RegistrationMap registrations = new RegistrationMap();
+    //final Map<PluginManager.RegistrationType<?>, List<PluginManager.Handler<?>>> registrations = new HashMap<>();
     public PluginInfo(ApexPlugin plugin)
     {
       this.plugin = plugin;
@@ -137,38 +128,17 @@ public abstract class AbstractApexPluginManager extends AbstractService implemen
   public <T> void register(PluginManager.RegistrationType<T> type, PluginManager.Handler<T> handler, ApexPlugin owner)
   {
     PluginInfo pInfo = getPluginInfo(owner);
-    boolean fresh = pInfo.registrations.add(type);
-    if (!fresh) {
-      LOG.warn("Handler already registered for the event type {} by plugin {}", type, owner);
-      return;
-    }
-    if (type == HEARTBEAT) {
-      LOG.info("setting hearbeat listenr for {} pInfo {}", pInfo.plugin, pInfo);
-      pInfo.heartbeatHandler = (PluginManager.Handler<ContainerHeartbeat>)handler;
-    } else if (type == STRAM_EVENT) {
-      pInfo.eventHandler = (PluginManager.Handler<StramEvent>)handler;
-    } else if (type == COMMIT_EVENT) {
-      pInfo.commitHandler = (PluginManager.Handler<Long>)handler;
-    }
+    pInfo.registrations.put(type, handler);
   }
-
-  public void addPlugin(ApexPlugin obj)
-  {
-    userServices.add(obj);
-  }
-
-  public abstract void submit(Runnable task);
 
   @Override
   public void setCommittedWindowId(long committedWindowId)
   {
     if (lastCommittedWindowId != committedWindowId) {
-      dispatchCommittedWindowId(committedWindowId);
+      dispatch(PluginManager.COMMIT_EVENT, committedWindowId);
       lastCommittedWindowId = committedWindowId;
     }
   }
-
-  public abstract void dispatchCommittedWindowId(long lastCommittedWindowId);
 
   class PluginManagerImpl implements PluginManager
   {
@@ -186,21 +156,29 @@ public abstract class AbstractApexPluginManager extends AbstractService implemen
     }
 
     @Override
-    public void submit(Runnable task)
-    {
-      AbstractApexPluginManager.this.submit(task);
-    }
-
-    @Override
-    public StramAppContext getApplicationContext()
-    {
-      return AbstractApexPluginManager.this.appContext;
-    }
-
-    @Override
     public PluginContext getPluginContext()
     {
       return AbstractApexPluginManager.this.pluginContext;
+    }
+  }
+
+  class RegistrationMap
+  {
+    Map<PluginManager.RegistrationType<?>, List<?>> registrationMap = new HashMap<>();
+
+    <T> void put(PluginManager.RegistrationType<T> registrationType, PluginManager.Handler<T> handler)
+    {
+      List<PluginManager.Handler<T>> handlers = get(registrationType);
+      if (handlers == null) {
+        handlers = new ArrayList<>();
+        registrationMap.put(registrationType, handlers);
+      }
+      handlers.add(handler);
+    }
+
+    <T> List<PluginManager.Handler<T>> get(PluginManager.RegistrationType<T> registrationType)
+    {
+      return (List<PluginManager.Handler<T>>)registrationMap.get(registrationType);
     }
   }
 }

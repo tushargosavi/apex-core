@@ -18,7 +18,6 @@
  */
 package com.datatorrent.stram.api.plugin;
 
-import com.datatorrent.stram.StramAppContext;
 import com.datatorrent.stram.api.StramEvent;
 import com.datatorrent.stram.api.StreamingContainerUmbilicalProtocol;
 
@@ -39,11 +38,5 @@ public interface PluginManager
     void handle(T data);
   }
 
-  void submit(Runnable task);
-
-  // provide application level configuration , name, id, other configurations.
-  StramAppContext getApplicationContext();
-
-  // get information about other things
   PluginContext getPluginContext();
 }

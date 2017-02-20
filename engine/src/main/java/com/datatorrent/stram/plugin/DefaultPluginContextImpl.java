@@ -27,6 +27,7 @@ import org.apache.hadoop.conf.Configuration;
 import com.datatorrent.api.DAG;
 import com.datatorrent.api.StatsListener;
 import com.datatorrent.common.util.Pair;
+import com.datatorrent.stram.StramAppContext;
 import com.datatorrent.stram.StreamingContainerManager;
 import com.datatorrent.stram.api.plugin.PluginContext;
 import com.datatorrent.stram.plan.physical.PTOperator;
@@ -34,14 +35,21 @@ import com.datatorrent.stram.webapp.LogicalOperatorInfo;
 
 public class DefaultPluginContextImpl implements PluginContext
 {
-
   private final StreamingContainerManager dnmgr;
   private final Configuration launchConf;
+  private final StramAppContext appContext;
 
-  public DefaultPluginContextImpl(StreamingContainerManager dnmgr, Configuration launcConf)
+  public DefaultPluginContextImpl(StramAppContext appContext, StreamingContainerManager dnmgr, Configuration launcConf)
   {
+    this.appContext = appContext;
     this.dnmgr = dnmgr;
     this.launchConf = launcConf;
+  }
+
+  @Override
+  public StramAppContext getApplicationContext()
+  {
+    return appContext;
   }
 
   @Override

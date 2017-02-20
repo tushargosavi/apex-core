@@ -27,10 +27,13 @@ import org.apache.hadoop.conf.Configuration;
 import com.datatorrent.api.DAG;
 import com.datatorrent.api.StatsListener.BatchedOperatorStats;
 import com.datatorrent.common.util.Pair;
+import com.datatorrent.stram.StramAppContext;
 import com.datatorrent.stram.webapp.LogicalOperatorInfo;
 
 public interface PluginContext
 {
+  StramAppContext getApplicationContext();
+
   public DAG getDAG();
 
   public String getOperatorName(int id);

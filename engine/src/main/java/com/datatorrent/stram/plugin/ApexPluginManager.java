@@ -20,14 +20,11 @@ package com.datatorrent.stram.plugin;
 
 import org.apache.hadoop.service.Service;
 
-import com.datatorrent.stram.api.StramEvent;
-import com.datatorrent.stram.api.StreamingContainerUmbilicalProtocol;
+import com.datatorrent.stram.api.plugin.PluginManager;
 
 public interface ApexPluginManager extends Service
 {
-  void dispatchHeartbeat(StreamingContainerUmbilicalProtocol.ContainerHeartbeat hb);
-
-  void dispatchEvent(StramEvent event);
+  <T> void dispatch(PluginManager.RegistrationType<T> registrationType, T data);
 
   void setCommittedWindowId(long committedWindowId);
 }
