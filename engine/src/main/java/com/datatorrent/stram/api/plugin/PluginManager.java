@@ -21,6 +21,13 @@ package com.datatorrent.stram.api.plugin;
 import com.datatorrent.stram.api.StramEvent;
 import com.datatorrent.stram.api.StreamingContainerUmbilicalProtocol;
 
+/**
+ * PluginManager provides and interface between Stram and ApexPlugin. It dispatches events from Stram
+ * to the interested @{link ApexPlugin}. It provides functionality for registration of callback handler
+ * for events.
+ *
+ * The actual dispatching is left to the implementation.
+ */
 public interface PluginManager
 {
   class RegistrationType<T>

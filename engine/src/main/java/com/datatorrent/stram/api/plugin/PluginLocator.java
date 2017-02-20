@@ -20,11 +20,16 @@ package com.datatorrent.stram.api.plugin;
 
 import java.util.Collection;
 
+/**
+ * Interface to discover plugins during Stram initialization. This should return collection of
+ * objects implementing ApexPlugin interface.
+ */
 public interface PluginLocator
 {
   /**
-   * Find list of apex plugins.
-   * @return
+   * Discover list of apex plugins.
+   *
+   * @return list of apex plugins.
    */
   Collection<ApexPlugin> discoverPlugins();
 }

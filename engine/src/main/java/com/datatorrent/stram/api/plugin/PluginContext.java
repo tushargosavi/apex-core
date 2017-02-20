@@ -30,6 +30,9 @@ import com.datatorrent.common.util.Pair;
 import com.datatorrent.stram.StramAppContext;
 import com.datatorrent.stram.webapp.LogicalOperatorInfo;
 
+/**
+ * Helper utility for ApexPlugin using which plugin can access information from Stram.
+ */
 public interface PluginContext
 {
   StramAppContext getApplicationContext();

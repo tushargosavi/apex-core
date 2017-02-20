@@ -40,6 +40,7 @@ import com.google.common.collect.Lists;
 
 import com.datatorrent.stram.StramAppContext;
 import com.datatorrent.stram.StreamingContainerManager;
+import com.datatorrent.stram.api.Checkpoint;
 import com.datatorrent.stram.api.plugin.ApexPlugin;
 import com.datatorrent.stram.api.plugin.PluginContext;
 import com.datatorrent.stram.api.plugin.PluginLocator;
@@ -47,21 +48,21 @@ import com.datatorrent.stram.api.plugin.PluginManager;
 import com.datatorrent.stram.plan.logical.LogicalPlan;
 
 /**
- * A top level ApexPluginManager which will handle multiple requests through
- * a thread pool.
+ * A default implementation for ApexPluginManager. It handler common tasks such as per handler
+ * registration. actual dispatching is left for classes extending from it.
  */
 public abstract class AbstractApexPluginManager extends AbstractService implements ApexPluginManager
 {
   private static final Logger LOG = LoggerFactory.getLogger(AbstractApexPluginManager.class);
-  protected Collection<ApexPlugin> userServices = Lists.newArrayList();
+  protected final Collection<ApexPlugin> plugins = Lists.newArrayList();
   protected final StramAppContext appContext;
   protected final StreamingContainerManager dmgr;
   private final PluginLocator locator;
   protected transient Configuration launchConfig;
   protected FileContext fileContext;
-  protected Map<ApexPlugin, PluginInfo> plugins = new HashMap<>();
-  PluginContext pluginContext;
-  private long lastCommittedWindowId = Long.MIN_VALUE;
+  protected final Map<ApexPlugin, PluginInfo> pluginInfoMap = new HashMap<>();
+  protected PluginContext pluginContext;
+  private long lastCommittedWindowId = Checkpoint.INITIAL_CHECKPOINT.getWindowId();
 
   public AbstractApexPluginManager(PluginLocator locator, StramAppContext context, StreamingContainerManager dmgr)
   {
@@ -94,16 +95,20 @@ public abstract class AbstractApexPluginManager extends AbstractService implemen
     if (locator != null) {
       Collection<ApexPlugin> plugins = locator.discoverPlugins();
       if (plugins != null) {
-        userServices.addAll(plugins);
+        this.plugins.addAll(plugins);
       }
     }
 
     super.serviceStart();
-    for (ApexPlugin plugin : userServices) {
+    for (ApexPlugin plugin : plugins) {
       plugin.init(new PluginManagerImpl(plugin));
     }
   }
 
+  /**
+   * Keeps information about plugin and its registrations. Dispatcher use this
+   * information while delivering events to plugin.
+   */
   class PluginInfo
   {
     final ApexPlugin plugin;
@@ -117,10 +122,10 @@ public abstract class AbstractApexPluginManager extends AbstractService implemen
 
   PluginInfo getPluginInfo(ApexPlugin plugin)
   {
-    PluginInfo pInfo = plugins.get(plugin);
+    PluginInfo pInfo = pluginInfoMap.get(plugin);
     if (pInfo == null) {
       pInfo = new PluginInfo(plugin);
-      plugins.put(plugin, pInfo);
+      pluginInfoMap.put(plugin, pInfo);
     }
     return pInfo;
   }
@@ -140,6 +145,10 @@ public abstract class AbstractApexPluginManager extends AbstractService implemen
     }
   }
 
+  /**
+   * A wrapper PluginManager to track registration from a plugin. with this plugin
+   * don't need to pass explicit owner argument during registration.
+   */
   class PluginManagerImpl implements PluginManager
   {
     private final ApexPlugin owner;
@@ -162,6 +171,9 @@ public abstract class AbstractApexPluginManager extends AbstractService implemen
     }
   }
 
+  /**
+   * A Map which keep track for registration from ApexPlugins.
+   */
   class RegistrationMap
   {
     Map<PluginManager.RegistrationType<?>, List<?>> registrationMap = new HashMap<>();

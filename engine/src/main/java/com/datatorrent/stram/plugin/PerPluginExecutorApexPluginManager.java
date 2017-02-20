@@ -57,7 +57,7 @@ public class PerPluginExecutorApexPluginManager extends AbstractApexPluginManage
   @Override
   public <T> void dispatch(PluginManager.RegistrationType<T> registrationType, T data)
   {
-    for (final PluginInfo pInfo : plugins.values()) {
+    for (final PluginInfo pInfo : pluginInfoMap.values()) {
       final List<PluginManager.Handler<T>> handlers = pInfo.registrations.get(registrationType);
       if (handlers != null) {
         PluginExecutionContext ctx = pluginExecutors.get(pInfo);
@@ -92,7 +92,7 @@ public class PerPluginExecutorApexPluginManager extends AbstractApexPluginManage
   protected void serviceInit(Configuration conf) throws Exception
   {
     super.serviceInit(conf);
-    for (ApexPlugin plugin : userServices) {
+    for (ApexPlugin plugin : plugins) {
       LOG.info("starting executor for plugin {}", plugin);
       PluginInfo pInfo = getPluginInfo(plugin);
       PluginExecutionContext context = new PluginExecutionContext(pInfo);
