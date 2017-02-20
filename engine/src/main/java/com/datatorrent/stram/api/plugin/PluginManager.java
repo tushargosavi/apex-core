@@ -30,7 +30,7 @@ public interface PluginManager
 
   RegistrationType<StreamingContainerUmbilicalProtocol.ContainerHeartbeat> HEARTBEAT = new RegistrationType<>();
   RegistrationType<StramEvent> STRAM_EVENT = new RegistrationType<>();
-  RegistrationType<Long> COMMIT_HANDLER = new RegistrationType<>();
+  RegistrationType<Long> COMMIT_EVENT = new RegistrationType<>();
 
   <T> void register(RegistrationType<T> type, Handler<T> handler);
 

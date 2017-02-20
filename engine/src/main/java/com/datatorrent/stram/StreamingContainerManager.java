@@ -801,6 +801,7 @@ public class StreamingContainerManager implements PlanContext
     processEvents();
 
     committedWindowId = updateCheckpoints(false);
+    apexPluginManager.setCommittedWindowId(committedWindowId);
     calculateEndWindowStats();
     if (this.vars.enableStatsRecording) {
       recordStats(currentTms);

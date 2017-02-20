@@ -48,6 +48,7 @@ import com.datatorrent.stram.api.plugin.PluginLocator;
 import com.datatorrent.stram.api.plugin.PluginManager;
 import com.datatorrent.stram.plan.logical.LogicalPlan;
 
+import static com.datatorrent.stram.api.plugin.PluginManager.COMMIT_EVENT;
 import static com.datatorrent.stram.api.plugin.PluginManager.HEARTBEAT;
 import static com.datatorrent.stram.api.plugin.PluginManager.STRAM_EVENT;
 
@@ -66,6 +67,7 @@ public abstract class AbstractApexPluginManager extends AbstractService implemen
   protected FileContext fileContext;
   protected Map<ApexPlugin, PluginInfo> plugins = new HashMap<>();
   PluginContext pluginContext;
+  private long lastCommittedWindowId = Long.MIN_VALUE;
 
   public AbstractApexPluginManager(PluginLocator locator, StramAppContext context, StreamingContainerManager dmgr)
   {
@@ -114,6 +116,7 @@ public abstract class AbstractApexPluginManager extends AbstractService implemen
     final Set<PluginManager.RegistrationType<?>> registrations = new HashSet<>();
     PluginManager.Handler<ContainerHeartbeat> heartbeatHandler;
     PluginManager.Handler<StramEvent> eventHandler;
+    public PluginManager.Handler<Long> commitHandler;
 
     public PluginInfo(ApexPlugin plugin)
     {
@@ -144,6 +147,8 @@ public abstract class AbstractApexPluginManager extends AbstractService implemen
       pInfo.heartbeatHandler = (PluginManager.Handler<ContainerHeartbeat>)handler;
     } else if (type == STRAM_EVENT) {
       pInfo.eventHandler = (PluginManager.Handler<StramEvent>)handler;
+    } else if (type == COMMIT_EVENT) {
+      pInfo.commitHandler = (PluginManager.Handler<Long>)handler;
     }
   }
 
@@ -153,6 +158,17 @@ public abstract class AbstractApexPluginManager extends AbstractService implemen
   }
 
   public abstract void submit(Runnable task);
+
+  @Override
+  public void setCommittedWindowId(long committedWindowId)
+  {
+    if (lastCommittedWindowId != committedWindowId) {
+      dispatchCommittedWindowId(committedWindowId);
+      lastCommittedWindowId = committedWindowId;
+    }
+  }
+
+  public abstract void dispatchCommittedWindowId(long lastCommittedWindowId);
 
   class PluginManagerImpl implements PluginManager
   {

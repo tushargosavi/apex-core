@@ -28,4 +28,6 @@ public interface ApexPluginManager extends Service
   void dispatchHeartbeat(StreamingContainerUmbilicalProtocol.ContainerHeartbeat hb);
 
   void dispatchEvent(StramEvent event);
+
+  void setCommittedWindowId(long committedWindowId);
 }

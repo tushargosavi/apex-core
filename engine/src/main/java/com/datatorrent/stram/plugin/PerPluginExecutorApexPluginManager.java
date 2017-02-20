@@ -20,8 +20,12 @@ package com.datatorrent.stram.plugin;
 
 import java.util.HashMap;
 import java.util.Map;
+import java.util.NoSuchElementException;
+import java.util.concurrent.ArrayBlockingQueue;
+import java.util.concurrent.BlockingQueue;
 import java.util.concurrent.ExecutorService;
-import java.util.concurrent.Executors;
+import java.util.concurrent.RejectedExecutionHandler;
+import java.util.concurrent.ThreadPoolExecutor;
 import java.util.concurrent.TimeUnit;
 
 import org.slf4j.Logger;
@@ -29,7 +33,6 @@ import org.slf4j.LoggerFactory;
 
 import org.apache.hadoop.conf.Configuration;
 
-import com.datatorrent.netlet.util.CircularBuffer;
 import com.datatorrent.stram.StramAppContext;
 import com.datatorrent.stram.StreamingContainerManager;
 import com.datatorrent.stram.api.StramEvent;
@@ -118,9 +121,8 @@ public class PerPluginExecutorApexPluginManager extends AbstractApexPluginManage
   {
     private final PluginInfo pInfo;
     ExecutorService executorService;
-    private Exception error;
-    int qsize = 1024;
-    private final CircularBuffer blockingQueue = new CircularBuffer(qsize);
+    int qsize = 4096;
+    private BlockingQueue blockingQueue;
 
     PluginExecutionContext(PluginInfo pInfo)
     {
@@ -129,7 +131,22 @@ public class PerPluginExecutorApexPluginManager extends AbstractApexPluginManage
 
     void start()
     {
-      executorService = Executors.newSingleThreadExecutor();
+      blockingQueue = new ArrayBlockingQueue<>(qsize);
+      RejectedExecutionHandler handler = new RejectedExecutionHandler()
+      {
+        @Override
+        public void rejectedExecution(Runnable r, ThreadPoolExecutor executor)
+        {
+          try {
+            Object item = blockingQueue.remove();
+            executor.submit(r);
+          } catch (NoSuchElementException ex) {
+            // Ignore no-such element as queue may finish, while this handler is called.
+          }
+        }
+      };
+
+      executorService = new ThreadPoolExecutor(1, 1, 0, TimeUnit.SECONDS, blockingQueue, handler);
     }
 
     void stop() throws InterruptedException

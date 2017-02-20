@@ -56,6 +56,12 @@ public class AbstractApexPluginManagerAllAsync extends AbstractApexPluginManager
   }
 
   @Override
+  public void dispatchCommittedWindowId(long lastCommittedWindowId)
+  {
+    poolExecutor.submit(new CommittedWindowIdDiliveryTask(lastCommittedWindowId));
+  }
+
+  @Override
   protected void serviceInit(Configuration conf) throws Exception
   {
     super.serviceInit(conf);
@@ -113,6 +119,26 @@ public class AbstractApexPluginManagerAllAsync extends AbstractApexPluginManager
       for (PluginInfo pInfo : plugins.values()) {
         if (pInfo.eventHandler != null) {
           pInfo.eventHandler.handle(event);
+        }
+      }
+    }
+  }
+
+  private class CommittedWindowIdDiliveryTask implements Runnable
+  {
+    long wid;
+
+    public CommittedWindowIdDiliveryTask(long lastCommittedWindowId)
+    {
+      this.wid = lastCommittedWindowId;
+    }
+
+    @Override
+    public void run()
+    {
+      for (PluginInfo pInfo : plugins.values()) {
+        if (pInfo.commitHandler != null) {
+          pInfo.commitHandler.handle(wid);
         }
       }
     }
