@@ -16,14 +16,16 @@
  * specific language governing permissions and limitations
  * under the License.
  */
-package com.datatorrent.stram.api.extensions;
+package com.datatorrent.stram.plugin;
 
-public interface ApexPlugin
+import org.apache.hadoop.service.Service;
+
+import com.datatorrent.stram.api.StramEvent;
+import com.datatorrent.stram.api.StreamingContainerUmbilicalProtocol;
+
+public interface ApexPluginManager extends Service
 {
-  // initialize the plugin
-  void init(PluginManager manager);
+  void dispatchHeartbeat(StreamingContainerUmbilicalProtocol.ContainerHeartbeat hb);
 
-  // stop the plugin
-  void shutdown();
-
+  void dispatchEvent(StramEvent event);
 }

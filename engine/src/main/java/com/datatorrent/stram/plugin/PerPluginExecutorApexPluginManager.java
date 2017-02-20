@@ -16,7 +16,7 @@
  * specific language governing permissions and limitations
  * under the License.
  */
-package com.datatorrent.stram.extensions.api;
+package com.datatorrent.stram.plugin;
 
 import java.util.HashMap;
 import java.util.Map;
@@ -34,8 +34,8 @@ import com.datatorrent.stram.StramAppContext;
 import com.datatorrent.stram.StreamingContainerManager;
 import com.datatorrent.stram.api.StramEvent;
 import com.datatorrent.stram.api.StreamingContainerUmbilicalProtocol.ContainerHeartbeat;
-import com.datatorrent.stram.api.extensions.ApexPlugin;
-import com.datatorrent.stram.api.extensions.PluginLocator;
+import com.datatorrent.stram.api.plugin.ApexPlugin;
+import com.datatorrent.stram.api.plugin.PluginLocator;
 
 /**
  * A top level ApexPluginManager which will handle multiple requests through

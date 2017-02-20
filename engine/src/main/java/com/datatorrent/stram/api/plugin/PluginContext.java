@@ -16,31 +16,32 @@
  * specific language governing permissions and limitations
  * under the License.
  */
-package com.datatorrent.stram.extensions.api;
+package com.datatorrent.stram.api.plugin;
 
-import java.util.Arrays;
-import java.util.Collection;
+import java.util.List;
+import java.util.Map;
+import java.util.Queue;
 
-import org.slf4j.Logger;
-import org.slf4j.LoggerFactory;
+import org.apache.hadoop.conf.Configuration;
 
-import com.datatorrent.stram.api.extensions.ApexPlugin;
-import com.datatorrent.stram.api.extensions.PluginLocator;
+import com.datatorrent.api.DAG;
+import com.datatorrent.api.StatsListener.BatchedOperatorStats;
+import com.datatorrent.common.util.Pair;
+import com.datatorrent.stram.webapp.LogicalOperatorInfo;
 
-public class StaticPluginLocator implements PluginLocator
+public interface PluginContext
 {
-  private static final Logger LOG = LoggerFactory.getLogger(StaticPluginLocator.class);
+  public DAG getDAG();
 
-  private final ApexPlugin[] plugins;
+  public String getOperatorName(int id);
 
-  public StaticPluginLocator(ApexPlugin... plugins)
-  {
-    this.plugins = plugins;
-  }
+  public Configuration getLaunchConfig();
 
-  @Override
-  public Collection<ApexPlugin> discoverPlugins()
-  {
-    return Arrays.asList(plugins);
-  }
+  public BatchedOperatorStats getPhysicalOperatorStats(int id);
+
+  public List<LogicalOperatorInfo> getLogicalOperatorInfoList();
+
+  public Queue<Pair<Long, Map<String, Object>>> getWindowMetrics(String operatorName);
+
+  public long windowIdToMillis(long windowId);
 }

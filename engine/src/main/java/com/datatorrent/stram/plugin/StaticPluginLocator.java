@@ -16,34 +16,31 @@
  * specific language governing permissions and limitations
  * under the License.
  */
-package com.datatorrent.stram.extensions.api;
+package com.datatorrent.stram.plugin;
 
-import java.util.ArrayList;
+import java.util.Arrays;
 import java.util.Collection;
-import java.util.List;
-import java.util.ServiceLoader;
 
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
-import com.datatorrent.stram.api.extensions.ApexPlugin;
-import com.datatorrent.stram.api.extensions.PluginLocator;
+import com.datatorrent.stram.api.plugin.ApexPlugin;
+import com.datatorrent.stram.api.plugin.PluginLocator;
 
-public class ServiceLoaderBasedPluginLocator implements PluginLocator
+public class StaticPluginLocator implements PluginLocator
 {
-  private static final Logger LOG = LoggerFactory.getLogger(ServiceLoaderBasedPluginLocator.class);
+  private static final Logger LOG = LoggerFactory.getLogger(StaticPluginLocator.class);
+
+  private final ApexPlugin[] plugins;
+
+  public StaticPluginLocator(ApexPlugin... plugins)
+  {
+    this.plugins = plugins;
+  }
 
   @Override
   public Collection<ApexPlugin> discoverPlugins()
   {
-    List<ApexPlugin> discovered = new ArrayList<>();
-    LOG.info("detecting plugins by {} locator", this.getClass().getName());
-    ServiceLoader<ApexPlugin> loader = ServiceLoader.load(ApexPlugin.class);
-    for (ApexPlugin plugin : loader) {
-      LOG.info("found plugin {}", plugin);
-      discovered.add(plugin);
-    }
-    LOG.info("detected loader {} {} plugins ",this.getClass().getName(), discovered.size());
-    return discovered;
+    return Arrays.asList(plugins);
   }
 }

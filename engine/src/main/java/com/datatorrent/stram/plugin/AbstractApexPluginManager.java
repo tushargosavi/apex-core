@@ -16,7 +16,7 @@
  * specific language governing permissions and limitations
  * under the License.
  */
-package com.datatorrent.stram.extensions.api;
+package com.datatorrent.stram.plugin;
 
 import java.io.IOException;
 import java.net.URI;
@@ -42,14 +42,14 @@ import com.datatorrent.stram.StramAppContext;
 import com.datatorrent.stram.StreamingContainerManager;
 import com.datatorrent.stram.api.StramEvent;
 import com.datatorrent.stram.api.StreamingContainerUmbilicalProtocol.ContainerHeartbeat;
-import com.datatorrent.stram.api.extensions.ApexPlugin;
-import com.datatorrent.stram.api.extensions.PluginContext;
-import com.datatorrent.stram.api.extensions.PluginLocator;
-import com.datatorrent.stram.api.extensions.PluginManager;
+import com.datatorrent.stram.api.plugin.ApexPlugin;
+import com.datatorrent.stram.api.plugin.PluginContext;
+import com.datatorrent.stram.api.plugin.PluginLocator;
+import com.datatorrent.stram.api.plugin.PluginManager;
 import com.datatorrent.stram.plan.logical.LogicalPlan;
 
-import static com.datatorrent.stram.api.extensions.PluginManager.HEARTBEAT;
-import static com.datatorrent.stram.api.extensions.PluginManager.STRAM_EVENT;
+import static com.datatorrent.stram.api.plugin.PluginManager.HEARTBEAT;
+import static com.datatorrent.stram.api.plugin.PluginManager.STRAM_EVENT;
 
 /**
  * A top level ApexPluginManager which will handle multiple requests through

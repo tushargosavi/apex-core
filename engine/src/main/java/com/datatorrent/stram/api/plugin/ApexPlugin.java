@@ -16,32 +16,14 @@
  * specific language governing permissions and limitations
  * under the License.
  */
-package com.datatorrent.stram.api.extensions;
+package com.datatorrent.stram.api.plugin;
 
-import java.util.List;
-import java.util.Map;
-import java.util.Queue;
-
-import org.apache.hadoop.conf.Configuration;
-
-import com.datatorrent.api.DAG;
-import com.datatorrent.api.StatsListener.BatchedOperatorStats;
-import com.datatorrent.common.util.Pair;
-import com.datatorrent.stram.webapp.LogicalOperatorInfo;
-
-public interface PluginContext
+public interface ApexPlugin
 {
-  public DAG getDAG();
+  // initialize the plugin
+  void init(PluginManager manager);
 
-  public String getOperatorName(int id);
+  // stop the plugin
+  void shutdown();
 
-  public Configuration getLaunchConfig();
-
-  public BatchedOperatorStats getPhysicalOperatorStats(int id);
-
-  public List<LogicalOperatorInfo> getLogicalOperatorInfoList();
-
-  public Queue<Pair<Long, Map<String, Object>>> getWindowMetrics(String operatorName);
-
-  public long windowIdToMillis(long windowId);
 }

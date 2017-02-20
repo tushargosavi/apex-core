@@ -51,17 +51,17 @@ import com.datatorrent.stram.StreamingContainerManager.ContainerResource;
 import com.datatorrent.stram.api.StreamingContainerUmbilicalProtocol;
 import com.datatorrent.stram.api.StreamingContainerUmbilicalProtocol.ContainerHeartbeatResponse;
 import com.datatorrent.stram.api.StreamingContainerUmbilicalProtocol.StreamingContainerContext;
-import com.datatorrent.stram.api.extensions.PluginLocator;
+import com.datatorrent.stram.api.plugin.PluginLocator;
 import com.datatorrent.stram.engine.Node;
 import com.datatorrent.stram.engine.OperatorContext;
 import com.datatorrent.stram.engine.StreamingContainer;
 import com.datatorrent.stram.engine.WindowGenerator;
-import com.datatorrent.stram.extensions.api.AbstractApexPluginManagerAllAsync;
-import com.datatorrent.stram.extensions.api.ApexPluginManager;
-import com.datatorrent.stram.extensions.api.ServiceLoaderBasedPluginLocator;
 import com.datatorrent.stram.plan.logical.LogicalPlan;
 import com.datatorrent.stram.plan.logical.LogicalPlan.OperatorMeta;
 import com.datatorrent.stram.plan.physical.PTOperator;
+import com.datatorrent.stram.plugin.AbstractApexPluginManagerAllAsync;
+import com.datatorrent.stram.plugin.ApexPluginManager;
+import com.datatorrent.stram.plugin.ServiceLoaderBasedPluginLocator;
 
 /**
  * Launcher for topologies in embedded mode within a single process.

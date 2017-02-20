@@ -16,15 +16,36 @@
  * specific language governing permissions and limitations
  * under the License.
  */
-package com.datatorrent.stram.api.extensions;
+package com.datatorrent.stram.plugin;
 
+import java.util.ArrayList;
 import java.util.Collection;
+import java.util.List;
 
-public interface PluginLocator
+import com.datatorrent.stram.api.plugin.ApexPlugin;
+import com.datatorrent.stram.api.plugin.PluginLocator;
+
+public class ChainedPluginLocator implements PluginLocator
 {
-  /**
-   * Find list of apex plugins.
-   * @return
-   */
-  Collection<ApexPlugin> discoverPlugins();
+  List<PluginLocator> locators = new ArrayList<>();
+
+  public ChainedPluginLocator(PluginLocator... locators)
+  {
+    for (PluginLocator locator : locators) {
+      this.locators.add(locator);
+    }
+  }
+
+  @Override
+  public Collection<ApexPlugin> discoverPlugins()
+  {
+    List<ApexPlugin> plugins = new ArrayList<>();
+
+    for (PluginLocator locator : locators) {
+      Collection<ApexPlugin> currentPlugins = locator.discoverPlugins();
+      plugins.addAll(currentPlugins);
+    }
+
+    return plugins;
+  }
 }

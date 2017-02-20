@@ -16,7 +16,7 @@
  * specific language governing permissions and limitations
  * under the License.
  */
-package com.datatorrent.stram.extensions.api;
+package com.datatorrent.stram.plugin;
 
 import java.util.List;
 import java.util.Map;
@@ -28,7 +28,7 @@ import com.datatorrent.api.DAG;
 import com.datatorrent.api.StatsListener;
 import com.datatorrent.common.util.Pair;
 import com.datatorrent.stram.StreamingContainerManager;
-import com.datatorrent.stram.api.extensions.PluginContext;
+import com.datatorrent.stram.api.plugin.PluginContext;
 import com.datatorrent.stram.plan.physical.PTOperator;
 import com.datatorrent.stram.webapp.LogicalOperatorInfo;
 

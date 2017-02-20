@@ -16,16 +16,34 @@
  * specific language governing permissions and limitations
  * under the License.
  */
-package com.datatorrent.stram.extensions.api;
+package com.datatorrent.stram.api.plugin;
 
-import org.apache.hadoop.service.Service;
-
+import com.datatorrent.stram.StramAppContext;
 import com.datatorrent.stram.api.StramEvent;
 import com.datatorrent.stram.api.StreamingContainerUmbilicalProtocol;
 
-public interface ApexPluginManager extends Service
+public interface PluginManager
 {
-  void dispatchHeartbeat(StreamingContainerUmbilicalProtocol.ContainerHeartbeat hb);
+  class RegistrationType<T>
+  {
+  }
 
-  void dispatchEvent(StramEvent event);
+  RegistrationType<StreamingContainerUmbilicalProtocol.ContainerHeartbeat> HEARTBEAT = new RegistrationType<>();
+  RegistrationType<StramEvent> STRAM_EVENT = new RegistrationType<>();
+  RegistrationType<Long> COMMIT_HANDLER = new RegistrationType<>();
+
+  <T> void register(RegistrationType<T> type, Handler<T> handler);
+
+  interface Handler<T>
+  {
+    void handle(T data);
+  }
+
+  void submit(Runnable task);
+
+  // provide application level configuration , name, id, other configurations.
+  StramAppContext getApplicationContext();
+
+  // get information about other things
+  PluginContext getPluginContext();
 }
