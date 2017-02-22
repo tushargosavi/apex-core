@@ -159,13 +159,18 @@ public class WrappedLogicalPlan extends LogicalPlan implements DAG
   public <T> LogicalPlan.StreamMeta addStream(String id, Operator.OutputPort<? extends T> source, Operator.InputPort<? super T>
       sink1, Operator.InputPort<? super T> sink2)
   {
+    assertExistingStream(id);
+    assertExistingStream(source);
+    assertExistingPort(sink1);
+    assertExistingPort(sink2);
     return super.addStream(id, source, sink1, sink2);
   }
 
   @Override
   public <T> void setAttribute(Attribute<T> key, T value)
   {
-    super.setAttribute(key, value);
+    // can't change existing attributes
+    throw new IllegalArgumentException("SetAttribute not allowed while in transaction ");
   }
 
   @Override
@@ -196,9 +201,74 @@ public class WrappedLogicalPlan extends LogicalPlan implements DAG
     super.setOutputPortAttribute(port, key, value);
   }
 
-  private void assertExistingPort(Operator.Port port)
+  /**
+   * check if port already exists in parent DAG and is connected to any stream.
+   * @param outputPort
+   */
+  private void assertExistingPort(Operator.OutputPort<?> outputPort)
   {
-    // check if port exists in original DAG.
+    LogicalPlan.OutputPortMeta meta = parent.getPortMeta(outputPort);
+    if (meta != null) {
+      // check if port is already connected
+      boolean alreadyConnected = meta.getOperatorMeta().getOutputStreams().containsKey(meta);
+      if (alreadyConnected) {
+        throw new IllegalArgumentException("Port already connected in parent dag ");
+      }
+    }
+  }
+
+  private void assertExistingPort(Operator.InputPort<?> inputPort)
+  {
+    LogicalPlan.InputPortMeta meta = parent.getPortMeta(inputPort);
+    if (meta != null) {
+      // check if port is already connected
+      boolean alreadyConnected = meta.getOperatorMeta().getInputStreams().containsKey(meta);
+      if (alreadyConnected) {
+        throw new IllegalArgumentException("Port already connected in parent dag ");
+      }
+    }
+  }
+
+  LogicalPlan.OutputPortMeta getLocalPortMeta(Operator.OutputPort<?> port)
+  {
+    for (LogicalPlan.OperatorMeta o : getAllOperators()) {
+      LogicalPlan.OutputPortMeta opm = o.getPortMapping().getOutPortMap().get(port);
+      if (opm != null) {
+        return opm;
+      }
+    }
+    return null;
+  }
+
+  @Override
+  LogicalPlan.OutputPortMeta getPortMeta(Operator.OutputPort<?> port)
+  {
+    LogicalPlan.OutputPortMeta meta = parent.getPortMeta(port);
+    if (meta == null) {
+      meta = getLocalPortMeta(port);
+    }
+    return meta;
+  }
+
+  LogicalPlan.InputPortMeta getLocalPortMeta(Operator.InputPort<?> port)
+  {
+    for (LogicalPlan.OperatorMeta o : getAllOperators()) {
+      LogicalPlan.InputPortMeta opm = o.getPortMapping().getInPortMap().get(port);
+      if (opm != null) {
+        return opm;
+      }
+    }
+    return null;
+  }
+
+  @Override
+  LogicalPlan.InputPortMeta getPortMeta(Operator.InputPort<?> port)
+  {
+    LogicalPlan.InputPortMeta meta = parent.getPortMeta(port);
+    if (meta == null) {
+      meta = getLocalPortMeta(port);
+    }
+    return meta;
   }
 
   @Override
@@ -219,25 +289,15 @@ public class WrappedLogicalPlan extends LogicalPlan implements DAG
     parent.commit(this);
   }
 
-  /**
-   * update current dag from parent. This is require for performing a final
-   * validation.
-   */
-  void updateFromParent() {
 
-    // update operators
-    for (LogicalPlan.OperatorMeta ometa : parent.getAllOperators()) {
-      super.addOperator(ometa.getName(), ometa.getOperator());
+  void merge(LogicalPlan plan)
+  {
+    for (LogicalPlan.OperatorMeta ometa : getAllOperators()) {
+      plan.addOperator(ometa);
     }
 
-    // add streams from existing operators here.
-    for (LogicalPlan.StreamMeta psmeta : parent.getAllStreams()) {
-      LogicalPlan.StreamMeta smeta = super.addStream(psmeta.getName());
-      smeta.setSource(psmeta.getSource().getPortObject());
-      for (LogicalPlan.InputPortMeta ip : psmeta.getSinks()) {
-        smeta.addSink(ip.getPortObject());
-      }
-      smeta.setLocality(psmeta.getLocality());
+    for (LogicalPlan.StreamMeta psmeta : getAllStreams()) {
+      plan.addStream(psmeta);
     }
 
   }
@@ -305,12 +365,32 @@ public class WrappedLogicalPlan extends LogicalPlan implements DAG
     {
       throw new UnsupportedOperationException();
     }
+
+    @Override
+    public <T extends DAG.OutputPortMeta> T getSource()
+    {
+      return (T)parent.getSource();
+    }
+
+    @Override
+    public <T extends DAG.InputPortMeta> Collection<T> getSinks()
+    {
+      // return null;
+      throw new NotImplementedException();
+    }
   }
 
   public void validate() throws ConstraintViolationException
   {
-    // bring back changes from logical plan to itself
-    updateFromParent();
+    try {
+      // copy plan for validation.
+      LogicalPlan plan = parent.copy();
+      merge(plan);
+      plan.validate();
+    } catch (CloneNotSupportedException e) {
+      e.printStackTrace();
+    }
+
     super.validate();
   }
 }
