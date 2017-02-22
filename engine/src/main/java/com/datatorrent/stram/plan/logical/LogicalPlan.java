@@ -193,7 +193,7 @@ public class LogicalPlan implements Serializable, DAG
     Attribute.AttributeMap.AttributeInitializer.initialize(LogicalPlan.class);
   }
 
-  private final Map<String, StreamMeta> streams = new HashMap<>();
+  protected final Map<String, StreamMeta> streams = new HashMap<>();
   protected final Map<String, OperatorMeta> operators = new HashMap<>();
   public final Map<String, ModuleMeta> modules = new LinkedHashMap<>();
   private final List<OperatorMeta> rootOperators = new ArrayList<>();
@@ -1024,9 +1024,7 @@ public class LogicalPlan implements Serializable, DAG
      */
     private void copyAttributes(AttributeMap dest, AttributeMap source)
     {
-      for (Entry<Attribute<?>, ?> a : source.entrySet()) {
-        dest.put((Attribute<Object>)a.getKey(), a.getValue());
-      }
+      dest.addAll(source);
     }
 
     /**
@@ -1035,7 +1033,7 @@ public class LogicalPlan implements Serializable, DAG
      *
      * @param operatorMeta copy attribute from this OperatorMeta to the object.
      */
-    private void copyAttributesFrom(OperatorMeta operatorMeta)
+    void copyAttributesFrom(OperatorMeta operatorMeta)
     {
       if (operator != operatorMeta.getOperator()) {
         throw new IllegalArgumentException("Operator meta is not for the same operator ");
@@ -1059,8 +1057,7 @@ public class LogicalPlan implements Serializable, DAG
       }
     }
 
-
-    private class PortMapping implements Operators.OperatorDescriptor
+    protected class PortMapping implements Operators.OperatorDescriptor
     {
       private final Map<Operator.InputPort<?>, InputPortMeta> inPortMap = new HashMap<>();
       private final Map<Operator.OutputPort<?>, OutputPortMeta> outPortMap = new HashMap<>();
@@ -1138,6 +1135,21 @@ public class LogicalPlan implements Serializable, DAG
           portMeta.classDeclaringHiddenPort = declaringClass;
         }
       }
+
+      public Map<InputPort<?>, InputPortMeta> getInPortMap()
+      {
+        return inPortMap;
+      }
+
+      public Map<OutputPort<?>, OutputPortMeta> getOutPortMap()
+      {
+        return outPortMap;
+      }
+
+      public Map<String, Object> getPortNameMap()
+      {
+        return portNameMap;
+      }
     }
 
     /**
@@ -1145,7 +1157,7 @@ public class LogicalPlan implements Serializable, DAG
      */
     private transient PortMapping portMapping = null;
 
-    private PortMapping getPortMapping()
+    PortMapping getPortMapping()
     {
       if (this.portMapping == null) {
         this.portMapping = new PortMapping();
@@ -1546,7 +1558,7 @@ public class LogicalPlan implements Serializable, DAG
     return null;
   }
 
-  private InputPortMeta assertGetPortMeta(Operator.InputPort<?> port)
+  public InputPortMeta assertGetPortMeta(Operator.InputPort<?> port)
   {
     InputPortMeta meta = getPortMeta(port);
     if (meta == null) {
@@ -2458,7 +2470,7 @@ public class LogicalPlan implements Serializable, DAG
 
   StreamMeta getStreamBySource(OutputPort<?> source) {
     for (StreamMeta smeta : streams.values()) {
-      if (smeta.getSource().getPortObject() == source) {
+      if (smeta.getSource().getPort() == source) {
         return smeta;
       }
     }
@@ -2472,6 +2484,48 @@ public class LogicalPlan implements Serializable, DAG
     return new WrappedLogicalPlan(this, version.incrementAndGet());
   }
 
+  protected void addOperator(OperatorMeta ometa)
+  {
+    addOperator(ometa.getName(), ometa.getOperator());
+    OperatorMeta meta = getMeta(ometa.getOperator());
+    meta.copyAttributesFrom(ometa);
+  }
+
+  protected void addStream(StreamMeta psmeta)
+  {
+    LogicalPlan.StreamMeta smeta = addStream(psmeta.getName());
+    smeta.setSource(psmeta.getSource().getPort());
+    for (LogicalPlan.InputPortMeta ip : psmeta.getSinks()) {
+      smeta.addSink(ip.getPort());
+    }
+    smeta.setLocality(psmeta.getLocality());
+    // TODO: copy unifier's attributes
+  }
+
+  /**
+   * create a copy of logical plan.
+   * @return
+   */
+  LogicalPlan copy() throws CloneNotSupportedException
+  {
+    LogicalPlan plan = new LogicalPlan();
+
+    // copy attributes from parent
+    plan.getAttributes().addAll(plan.getAttributes());
+
+    // Update operators
+    for (LogicalPlan.OperatorMeta ometa : getAllOperators()) {
+      plan.addOperator(ometa);
+    }
+
+    // Add streams from existing operators here.
+    for (LogicalPlan.StreamMeta psmeta : getAllStreams()) {
+      addStream(psmeta);
+    }
+
+    return plan;
+  }
+
   public synchronized void commit(WrappedLogicalPlan plan)
   {
     if (this.version.get() != plan.parentVersion) {
@@ -2482,8 +2536,8 @@ public class LogicalPlan implements Serializable, DAG
     plan.validate();
     version.incrementAndGet();
 
-    // make changes to actual plan.
-
+    // make actual changes to dag
+    plan.merge(this);
   }
 
   void abort()
