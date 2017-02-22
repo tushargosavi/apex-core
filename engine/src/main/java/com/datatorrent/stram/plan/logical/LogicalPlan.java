@@ -2501,6 +2501,8 @@ public class LogicalPlan implements Serializable, DAG
     }
     smeta.setLocality(psmeta.getLocality());
     // TODO: copy unifier's attributes
+
+    // TODO copy persist operators and their attributes.
   }
 
   /**
