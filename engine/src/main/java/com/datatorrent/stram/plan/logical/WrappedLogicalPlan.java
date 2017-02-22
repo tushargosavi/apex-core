@@ -33,8 +33,6 @@ import com.datatorrent.api.DAG;
 import com.datatorrent.api.Module;
 import com.datatorrent.api.Operator;
 
-import sun.reflect.generics.reflectiveObjects.NotImplementedException;
-
 public class WrappedLogicalPlan extends LogicalPlan implements DAG
 {
   final int parentVersion;
@@ -46,7 +44,8 @@ public class WrappedLogicalPlan extends LogicalPlan implements DAG
   Map<String, LogicalPlan.StreamMeta> newStreams = Maps.newHashMap();
   Map<String, WrappedStreamMeta> changedStreams = Maps.newHashMap();
 
-  public WrappedLogicalPlan(LogicalPlan plan, int version) {
+  public WrappedLogicalPlan(LogicalPlan plan, int version)
+  {
     parent = plan;
     this.parentVersion = version;
   }
@@ -98,7 +97,7 @@ public class WrappedLogicalPlan extends LogicalPlan implements DAG
   private void assertExistingOpeartor(String name)
   {
     if (parent.getOperatorMeta(name) != null || super.operators.containsKey(name)) {
-      LogicalPlan.OperatorMeta ometa  = parent.getOperatorMeta(name) != null?
+      LogicalPlan.OperatorMeta ometa  = parent.getOperatorMeta(name) != null ?
           parent.getOperatorMeta(name) : operators.get(name);
       throw new IllegalArgumentException("duplicate operator id: " + ometa.getName());
     }
@@ -107,13 +106,13 @@ public class WrappedLogicalPlan extends LogicalPlan implements DAG
   @Override
   public <T extends Module> T addModule(String name, Class<T> moduleClass)
   {
-    throw new NotImplementedException();
+    throw new RuntimeException("Not implemented");
   }
 
   @Override
   public <T extends Module> T addModule(String name, T module)
   {
-    throw new NotImplementedException();
+    throw new RuntimeException("Not implemented");
   }
 
   @Override
@@ -285,7 +284,8 @@ public class WrappedLogicalPlan extends LogicalPlan implements DAG
     super.setInputPortAttribute(port, key, value);
   }
 
-  public void commit() {
+  public void commit()
+  {
     parent.commit(this);
   }
 
@@ -306,7 +306,8 @@ public class WrappedLogicalPlan extends LogicalPlan implements DAG
    * A wrapper class to track stream extension. A stream can be extended by adding more
    * sink to it.
    */
-  private class WrappedStreamMeta implements DAG.StreamMeta {
+  private class WrappedStreamMeta implements DAG.StreamMeta
+  {
 
     /* the original stream meta */
     final LogicalPlan.StreamMeta parent;
@@ -376,7 +377,7 @@ public class WrappedLogicalPlan extends LogicalPlan implements DAG
     public <T extends DAG.InputPortMeta> Collection<T> getSinks()
     {
       // return null;
-      throw new NotImplementedException();
+      throw new RuntimeException("not implemented");
     }
   }
 
