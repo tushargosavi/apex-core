@@ -2468,7 +2468,8 @@ public class LogicalPlan implements Serializable, DAG
     return result;
   }
 
-  StreamMeta getStreamBySource(OutputPort<?> source) {
+  StreamMeta getStreamBySource(OutputPort<?> source)
+  {
     for (StreamMeta smeta : streams.values()) {
       if (smeta.getSource().getPort() == source) {
         return smeta;
@@ -2548,9 +2549,12 @@ public class LogicalPlan implements Serializable, DAG
   /** this is required for runtime dag change */
   private transient CommitHandler commitHandler;
 
-  static interface CommitHandler {
+  static interface CommitHandler
+  {
     public void addOperator(OperatorMeta ometa);
+
     public void addStream(StreamMeta smeta);
+
     public void extendStream(StreamMeta smeta);
   }
 }
