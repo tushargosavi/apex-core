@@ -50,6 +50,7 @@ import com.datatorrent.api.AutoMetric;
 import com.datatorrent.api.Context;
 import com.datatorrent.api.Context.OperatorContext;
 import com.datatorrent.api.Context.PortContext;
+import com.datatorrent.api.DAG;
 import com.datatorrent.api.DAG.Locality;
 import com.datatorrent.api.Stats.OperatorStats;
 import com.datatorrent.api.Stats.OperatorStats.PortStats;
@@ -277,8 +278,8 @@ public class StreamingContainerManagerTest
     GenericTestOperator node3 = dag.addOperator("node3", GenericTestOperator.class);
     dag.setInputPortAttribute(node3.inport1, PortContext.QUEUE_CAPACITY, 2222);
 
-    LogicalPlan.StreamMeta n1n2 = dag.addStream("n1n2", node1.outport1, node2.inport1);
-    LogicalPlan.StreamMeta n2n3 = dag.addStream("n2n3", node2.outport1, node3.inport1);
+    DAG.StreamMeta n1n2 = dag.addStream("n1n2", node1.outport1, node2.inport1);
+    DAG.StreamMeta n2n3 = dag.addStream("n2n3", node2.outport1, node3.inport1);
 
     dag.setAttribute(LogicalPlan.CONTAINERS_MAX_COUNT, Integer.MAX_VALUE);
     MemoryStorageAgent msa = new MemoryStorageAgent();

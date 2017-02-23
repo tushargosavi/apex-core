@@ -56,6 +56,7 @@ import com.datatorrent.api.Attribute;
 import com.datatorrent.api.Context.DAGContext;
 import com.datatorrent.api.Context.OperatorContext;
 import com.datatorrent.api.Context.PortContext;
+import com.datatorrent.api.DAG;
 import com.datatorrent.api.DAG.Locality;
 import com.datatorrent.api.DefaultInputPort;
 import com.datatorrent.api.DefaultOutputPort;
@@ -110,7 +111,7 @@ public class LogicalPlanTest
     dag.addStream("n4n2", operator4.outport1, operator2.inport1);
 
     // self referencing operator cycle
-    StreamMeta n7n7 = dag.addStream("n7n7", operator7.outport1, operator7.inport1);
+    DAG.StreamMeta n7n7 = dag.addStream("n7n7", operator7.outport1, operator7.inport1);
     try {
       n7n7.addSink(operator7.inport1);
       fail("cannot add to stream again");
@@ -236,7 +237,7 @@ public class LogicalPlanTest
     GenericTestOperator o1 = dag.addOperator("o1", GenericTestOperator.class);
     GenericTestOperator o2 = dag.addOperator("o2", GenericTestOperator.class);
     dag.addStream("s0", input.outport, o1.inport1);
-    StreamMeta s1 = dag.addStream("s1", o1.outport1, o2.inport1);
+    StreamMeta s1 = (StreamMeta)dag.addStream("s1", o1.outport1, o2.inport1);
     dag.validate();
     Assert.assertEquals("", 3, dag.getAllOperators().size());
 
@@ -608,7 +609,7 @@ public class LogicalPlanTest
 
     TestGeneratorInputOperator input1 = dag.addOperator("input1", TestGeneratorInputOperator.class);
     GenericTestOperator o1 = dag.addOperator("o1", GenericTestOperator.class);
-    StreamMeta s1 = dag.addStream("input1.outport", input1.outport, o1.inport1).setLocality(Locality.THREAD_LOCAL);
+    DAG.StreamMeta s1 = dag.addStream("input1.outport", input1.outport, o1.inport1).setLocality(Locality.THREAD_LOCAL);
     dag.validate();
 
     TestGeneratorInputOperator input2 = dag.addOperator("input2", TestGeneratorInputOperator.class);
@@ -1029,7 +1030,7 @@ public class LogicalPlanTest
     GenericTestOperator o2 = dag.addOperator("O2", new GenericTestOperator());
     GenericTestOperator o3 = dag.addOperator("O3", new GenericTestOperator());
     dag.addStream("stream1", o1.outport, o2.inport1).setLocality(Locality.THREAD_LOCAL);
-    StreamMeta stream2 = dag.addStream("stream2", o2.outport1, o3.inport1).setLocality(Locality.CONTAINER_LOCAL);
+    DAG.StreamMeta stream2 = dag.addStream("stream2", o2.outport1, o3.inport1).setLocality(Locality.CONTAINER_LOCAL);
 
     AffinityRulesSet ruleSet = new AffinityRulesSet();
     // Valid case:
