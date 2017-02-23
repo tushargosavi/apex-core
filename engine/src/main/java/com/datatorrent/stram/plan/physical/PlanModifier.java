@@ -24,6 +24,7 @@ import java.util.Map;
 import javax.validation.ValidationException;
 
 import com.datatorrent.api.Context.DAGContext;
+import com.datatorrent.api.DAG;
 import com.datatorrent.api.Operator;
 import com.datatorrent.api.Operator.InputPort;
 import com.datatorrent.api.Operator.OutputPort;
@@ -82,7 +83,7 @@ public class PlanModifier
 
   public StreamMeta addSinks(String id, Operator.InputPort<?>... sinks)
   {
-    StreamMeta sm = logicalPlan.getStream(id);
+    StreamMeta sm = (StreamMeta)logicalPlan.getStream(id);
     if (sm == null) {
       throw new AssertionError("Stream " + id + " is not found!");
     }
@@ -101,7 +102,7 @@ public class PlanModifier
 
   public <T> StreamMeta addStream(String id, Operator.OutputPort<? extends T> source, Operator.InputPort<?>... sinks)
   {
-    StreamMeta sm = logicalPlan.getStream(id);
+    DAG.StreamMeta sm = logicalPlan.getStream(id);
     if (sm != null) {
       if (sm.getSource().getOperatorMeta().getMeta(source) != sm.getSource()) {
         throw new AssertionError(String.format("Stream %s already connected to %s", sm, sm.getSource()));
@@ -180,7 +181,7 @@ public class PlanModifier
    */
   public void removeStream(String streamName)
   {
-    StreamMeta sm = logicalPlan.getStream(streamName);
+    StreamMeta sm = (StreamMeta)logicalPlan.getStream(streamName);
     if (sm == null) {
       return;
     }
