@@ -32,6 +32,7 @@ import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
 import com.datatorrent.api.Context.OperatorContext;
+import com.datatorrent.api.DAG;
 import com.datatorrent.api.DAG.Locality;
 import com.datatorrent.api.DefaultInputPort;
 import com.datatorrent.api.DefaultOutputPort;
@@ -120,8 +121,8 @@ public class OiOStreamTest
     RecoverableInputOperator inputOp1 = plan.addOperator("InputOperator1", new RecoverableInputOperator());
     RecoverableInputOperator inputOp2 = plan.addOperator("InputOperator2", new RecoverableInputOperator());
     GenericOperator genOp = plan.addOperator("GenericOperator", new GenericOperator());
-    StreamMeta oio1 = plan.addStream("OiO1", inputOp1.output, genOp.ip1).setLocality(Locality.THREAD_LOCAL);
-    StreamMeta oio2 = plan.addStream("OiO2", inputOp2.output, genOp.ip2).setLocality(Locality.THREAD_LOCAL);
+    DAG.StreamMeta oio1 = plan.addStream("OiO1", inputOp1.output, genOp.ip1).setLocality(Locality.THREAD_LOCAL);
+    DAG.StreamMeta oio2 = plan.addStream("OiO2", inputOp2.output, genOp.ip2).setLocality(Locality.THREAD_LOCAL);
 
     try {
       plan.validate();
@@ -481,7 +482,7 @@ public class OiOStreamTest
 
     ThreadIdValidatingInputOperator io = lp.addOperator("Input Operator", new ThreadIdValidatingInputOperator());
     ThreadIdValidatingOutputOperator go = lp.addOperator("Output Operator", new ThreadIdValidatingOutputOperator());
-    StreamMeta stream = lp.addStream("Stream", io.output, go.input);
+    DAG.StreamMeta stream = lp.addStream("Stream", io.output, go.input);
 
     /* The first test makes sure that when they are not ThreadLocal they use different threads */
     ThreadIdValidatingOutputOperator.threadList.clear();
@@ -509,8 +510,8 @@ public class OiOStreamTest
     ThreadIdValidatingGenericIntermediateOperator intermediateOperator = lp.addOperator("intermediateOperator", new ThreadIdValidatingGenericIntermediateOperator());
     ThreadIdValidatingOutputOperator outputOperator = lp.addOperator("outputOperator", new ThreadIdValidatingOutputOperator());
 
-    StreamMeta stream1 = lp.addStream("OiO1", inputOperator.output, intermediateOperator.input);
-    StreamMeta stream2 = lp.addStream("OiO2", intermediateOperator.output, outputOperator.input);
+    DAG.StreamMeta stream1 = lp.addStream("OiO1", inputOperator.output, intermediateOperator.input);
+    DAG.StreamMeta stream2 = lp.addStream("OiO2", intermediateOperator.output, outputOperator.input);
 
     StramLocalCluster slc;
 
@@ -544,9 +545,9 @@ public class OiOStreamTest
     ThreadIdValidatingGenericIntermediateOperator intermediateOperator2 = lp.addOperator("intermediateOperator2", new ThreadIdValidatingGenericIntermediateOperator());
     ThreadIdValidatingGenericOperatorWithTwoInputPorts outputOperator = lp.addOperator("outputOperator", new ThreadIdValidatingGenericOperatorWithTwoInputPorts());
 
-    StreamMeta stream1 = lp.addStream("OiOinput", inputOperator.output, intermediateOperator1.input, intermediateOperator2.input);
-    StreamMeta stream2 = lp.addStream("OiOintermediateToOutput1", intermediateOperator1.output, outputOperator.input);
-    StreamMeta stream3 = lp.addStream("OiOintermediateToOutput2", intermediateOperator2.output, outputOperator.input2);
+    DAG.StreamMeta stream1 = lp.addStream("OiOinput", inputOperator.output, intermediateOperator1.input, intermediateOperator2.input);
+    DAG.StreamMeta stream2 = lp.addStream("OiOintermediateToOutput1", intermediateOperator1.output, outputOperator.input);
+    DAG.StreamMeta stream3 = lp.addStream("OiOintermediateToOutput2", intermediateOperator2.output, outputOperator.input2);
 
     StramLocalCluster slc;
 
@@ -603,9 +604,9 @@ public class OiOStreamTest
     ThreadIdValidatingOutputOperator outputOperatorFromInterOper21 = lp.addOperator("outputOperatorFromInterOper21", new ThreadIdValidatingOutputOperator());
     ThreadIdValidatingOutputOperator outputOperatorFromInterOper22 = lp.addOperator("outputOperatorFromInterOper22", new ThreadIdValidatingOutputOperator());
 
-    StreamMeta stream1 = lp.addStream("OiO1", inputOperator1.output, outputOperatorFromInputOper.input, intermediateOperatorfromInputOper1.input);
-    StreamMeta stream2 = lp.addStream("OiO2", intermediateOperatorfromInputOper1.output, intermediateOperatorfromInterOper11.input, intermediateOperatorfromInterOper12.input);
-    StreamMeta stream3 = lp.addStream("OiO3", intermediateOperatorfromInterOper11.output, outputOperatorFromInterOper11.input);
+    DAG.StreamMeta stream1 = lp.addStream("OiO1", inputOperator1.output, outputOperatorFromInputOper.input, intermediateOperatorfromInputOper1.input);
+    DAG.StreamMeta stream2 = lp.addStream("OiO2", intermediateOperatorfromInputOper1.output, intermediateOperatorfromInterOper11.input, intermediateOperatorfromInterOper12.input);
+    DAG.StreamMeta stream3 = lp.addStream("OiO3", intermediateOperatorfromInterOper11.output, outputOperatorFromInterOper11.input);
     lp.addStream("nonOiO1", intermediateOperatorfromInterOper12.output, outputOperatorFromInterOper21.input, outputOperatorFromInterOper22.input);
 
     StramLocalCluster slc;
@@ -657,9 +658,9 @@ public class OiOStreamTest
     ThreadIdValidatingGenericIntermediateOperatorWithTwoOutputPorts intermediateOperator = lp.addOperator("intermediateOperator1", new ThreadIdValidatingGenericIntermediateOperatorWithTwoOutputPorts());
     ThreadIdValidatingGenericOperatorWithTwoInputPorts outputOperator = lp.addOperator("outputOperator", new ThreadIdValidatingGenericOperatorWithTwoInputPorts());
 
-    StreamMeta stream1 = lp.addStream("OiOinput", inputOperator.output, intermediateOperator.input);
-    StreamMeta stream2 = lp.addStream("OiOintermediateOutput1", intermediateOperator.output, outputOperator.input);
-    StreamMeta stream3 = lp.addStream("OiOintermediateOutput2", intermediateOperator.output2, outputOperator.input2);
+    DAG.StreamMeta stream1 = lp.addStream("OiOinput", inputOperator.output, intermediateOperator.input);
+    DAG.StreamMeta stream2 = lp.addStream("OiOintermediateOutput1", intermediateOperator.output, outputOperator.input);
+    DAG.StreamMeta stream3 = lp.addStream("OiOintermediateOutput2", intermediateOperator.output2, outputOperator.input2);
 
     StramLocalCluster slc;
 

@@ -109,7 +109,7 @@ public class PlanModifier
     } else {
       // fails on duplicate stream name
       @SuppressWarnings("unchecked")
-      StreamMeta newStream = logicalPlan.addStream(id, source);
+      StreamMeta newStream = (StreamMeta)logicalPlan.addStream(id, source);
       sm = newStream;
     }
     return addSinks(id, sinks);

@@ -1412,7 +1412,7 @@ public class LogicalPlan implements Serializable, DAG
   }
 
   @Override
-  public StreamMeta addStream(String id)
+  public DAG.StreamMeta addStream(String id)
   {
     StreamMeta s = new StreamMeta(id);
     StreamMeta o = streams.put(id, s);
@@ -1425,9 +1425,9 @@ public class LogicalPlan implements Serializable, DAG
 
   @Override
   @SuppressWarnings("unchecked")
-  public <T> StreamMeta addStream(String id, Operator.OutputPort<? extends T> source, Operator.InputPort<? super T>... sinks)
+  public <T> DAG.StreamMeta addStream(String id, Operator.OutputPort<? extends T> source, Operator.InputPort<? super T>... sinks)
   {
-    StreamMeta s = addStream(id);
+    DAG.StreamMeta s = addStream(id);
     s.setSource(source);
     for (Operator.InputPort<?> sink : sinks) {
       s.addSink(sink);
@@ -1470,14 +1470,14 @@ public class LogicalPlan implements Serializable, DAG
       InputPort[] inputPorts = ports.toArray(new InputPort[]{});
 
       name = subDAGName + MODULE_NAMESPACE_SEPARATOR + streamMeta.getName();
-      StreamMeta streamMetaNew = this.addStream(name, sourceMeta.getPort(), inputPorts);
+      DAG.StreamMeta streamMetaNew = this.addStream(name, sourceMeta.getPort(), inputPorts);
       streamMetaNew.setLocality(streamMeta.getLocality());
     }
   }
 
   @Override
   @SuppressWarnings("unchecked")
-  public <T> StreamMeta addStream(String id, Operator.OutputPort<? extends T> source, Operator.InputPort<? super T> sink1)
+  public <T> DAG.StreamMeta addStream(String id, Operator.OutputPort<? extends T> source, Operator.InputPort<? super T> sink1)
   {
     @SuppressWarnings("rawtypes")
     InputPort[] ports = new Operator.InputPort[]{sink1};
@@ -1486,14 +1486,14 @@ public class LogicalPlan implements Serializable, DAG
 
   @Override
   @SuppressWarnings("unchecked")
-  public <T> StreamMeta addStream(String id, Operator.OutputPort<? extends T> source, Operator.InputPort<? super T> sink1, Operator.InputPort<? super T> sink2)
+  public <T> DAG.StreamMeta addStream(String id, Operator.OutputPort<? extends T> source, Operator.InputPort<? super T> sink1, Operator.InputPort<? super T> sink2)
   {
     @SuppressWarnings("rawtypes")
     InputPort[] ports = new Operator.InputPort[] {sink1, sink2};
     return addStream(id, source, ports);
   }
 
-  public StreamMeta getStream(String id)
+  public DAG.StreamMeta getStream(String id)
   {
     return this.streams.get(id);
   }
@@ -2492,11 +2492,11 @@ public class LogicalPlan implements Serializable, DAG
     meta.copyAttributesFrom(ometa);
   }
 
-  protected void addStream(StreamMeta psmeta)
+  protected void addStream(DAG.StreamMeta psmeta)
   {
-    LogicalPlan.StreamMeta smeta = addStream(psmeta.getName());
+    DAG.StreamMeta smeta = addStream(psmeta.getName());
     smeta.setSource(psmeta.getSource().getPort());
-    for (LogicalPlan.InputPortMeta ip : psmeta.getSinks()) {
+    for (DAG.InputPortMeta ip : psmeta.getSinks()) {
       smeta.addSink(ip.getPort());
     }
     smeta.setLocality(psmeta.getLocality());
@@ -2536,7 +2536,7 @@ public class LogicalPlan implements Serializable, DAG
     }
 
     // validate if changing plan does not cause any issues.
-    plan.validate();
+    //plan.validate();
     version.incrementAndGet();
 
     // make actual changes to dag

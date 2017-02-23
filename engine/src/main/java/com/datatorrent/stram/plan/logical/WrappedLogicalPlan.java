@@ -25,8 +25,15 @@ import java.util.Map;
 
 import javax.validation.ConstraintViolationException;
 
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
+
+import org.apache.commons.collections.list.UnmodifiableList;
+
 import com.google.common.collect.Lists;
 import com.google.common.collect.Maps;
+import com.sun.javafx.UnmodifiableArrayList;
+import com.sun.javafx.collections.FloatArraySyncer;
 
 import com.datatorrent.api.Attribute;
 import com.datatorrent.api.DAG;
@@ -35,13 +42,15 @@ import com.datatorrent.api.Operator;
 
 public class WrappedLogicalPlan extends LogicalPlan implements DAG
 {
+  private static final Logger LOG = LoggerFactory.getLogger(LogicalPlan.class);
+
   final int parentVersion;
   /* The original snapshot of logical plan */
   private LogicalPlan parent;
 
   List<LogicalPlan.OperatorMeta> removedOperators = Lists.newArrayList();
   Map<String, LogicalPlan.OperatorMeta> newOperators = Maps.newHashMap();
-  Map<String, LogicalPlan.StreamMeta> newStreams = Maps.newHashMap();
+  Map<String, TransactionStreamMeta> newStreams = Maps.newHashMap();
   Map<String, WrappedStreamMeta> changedStreams = Maps.newHashMap();
 
   public WrappedLogicalPlan(LogicalPlan plan, int version)
@@ -116,10 +125,12 @@ public class WrappedLogicalPlan extends LogicalPlan implements DAG
   }
 
   @Override
-  public LogicalPlan.StreamMeta addStream(String id)
+  public DAG.StreamMeta addStream(String id)
   {
     assertExistingStream(id);
-    return super.addStream(id);
+    TransactionStreamMeta meta = new TransactionStreamMeta();
+    newStreams.put(id, meta);
+    return meta;
   }
 
   private void assertExistingStream(Operator.OutputPort<?> port)
@@ -138,7 +149,7 @@ public class WrappedLogicalPlan extends LogicalPlan implements DAG
   }
 
   @Override
-  public <T> LogicalPlan.StreamMeta addStream(String id, Operator.OutputPort<? extends T> source, Operator.InputPort<? super T>[]
+  public <T> DAG.StreamMeta addStream(String id, Operator.OutputPort<? extends T> source, Operator.InputPort<? super T>[]
       sinks)
   {
     assertExistingStream(source);
@@ -147,7 +158,7 @@ public class WrappedLogicalPlan extends LogicalPlan implements DAG
   }
 
   @Override
-  public <T> LogicalPlan.StreamMeta addStream(String id, Operator.OutputPort<? extends T> source, Operator.InputPort<? super T> sink1)
+  public <T> DAG.StreamMeta addStream(String id, Operator.OutputPort<? extends T> source, Operator.InputPort<? super T> sink1)
   {
     assertExistingStream(id);
     assertExistingPort(source);
@@ -155,7 +166,7 @@ public class WrappedLogicalPlan extends LogicalPlan implements DAG
   }
 
   @Override
-  public <T> LogicalPlan.StreamMeta addStream(String id, Operator.OutputPort<? extends T> source, Operator.InputPort<? super T>
+  public <T> DAG.StreamMeta addStream(String id, Operator.OutputPort<? extends T> source, Operator.InputPort<? super T>
       sink1, Operator.InputPort<? super T> sink2)
   {
     assertExistingStream(id);
@@ -289,18 +300,99 @@ public class WrappedLogicalPlan extends LogicalPlan implements DAG
     parent.commit(this);
   }
 
-
+  /**
+   * Merge the delta into given plan.
+   * @param plan
+   */
   void merge(LogicalPlan plan)
   {
+    LOG.info("Number of new operators {}", getAllOperators().size());
     for (LogicalPlan.OperatorMeta ometa : getAllOperators()) {
       plan.addOperator(ometa);
     }
 
-    for (LogicalPlan.StreamMeta psmeta : getAllStreams()) {
+    LOG.info("Number of new streams {}", getAllStreams().size());
+    for (DAG.StreamMeta psmeta : newStreams.values()) {
       plan.addStream(psmeta);
     }
 
+    // TODO make changes to extended stream.
   }
+
+  private class TransactionStreamMeta implements DAG.StreamMeta
+  {
+    private String name;
+    private Operator.OutputPort<?> source;
+    private List<Operator.InputPort<?>> sinks = new ArrayList<>();
+    private List<LogicalPlan.InputPortMeta> sinksMeta = new ArrayList<>();
+    private Locality locality;
+
+    @Override
+    public String getName()
+    {
+      return name;
+    }
+
+    @Override
+    public Locality getLocality()
+    {
+      return locality;
+    }
+
+    @Override
+    public DAG.StreamMeta setLocality(Locality locality)
+    {
+      this.locality = locality;
+      return this;
+    }
+
+    @Override
+    public DAG.StreamMeta setSource(Operator.OutputPort<?> port)
+    {
+      source = port;
+      return this;
+    }
+
+
+    @Override
+    public DAG.StreamMeta addSink(Operator.InputPort<?> port)
+    {
+      sinks.add(port);
+      sinksMeta.add(getPortMeta(port));
+      return this;
+    }
+
+    @Override
+    public DAG.StreamMeta persistUsing(String name, Operator persistOperator, Operator.InputPort<?> persistOperatorInputPort)
+    {
+      throw new RuntimeException("Not implemented");
+    }
+
+    @Override
+    public DAG.StreamMeta persistUsing(String name, Operator persistOperator)
+    {
+      throw new RuntimeException("Not implemented");
+    }
+
+    @Override
+    public DAG.StreamMeta persistUsing(String name, Operator persistOperator, Operator.InputPort<?> persistOperatorInputPort, Operator.InputPort<?> sinkToPersist)
+    {
+      throw new RuntimeException("Not implemented");
+    }
+
+    @Override
+    public <T extends DAG.OutputPortMeta> T getSource()
+    {
+      return (T)getPortMeta(source);
+    }
+
+    @Override
+    public <T extends DAG.InputPortMeta> Collection<T> getSinks()
+    {
+      return (Collection<T>)sinksMeta;
+    }
+  }
+
 
   /**
    * A wrapper class to track stream extension. A stream can be extended by adding more

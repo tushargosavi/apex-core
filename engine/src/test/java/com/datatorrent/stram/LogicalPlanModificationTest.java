@@ -37,6 +37,7 @@ import com.datatorrent.api.AffinityRule;
 import com.datatorrent.api.AffinityRule.Type;
 import com.datatorrent.api.AffinityRulesSet;
 import com.datatorrent.api.Context.DAGContext;
+import com.datatorrent.api.DAG;
 import com.datatorrent.api.DAG.Locality;
 import com.datatorrent.api.StorageAgent;
 import com.datatorrent.common.util.AsyncFSStorageAgent;
@@ -201,8 +202,8 @@ public class LogicalPlanModificationTest
     GenericTestOperator o3 = dag.addOperator("o3", GenericTestOperator.class);
     OperatorMeta o3Meta = dag.getMeta(o3);
 
-    LogicalPlan.StreamMeta s1 = dag.addStream("o1.outport1", o1.outport1, o2.inport1, o12.inport1);
-    LogicalPlan.StreamMeta s2 = dag.addStream("o2.outport1", o2.outport1, o3.inport1);
+    DAG.StreamMeta s1 = dag.addStream("o1.outport1", o1.outport1, o2.inport1, o12.inport1);
+    DAG.StreamMeta s2 = dag.addStream("o2.outport1", o2.outport1, o3.inport1);
 
     TestPlanContext ctx = new TestPlanContext();
     dag.setAttribute(OperatorContext.STORAGE_AGENT, ctx);
@@ -269,7 +270,7 @@ public class LogicalPlanModificationTest
     GenericTestOperator o3 = dag.addOperator("o3", GenericTestOperator.class);
     OperatorMeta o3Meta = dag.getMeta(o3);
 
-    LogicalPlan.StreamMeta s1 = dag.addStream("o1.outport1", o1.outport1, o2.inport1, o3.inport1).setLocality(Locality.CONTAINER_LOCAL);
+    DAG.StreamMeta s1 = dag.addStream("o1.outport1", o1.outport1, o2.inport1, o3.inport1).setLocality(Locality.CONTAINER_LOCAL);
 
     TestPlanContext ctx = new TestPlanContext();
     dag.setAttribute(OperatorContext.STORAGE_AGENT, ctx);
