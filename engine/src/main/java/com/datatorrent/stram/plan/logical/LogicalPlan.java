@@ -2480,9 +2480,9 @@ public class LogicalPlan implements Serializable, DAG
 
   AtomicInteger version = new AtomicInteger(0);
 
-  WrappedLogicalPlan startTransaction()
+  DAGChangeTransaction startTransaction()
   {
-    return new WrappedLogicalPlan(this, version.incrementAndGet());
+    return new DAGChangeTransactionImpl(this, version.incrementAndGet());
   }
 
   protected void addOperator(OperatorMeta ometa)
@@ -2529,18 +2529,16 @@ public class LogicalPlan implements Serializable, DAG
     return plan;
   }
 
-  public synchronized void commit(WrappedLogicalPlan plan)
+  public synchronized void commit(DAGChangeTransaction plan)
   {
-    if (this.version.get() != plan.parentVersion) {
+    if (this.version.get() != plan.getTransactionId()) {
       throw new ConcurrentModificationException("Dag modified in between");
     }
 
-    // validate if changing plan does not cause any issues.
-    //plan.validate();
     version.incrementAndGet();
 
     // make actual changes to dag
-    plan.merge(this);
+    ((DAGChangeTransactionImpl)plan).merge(this);
   }
 
   void abort()

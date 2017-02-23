@@ -35,7 +35,7 @@ public class WrappedLogicalPlanTest
     InputNodeTest.TestInputOperator input = plan.addOperator("input", new InputNodeTest.TestInputOperator());
     plan.validate();
 
-    WrappedLogicalPlan cdag = plan.startTransaction();
+    DAGChangeTransactionImpl cdag = (DAGChangeTransactionImpl)plan.startTransaction();
     GenericTestOperator sinkOperator = cdag.addOperator("input1", new GenericTestOperator());
     cdag.addStream("s1", input.output, sinkOperator.inport1);
     cdag.commit();

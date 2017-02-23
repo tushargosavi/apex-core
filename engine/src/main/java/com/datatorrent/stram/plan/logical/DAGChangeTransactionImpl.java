@@ -28,41 +28,38 @@ import javax.validation.ConstraintViolationException;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
-import org.apache.commons.collections.list.UnmodifiableList;
-
 import com.google.common.collect.Lists;
 import com.google.common.collect.Maps;
-import com.sun.javafx.UnmodifiableArrayList;
-import com.sun.javafx.collections.FloatArraySyncer;
 
 import com.datatorrent.api.Attribute;
 import com.datatorrent.api.DAG;
 import com.datatorrent.api.Module;
 import com.datatorrent.api.Operator;
 
-public class WrappedLogicalPlan extends LogicalPlan implements DAG
+public class DAGChangeTransactionImpl extends LogicalPlan implements DAG.DAGChangeTransaction
 {
   private static final Logger LOG = LoggerFactory.getLogger(LogicalPlan.class);
 
-  final int parentVersion;
+  final int transactionId;
   /* The original snapshot of logical plan */
   private LogicalPlan parent;
 
-  List<LogicalPlan.OperatorMeta> removedOperators = Lists.newArrayList();
+  List<DAG.OperatorMeta> removedOperators = Lists.newArrayList();
+  List<DAG.StreamMeta> removedStreams = Lists.newArrayList();
   Map<String, LogicalPlan.OperatorMeta> newOperators = Maps.newHashMap();
   Map<String, TransactionStreamMeta> newStreams = Maps.newHashMap();
   Map<String, WrappedStreamMeta> changedStreams = Maps.newHashMap();
 
-  public WrappedLogicalPlan(LogicalPlan plan, int version)
+  public DAGChangeTransactionImpl(LogicalPlan plan, int version)
   {
     parent = plan;
-    this.parentVersion = version;
+    this.transactionId = version;
   }
 
   @Override
   public Attribute.AttributeMap getAttributes()
   {
-    return parent.getAttributes();
+    return new Attribute.AttributeMap.ReadOnlyAttributeMap(parent.getAttributes());
   }
 
   @Override
@@ -306,17 +303,30 @@ public class WrappedLogicalPlan extends LogicalPlan implements DAG
    */
   void merge(LogicalPlan plan)
   {
-    LOG.info("Number of new operators {}", getAllOperators().size());
+    /**
+     * Add newly added operators.
+     */
     for (LogicalPlan.OperatorMeta ometa : getAllOperators()) {
       plan.addOperator(ometa);
     }
 
+    /**
+     * Add new streams.
+     */
     LOG.info("Number of new streams {}", getAllStreams().size());
     for (DAG.StreamMeta psmeta : newStreams.values()) {
       plan.addStream(psmeta);
     }
 
-    // TODO make changes to extended stream.
+    /**
+     * Add newly connected port to existing streams.
+     */
+    for (WrappedStreamMeta psmeta : changedStreams.values()) {
+      DAG.StreamMeta smeta = plan.getStream(psmeta.getName());
+      for (Operator.InputPort ip : psmeta.getNewSinks()) {
+        smeta.addSink(ip);
+      }
+    }
   }
 
   private class TransactionStreamMeta implements DAG.StreamMeta
@@ -471,6 +481,35 @@ public class WrappedLogicalPlan extends LogicalPlan implements DAG
       // return null;
       throw new RuntimeException("not implemented");
     }
+
+    public <T extends DAG.InputPortMeta> Collection<Operator.InputPort<?>> getNewSinks()
+    {
+      return newSinks;
+    }
+  }
+
+  @Override
+  public void removeOperator(String name)
+  {
+    removedOperators.add(getOperatorMeta(name));
+  }
+
+  @Override
+  public <T extends DAG.OperatorMeta> void removeOperator(T meta)
+  {
+    removedOperators.add(meta);
+  }
+
+  @Override
+  public void removeStream(String name)
+  {
+    removedStreams.add(getStream(name));
+  }
+
+  @Override
+  public <T extends DAG.StreamMeta> void removeStream(T streamMeta)
+  {
+    removedStreams.add(streamMeta);
   }
 
   public void validate() throws ConstraintViolationException
@@ -485,5 +524,11 @@ public class WrappedLogicalPlan extends LogicalPlan implements DAG
     }
 
     super.validate();
+  }
+
+  @Override
+  public int getTransactionId()
+  {
+    return transactionId;
   }
 }

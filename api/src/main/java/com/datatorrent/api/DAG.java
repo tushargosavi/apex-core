@@ -359,4 +359,21 @@ public interface DAG extends DAGContext, Serializable
   {
 
   }
+
+  interface DAGChangeTransaction extends DAG
+  {
+    int getTransactionId();
+
+    void removeOperator(String name);
+
+    <T extends Operator> void removeOperator(T operator);
+
+    <T extends OperatorMeta> void removeOperator(T operator);
+
+    void removeStream(String name);
+
+    <T extends StreamMeta> void removeStream(T streamMeta);
+
+    void commit();
+  }
 }
