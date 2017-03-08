@@ -1547,7 +1547,7 @@ public class LogicalPlan implements Serializable, DAG
     return meta;
   }
 
-  InputPortMeta getPortMeta(InputPort<?> port)
+  public InputPortMeta getPortMeta(InputPort<?> port)
   {
     for (OperatorMeta o : getAllOperators()) {
       InputPortMeta opm = o.getPortMapping().inPortMap.get(port);

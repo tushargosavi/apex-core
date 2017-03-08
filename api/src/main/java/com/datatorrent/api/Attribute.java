@@ -238,52 +238,6 @@ public class Attribute<T> implements Serializable
       private static final long serialVersionUID = 201306051022L;
     }
 
-    public static class ReadOnlyAttributeMap implements AttributeMap, Serializable
-    {
-      private final AttributeMap parent;
-
-      public ReadOnlyAttributeMap(AttributeMap parent)
-      {
-        this.parent = parent;
-      }
-
-      @Override
-      public <T> T get(Attribute<T> key)
-      {
-        return parent.get(key);
-      }
-
-      @Override
-      public boolean contains(Attribute<?> key)
-      {
-        return parent.contains(key);
-      }
-
-      @Override
-      public <T> T put(Attribute<T> key, T value)
-      {
-        throw new RuntimeException("Can't modify readonly state");
-      }
-
-      @Override
-      public Set<Entry<Attribute<?>, Object>> entrySet()
-      {
-        return parent.entrySet();
-      }
-
-      @Override
-      public AttributeMap clone() throws CloneNotSupportedException
-      {
-        return new ReadOnlyAttributeMap(parent.clone());
-      }
-
-      @Override
-      public void addAll(AttributeMap attrMap)
-      {
-        throw new RuntimeException("Can not modify read-only attribute map");
-      }
-    }
-
     /**
      * This class inspects and initializes the attributes with their field names so that they can be used
      * from properties files.
