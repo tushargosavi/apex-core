@@ -18,7 +18,6 @@
  */
 package com.datatorrent.stram.plan.logical;
 
-import java.util.ArrayList;
 import java.util.Collection;
 import java.util.List;
 import java.util.Map;
@@ -48,7 +47,7 @@ public class DAGChangeTransactionImpl extends LogicalPlan implements DAG.DAGChan
   List<DAG.StreamMeta> removedStreams = Lists.newArrayList();
   Map<String, LogicalPlan.OperatorMeta> newOperators = Maps.newHashMap();
   Map<String, TransactionStreamMeta> newStreams = Maps.newHashMap();
-  Map<String, WrappedStreamMeta> changedStreams = Maps.newHashMap();
+  Map<String, ExtendableStreamMeta> changedStreams = Maps.newHashMap();
 
   public DAGChangeTransactionImpl(LogicalPlan plan, int version)
   {
@@ -59,7 +58,7 @@ public class DAGChangeTransactionImpl extends LogicalPlan implements DAG.DAGChan
   @Override
   public Attribute.AttributeMap getAttributes()
   {
-    return new Attribute.AttributeMap.ReadOnlyAttributeMap(parent.getAttributes());
+    return new ReadOnlyAttributeMap(parent.getAttributes());
   }
 
   @Override
@@ -125,7 +124,7 @@ public class DAGChangeTransactionImpl extends LogicalPlan implements DAG.DAGChan
   public DAG.StreamMeta addStream(String id)
   {
     assertExistingStream(id);
-    TransactionStreamMeta meta = new TransactionStreamMeta();
+    TransactionStreamMeta meta = new TransactionStreamMeta(id, this);
     newStreams.put(id, meta);
     return meta;
   }
@@ -269,7 +268,7 @@ public class DAGChangeTransactionImpl extends LogicalPlan implements DAG.DAGChan
   }
 
   @Override
-  LogicalPlan.InputPortMeta getPortMeta(Operator.InputPort<?> port)
+  public LogicalPlan.InputPortMeta getPortMeta(Operator.InputPort<?> port)
   {
     LogicalPlan.InputPortMeta meta = parent.getPortMeta(port);
     if (meta == null) {
@@ -321,170 +320,11 @@ public class DAGChangeTransactionImpl extends LogicalPlan implements DAG.DAGChan
     /**
      * Add newly connected port to existing streams.
      */
-    for (WrappedStreamMeta psmeta : changedStreams.values()) {
+    for (ExtendableStreamMeta psmeta : changedStreams.values()) {
       DAG.StreamMeta smeta = plan.getStream(psmeta.getName());
       for (Operator.InputPort ip : psmeta.getNewSinks()) {
         smeta.addSink(ip);
       }
-    }
-  }
-
-  private class TransactionStreamMeta implements DAG.StreamMeta
-  {
-    private String name;
-    private Operator.OutputPort<?> source;
-    private List<Operator.InputPort<?>> sinks = new ArrayList<>();
-    private List<LogicalPlan.InputPortMeta> sinksMeta = new ArrayList<>();
-    private Locality locality;
-
-    @Override
-    public String getName()
-    {
-      return name;
-    }
-
-    @Override
-    public Locality getLocality()
-    {
-      return locality;
-    }
-
-    @Override
-    public DAG.StreamMeta setLocality(Locality locality)
-    {
-      this.locality = locality;
-      return this;
-    }
-
-    @Override
-    public DAG.StreamMeta setSource(Operator.OutputPort<?> port)
-    {
-      source = port;
-      return this;
-    }
-
-
-    @Override
-    public DAG.StreamMeta addSink(Operator.InputPort<?> port)
-    {
-      sinks.add(port);
-      sinksMeta.add(getPortMeta(port));
-      return this;
-    }
-
-    @Override
-    public DAG.StreamMeta persistUsing(String name, Operator persistOperator, Operator.InputPort<?> persistOperatorInputPort)
-    {
-      throw new RuntimeException("Not implemented");
-    }
-
-    @Override
-    public DAG.StreamMeta persistUsing(String name, Operator persistOperator)
-    {
-      throw new RuntimeException("Not implemented");
-    }
-
-    @Override
-    public DAG.StreamMeta persistUsing(String name, Operator persistOperator, Operator.InputPort<?> persistOperatorInputPort, Operator.InputPort<?> sinkToPersist)
-    {
-      throw new RuntimeException("Not implemented");
-    }
-
-    @Override
-    public <T extends DAG.OutputPortMeta> T getSource()
-    {
-      return (T)getPortMeta(source);
-    }
-
-    @Override
-    public <T extends DAG.InputPortMeta> Collection<T> getSinks()
-    {
-      return (Collection<T>)sinksMeta;
-    }
-  }
-
-
-  /**
-   * A wrapper class to track stream extension. A stream can be extended by adding more
-   * sink to it.
-   */
-  private class WrappedStreamMeta implements DAG.StreamMeta
-  {
-
-    /* the original stream meta */
-    final LogicalPlan.StreamMeta parent;
-    private List<Operator.InputPort<?>> newSinks = new ArrayList<>();
-
-    public WrappedStreamMeta(LogicalPlan.StreamMeta parent)
-    {
-      this.parent = parent;
-    }
-
-    @Override
-    public String getName()
-    {
-      return parent.getName();
-    }
-
-    @Override
-    public Locality getLocality()
-    {
-      return parent.getLocality();
-    }
-
-    @Override
-    public DAG.StreamMeta setLocality(Locality locality)
-    {
-      throw new UnsupportedOperationException("Can not set locality of existing stream");
-    }
-
-    @Override
-    public DAG.StreamMeta setSource(Operator.OutputPort<?> port)
-    {
-      throw new UnsupportedOperationException("Can not set source of existing stream");
-    }
-
-    @Override
-    public DAG.StreamMeta addSink(Operator.InputPort<?> port)
-    {
-      newSinks.add(port);
-      return this;
-    }
-
-    @Override
-    public DAG.StreamMeta persistUsing(String name, Operator persistOperator, Operator.InputPort<?> persistOperatorInputPort)
-    {
-      throw new UnsupportedOperationException();
-    }
-
-    @Override
-    public DAG.StreamMeta persistUsing(String name, Operator persistOperator)
-    {
-      throw new UnsupportedOperationException();
-    }
-
-    @Override
-    public DAG.StreamMeta persistUsing(String name, Operator persistOperator, Operator.InputPort<?> persistOperatorInputPort, Operator.InputPort<?> sinkToPersist)
-    {
-      throw new UnsupportedOperationException();
-    }
-
-    @Override
-    public <T extends DAG.OutputPortMeta> T getSource()
-    {
-      return (T)parent.getSource();
-    }
-
-    @Override
-    public <T extends DAG.InputPortMeta> Collection<T> getSinks()
-    {
-      // return null;
-      throw new RuntimeException("not implemented");
-    }
-
-    public <T extends DAG.InputPortMeta> Collection<Operator.InputPort<?>> getNewSinks()
-    {
-      return newSinks;
     }
   }
 

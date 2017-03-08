@@ -31,7 +31,7 @@ import com.datatorrent.api.Operator;
 public class ReadOnlyLogicalPlan implements DAG
 {
   private final LogicalPlan parent;
-  private Attribute.AttributeMap.ReadOnlyAttributeMap readOnlyAttributes;
+  private ReadOnlyAttributeMap readOnlyAttributes;
 
   public ReadOnlyLogicalPlan(LogicalPlan parent)
   {
@@ -42,7 +42,7 @@ public class ReadOnlyLogicalPlan implements DAG
   public Attribute.AttributeMap getAttributes()
   {
     if (readOnlyAttributes == null) {
-      readOnlyAttributes = new Attribute.AttributeMap.ReadOnlyAttributeMap(parent.getAttributes());
+      readOnlyAttributes = new ReadOnlyAttributeMap(parent.getAttributes());
     }
     return readOnlyAttributes;
   }
