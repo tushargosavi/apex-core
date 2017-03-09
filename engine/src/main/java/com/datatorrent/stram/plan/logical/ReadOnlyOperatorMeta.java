@@ -49,7 +49,7 @@ public class ReadOnlyOperatorMeta implements DAG.OperatorMeta
     this.attrs = new ReadOnlyAttributeMap(ometa.getAttributes());
     Map<DAG.InputPortMeta, DAG.StreamMeta> streams = ometa.getInputStreams();
     for (Map.Entry<InputPortMeta, StreamMeta> entry : streams.entrySet()) {
-      inputs.put(entry.getKey().getPort(), new ExtendableStreamMeta(entry.getValue()));
+      inputs.put(entry.getKey().getPort(), new ReadOnlyInputPortMeta(ometa, entry.getKey()));
     }
   }
 
