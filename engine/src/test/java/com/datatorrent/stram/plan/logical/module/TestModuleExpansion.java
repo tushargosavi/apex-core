@@ -39,6 +39,8 @@ import org.apache.hadoop.conf.Configuration;
 import com.datatorrent.api.Attribute;
 import com.datatorrent.api.Context;
 import com.datatorrent.api.DAG;
+import com.datatorrent.api.DAG.StreamMeta;
+import com.datatorrent.api.DAG.InputPortMeta;
 import com.datatorrent.api.DefaultInputPort;
 import com.datatorrent.api.DefaultOutputPort;
 import com.datatorrent.api.InputOperator;
@@ -454,11 +456,11 @@ public class TestModuleExpansion
   private void validateSeperateStream(LogicalPlan dag, String streamName, String inputOperatorName,
       String... outputOperatorNames)
   {
-    LogicalPlan.StreamMeta streamMeta = dag.getStream(streamName);
+    StreamMeta streamMeta = dag.getStream(streamName);
     String sourceName = streamMeta.getSource().getOperatorMeta().getName();
 
     List<String> sinksName = new ArrayList<>();
-    for (LogicalPlan.InputPortMeta inputPortMeta : streamMeta.getSinks()) {
+    for (InputPortMeta inputPortMeta : streamMeta.getSinks()) {
       sinksName.add(inputPortMeta.getOperatorMeta().getName());
     }
 
@@ -668,7 +670,7 @@ public class TestModuleExpansion
    */
   private void validateStreamLocality(LogicalPlan dag, String name, DAG.Locality locality)
   {
-    LogicalPlan.StreamMeta meta = dag.getStream(name);
+    StreamMeta meta = dag.getStream(name);
     Assert.assertTrue("Metadata for stream is available ", meta != null);
     Assert.assertEquals("Locality is " + locality, meta.getLocality(), locality);
   }

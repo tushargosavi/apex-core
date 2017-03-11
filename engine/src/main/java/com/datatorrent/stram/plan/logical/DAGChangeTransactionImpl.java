@@ -23,6 +23,7 @@ import java.util.List;
 import java.util.Map;
 
 import javax.validation.ConstraintViolationException;
+import javax.validation.ValidationException;
 
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
@@ -46,66 +47,12 @@ public class DAGChangeTransactionImpl extends LogicalPlan implements DAG.DAGChan
   List<DAG.OperatorMeta> removedOperators = Lists.newArrayList();
   List<DAG.StreamMeta> removedStreams = Lists.newArrayList();
   Map<String, LogicalPlan.OperatorMeta> newOperators = Maps.newHashMap();
-  Map<String, TransactionStreamMeta> newStreams = Maps.newHashMap();
-  Map<String, ExtendableStreamMeta> changedStreams = Maps.newHashMap();
+  Map<String, DAG.StreamMeta> changedStreams = Maps.newHashMap();
 
   public DAGChangeTransactionImpl(LogicalPlan plan, int version)
   {
     parent = plan;
     this.transactionId = version;
-  }
-
-  @Override
-  public Attribute.AttributeMap getAttributes()
-  {
-    return new ReadOnlyAttributeMap(parent.getAttributes());
-  }
-
-  @Override
-  public <T> T getValue(Attribute<T> key)
-  {
-    return parent.getValue(key);
-  }
-
-  @Override
-  public void setCounters(Object counters)
-  {
-    // not implemented.
-  }
-
-  @Override
-  public void sendMetrics(Collection<String> metricNames)
-  {
-    // not implemented.
-  }
-
-  @Override
-  public <T extends Operator> T addOperator(String name, Class<T> clazz)
-  {
-    T instance;
-    try {
-      instance = clazz.newInstance();
-    } catch (Exception ex) {
-      throw new IllegalArgumentException(ex);
-    }
-    addOperator(name, instance);
-    return instance;
-  }
-
-  @Override
-  public <T extends Operator> T addOperator(String name, T operator)
-  {
-    assertExistingOpeartor(name);
-    return super.addOperator(name, operator);
-  }
-
-  private void assertExistingOpeartor(String name)
-  {
-    if (parent.getOperatorMeta(name) != null || super.operators.containsKey(name)) {
-      LogicalPlan.OperatorMeta ometa  = parent.getOperatorMeta(name) != null ?
-          parent.getOperatorMeta(name) : operators.get(name);
-      throw new IllegalArgumentException("duplicate operator id: " + ometa.getName());
-    }
   }
 
   @Override
@@ -120,62 +67,8 @@ public class DAGChangeTransactionImpl extends LogicalPlan implements DAG.DAGChan
     throw new RuntimeException("Not implemented");
   }
 
-  @Override
-  public DAG.StreamMeta addStream(String id)
-  {
-    assertExistingStream(id);
-    TransactionStreamMeta meta = new TransactionStreamMeta(id, this);
-    newStreams.put(id, meta);
-    return meta;
-  }
-
-  private void assertExistingStream(Operator.OutputPort<?> port)
-  {
-    LogicalPlan.StreamMeta smeta = parent.getStreamBySource(port);
-    if (smeta != null) {
-      throw new IllegalArgumentException("Stream name already exists ");
-    }
-  }
-
-  private void assertExistingStream(String id)
-  {
-    if (parent.getStream(id) != null) {
-      throw new IllegalArgumentException("Stream already exists ");
-    }
-  }
-
-  @Override
-  public <T> DAG.StreamMeta addStream(String id, Operator.OutputPort<? extends T> source, Operator.InputPort<? super T>[]
-      sinks)
-  {
-    assertExistingStream(source);
-    assertExistingStream(id);
-    return super.addStream(id, source, sinks);
-  }
-
-  @Override
-  public <T> DAG.StreamMeta addStream(String id, Operator.OutputPort<? extends T> source, Operator.InputPort<? super T> sink1)
-  {
-    assertExistingStream(id);
-    assertExistingPort(source);
-    return super.addStream(id, source, sink1);
-  }
-
-  @Override
-  public <T> DAG.StreamMeta addStream(String id, Operator.OutputPort<? extends T> source, Operator.InputPort<? super T>
-      sink1, Operator.InputPort<? super T> sink2)
-  {
-    assertExistingStream(id);
-    assertExistingStream(source);
-    assertExistingPort(sink1);
-    assertExistingPort(sink2);
-    return super.addStream(id, source, sink1, sink2);
-  }
-
-  @Override
   public <T> void setAttribute(Attribute<T> key, T value)
   {
-    // can't change existing attributes
     throw new IllegalArgumentException("SetAttribute not allowed while in transaction ");
   }
 
@@ -195,8 +88,8 @@ public class DAGChangeTransactionImpl extends LogicalPlan implements DAG.DAGChan
 
   private void assertExistingOpeator(Operator operator)
   {
-    if (operators.containsValue(operator)) {
-      throw new IllegalArgumentException("Can not set attribute of existing opeator " + operator);
+    if (parent.operators.containsValue(operator)) {
+      throw new IllegalArgumentException("Trying to modify existing operator " + operator);
     }
   }
 
@@ -306,24 +199,36 @@ public class DAGChangeTransactionImpl extends LogicalPlan implements DAG.DAGChan
      * Add newly added operators.
      */
     for (LogicalPlan.OperatorMeta ometa : getAllOperators()) {
+      if (plan.getOperatorMeta(ometa.getName()) != null) {
+        throw new ValidationException("Operator already exists in Original DAG");
+      }
       plan.addOperator(ometa);
+      newOperators.put(ometa.getName(), ometa);
     }
 
     /**
-     * Add new streams.
+     * Merge streams in the plan
      */
-    LOG.info("Number of new streams {}", getAllStreams().size());
-    for (DAG.StreamMeta psmeta : newStreams.values()) {
-      plan.addStream(psmeta);
-    }
+    for (DAG.StreamMeta smeta : getAllStreams()) {
+      DAG.StreamMeta original = plan.getStream(smeta.getName());
 
-    /**
-     * Add newly connected port to existing streams.
-     */
-    for (ExtendableStreamMeta psmeta : changedStreams.values()) {
-      DAG.StreamMeta smeta = plan.getStream(psmeta.getName());
-      for (Operator.InputPort ip : psmeta.getNewSinks()) {
-        smeta.addSink(ip);
+      // Only adding new sink is supported
+      if (original != null) {
+        if (smeta.getLocality() != original.getLocality()) {
+          throw new ValidationException("Can not change locality for existing stream ");
+        }
+
+        if (smeta.getSource() != null) {
+          throw new ValidationException("Can not specify new source for existing stream");
+        }
+
+        for (DAG.InputPortMeta ipm : smeta.getSinks()) {
+          original.addSink(ipm.getPort());
+        }
+        changedStreams.put(original.getName(), original);
+      } else {
+        // add stream to new plan
+        plan.addStream(smeta);
       }
     }
   }
@@ -362,8 +267,6 @@ public class DAGChangeTransactionImpl extends LogicalPlan implements DAG.DAGChan
     } catch (CloneNotSupportedException e) {
       e.printStackTrace();
     }
-
-    super.validate();
   }
 
   @Override

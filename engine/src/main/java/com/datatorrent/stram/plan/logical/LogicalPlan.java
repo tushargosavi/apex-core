@@ -1184,6 +1184,7 @@ public class LogicalPlan implements Serializable, DAG
       return this.inputStreams;
     }
 
+    @Override
     public Map<OutputPortMeta, StreamMeta> getOutputStreams()
     {
       return this.outputStreams;

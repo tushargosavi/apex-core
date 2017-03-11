@@ -56,6 +56,10 @@ import com.datatorrent.api.DAG;
 import com.datatorrent.api.DefaultInputPort;
 import com.datatorrent.api.DefaultOutputPort;
 import com.datatorrent.api.Module;
+import com.datatorrent.api.DAG.StreamMeta;
+import com.datatorrent.api.DAG.InputPortMeta;
+import com.datatorrent.api.DAG.OutputPortMeta;
+import com.datatorrent.api.DAG.OperatorMeta;
 import com.datatorrent.api.Operator;
 import com.datatorrent.api.StatsListener;
 import com.datatorrent.api.StreamingApplication;
@@ -162,14 +166,14 @@ public class LogicalPlanConfigurationTest
     StreamMeta fromNode2 = operator2.getOutputStreams().values().iterator().next();
 
     Set<OperatorMeta> targetNodes = Sets.newHashSet();
-    for (LogicalPlan.InputPortMeta ip : fromNode2.getSinks()) {
+    for (InputPortMeta ip : fromNode2.getSinks()) {
       targetNodes.add(ip.getOperatorMeta());
     }
     Assert.assertEquals("outputs " + fromNode2, Sets.newHashSet(operator3, operator4), targetNodes);
 
     OperatorMeta operator6 = assertNode(dag, "operator6");
 
-    List<OperatorMeta> rootNodes = dag.getRootOperators();
+    List<? extends DAG.OperatorMeta> rootNodes = dag.getRootOperators();
     assertEquals("number root operators", 2, rootNodes.size());
     assertTrue("root operator2", rootNodes.contains(operator1));
     assertTrue("root operator6", rootNodes.contains(operator6));
@@ -189,7 +193,7 @@ public class LogicalPlanConfigurationTest
     logger.debug(prefix + operator.getName());
     for (StreamMeta downStream : operator.getOutputStreams().values()) {
       if (!downStream.getSinks().isEmpty()) {
-        for (LogicalPlan.InputPortMeta targetNode : downStream.getSinks()) {
+        for (InputPortMeta targetNode : downStream.getSinks()) {
           printTopology(targetNode.getOperatorMeta(), tplg, level + 1);
         }
       }
@@ -236,7 +240,7 @@ public class LogicalPlanConfigurationTest
     assertNotNull(input1);
     Assert.assertEquals("input1 source", dag.getOperatorMeta("inputOperator"), input1.getSource().getOperatorMeta());
     Set<OperatorMeta> targetNodes = Sets.newHashSet();
-    for (LogicalPlan.InputPortMeta targetPort : input1.getSinks()) {
+    for (InputPortMeta targetPort : input1.getSinks()) {
       targetNodes.add(targetPort.getOperatorMeta());
     }
 
@@ -304,7 +308,7 @@ public class LogicalPlanConfigurationTest
     OperatorMeta inputOperator = dag.getOperatorMeta("inputOperator");
     Assert.assertEquals("input1 source", inputOperator, input1.getSource().getOperatorMeta());
     Set<OperatorMeta> targetNodes = Sets.newHashSet();
-    for (LogicalPlan.InputPortMeta targetPort : input1.getSinks()) {
+    for (InputPortMeta targetPort : input1.getSinks()) {
       targetNodes.add(targetPort.getOperatorMeta());
     }
     Assert.assertEquals("operator attribute " + inputOperator, 64, (int)inputOperator.getValue(OperatorContext.MEMORY_MB));
@@ -598,8 +602,9 @@ public class LogicalPlanConfigurationTest
     dagBuilder.prepareDAG(dag, app, appPath);
 
     OperatorMeta om = null;
-    for (Map.Entry<OutputPortMeta, StreamMeta> entry : dag.getOperatorMeta("operator1").getOutputStreams().entrySet()) {
-      if (entry.getKey().getPortName().equals("outport1")) {
+    for (Map.Entry<? extends OutputPortMeta, ? extends DAG.StreamMeta> entry : dag.getOperatorMeta("operator1").getOutputStreams().entrySet()) {
+      LogicalPlan.OutputPortMeta opm = (LogicalPlan.OutputPortMeta)entry.getKey();
+      if (opm.getPortName().equals("outport1")) {
         om = entry.getKey().getUnifierMeta();
       }
     }
@@ -898,7 +903,7 @@ public class LogicalPlanConfigurationTest
 
     StreamMeta input1 = dag.getStream("inputStream");
     assertNotNull(input1);
-    for (LogicalPlan.InputPortMeta targetPort : input1.getSinks()) {
+    for (InputPortMeta targetPort : input1.getSinks()) {
       Assert.assertEquals("tuple class name required", TestSchema.class, targetPort.getAttributes().get(PortContext.TUPLE_CLASS));
     }
   }
