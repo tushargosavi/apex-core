@@ -19,15 +19,20 @@
 package com.datatorrent.stram.plan.logical;
 
 import org.junit.Test;
+import org.slf4j.Logger;
 
 import com.datatorrent.stram.engine.GenericTestOperator;
 import com.datatorrent.stram.engine.InputNodeTest;
+
+import static org.slf4j.LoggerFactory.getLogger;
 
 /**
  * Tests for modifying logical plan
  */
 public class WrappedLogicalPlanTest
 {
+  private static final Logger LOG = getLogger(WrappedLogicalPlanTest.class);
+
   @Test
   public void testAddOperator()
   {
@@ -36,8 +41,32 @@ public class WrappedLogicalPlanTest
     plan.validate();
 
     DAGChangeTransactionImpl cdag = (DAGChangeTransactionImpl)plan.startTransaction();
-    GenericTestOperator sinkOperator = cdag.addOperator("input1", new GenericTestOperator());
+    GenericTestOperator sinkOperator = cdag.addOperator("output", new GenericTestOperator());
+    InputNodeTest.TestInputOperator input1 = (InputNodeTest.TestInputOperator)cdag.getOperatorMeta("input").getOperator();
     cdag.addStream("s1", input.output, sinkOperator.inport1);
     cdag.commit();
+
+    plan.validate();
+    LOG.info("number of operators in new dag {}", plan.getAllOperators().size());
+    LOG.info("number of streams in new dag {}", plan.getAllStreams().size());
   }
+
+  @Test
+  public void testAddDisconnectedDAG()
+  {
+    LogicalPlan plan = new LogicalPlan();
+    InputNodeTest.TestInputOperator input = plan.addOperator("input", new InputNodeTest.TestInputOperator());
+    plan.validate();
+
+    DAGChangeTransactionImpl cdag = (DAGChangeTransactionImpl)plan.startTransaction();
+    InputNodeTest.TestInputOperator input1 = cdag.addOperator("input1", new InputNodeTest.TestInputOperator());
+    GenericTestOperator sinkOperator = cdag.addOperator("output1", new GenericTestOperator());
+    cdag.addStream("s1", input1.output, sinkOperator.inport1);
+    cdag.commit();
+
+    plan.validate();
+    LOG.info("number of operators in new dag {}", plan.getAllOperators().size());
+    LOG.info("number of streams in new dag {}", plan.getAllStreams().size());
+  }
+
 }

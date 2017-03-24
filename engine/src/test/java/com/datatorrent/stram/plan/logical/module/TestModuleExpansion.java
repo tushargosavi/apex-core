@@ -454,7 +454,7 @@ public class TestModuleExpansion
   private void validateSeperateStream(LogicalPlan dag, String streamName, String inputOperatorName,
       String... outputOperatorNames)
   {
-    LogicalPlan.StreamMeta streamMeta = dag.getStream(streamName);
+    LogicalPlan.StreamMeta streamMeta = (LogicalPlan.StreamMeta)dag.getStream(streamName);
     String sourceName = streamMeta.getSource().getOperatorMeta().getName();
 
     List<String> sinksName = new ArrayList<>();
@@ -668,7 +668,7 @@ public class TestModuleExpansion
    */
   private void validateStreamLocality(LogicalPlan dag, String name, DAG.Locality locality)
   {
-    LogicalPlan.StreamMeta meta = dag.getStream(name);
+    LogicalPlan.StreamMeta meta = (LogicalPlan.StreamMeta)dag.getStream(name);
     Assert.assertTrue("Metadata for stream is available ", meta != null);
     Assert.assertEquals("Locality is " + locality, meta.getLocality(), locality);
   }

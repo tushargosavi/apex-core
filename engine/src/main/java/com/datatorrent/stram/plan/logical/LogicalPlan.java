@@ -2509,7 +2509,7 @@ public class LogicalPlan implements Serializable, DAG
    * create a copy of logical plan.
    * @return
    */
-  LogicalPlan copy() throws CloneNotSupportedException
+  LogicalPlan copy()
   {
     LogicalPlan plan = new LogicalPlan();
 

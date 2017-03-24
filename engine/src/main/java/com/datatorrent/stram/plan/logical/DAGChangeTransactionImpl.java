@@ -18,7 +18,9 @@
  */
 package com.datatorrent.stram.plan.logical;
 
+import java.util.ArrayList;
 import java.util.Collection;
+import java.util.Collections;
 import java.util.List;
 import java.util.Map;
 
@@ -40,31 +42,32 @@ public class DAGChangeTransactionImpl extends LogicalPlan implements DAG.DAGChan
   private static final Logger LOG = LoggerFactory.getLogger(LogicalPlan.class);
 
   final int transactionId;
-  /* The original snapshot of logical plan */
-  private LogicalPlan parent;
+
+  /* The reference to original DAG */
+  private final LogicalPlan parent;
+  /* The clone of parent */
+  private final LogicalPlan cloned;
 
   List<DAG.OperatorMeta> removedOperators = Lists.newArrayList();
   List<DAG.StreamMeta> removedStreams = Lists.newArrayList();
-  Map<String, LogicalPlan.OperatorMeta> newOperators = Maps.newHashMap();
-  Map<String, TransactionStreamMeta> newStreams = Maps.newHashMap();
-  Map<String, ExtendableStreamMeta> changedStreams = Maps.newHashMap();
 
   public DAGChangeTransactionImpl(LogicalPlan plan, int version)
   {
     parent = plan;
+    cloned = plan.copy();
     this.transactionId = version;
   }
 
   @Override
   public Attribute.AttributeMap getAttributes()
   {
-    return new ReadOnlyAttributeMap(parent.getAttributes());
+    return new ReadOnlyAttributeMap(cloned.getAttributes());
   }
 
   @Override
   public <T> T getValue(Attribute<T> key)
   {
-    return parent.getValue(key);
+    return cloned.getValue(key);
   }
 
   @Override
@@ -80,35 +83,6 @@ public class DAGChangeTransactionImpl extends LogicalPlan implements DAG.DAGChan
   }
 
   @Override
-  public <T extends Operator> T addOperator(String name, Class<T> clazz)
-  {
-    T instance;
-    try {
-      instance = clazz.newInstance();
-    } catch (Exception ex) {
-      throw new IllegalArgumentException(ex);
-    }
-    addOperator(name, instance);
-    return instance;
-  }
-
-  @Override
-  public <T extends Operator> T addOperator(String name, T operator)
-  {
-    assertExistingOpeartor(name);
-    return super.addOperator(name, operator);
-  }
-
-  private void assertExistingOpeartor(String name)
-  {
-    if (parent.getOperatorMeta(name) != null || super.operators.containsKey(name)) {
-      LogicalPlan.OperatorMeta ometa  = parent.getOperatorMeta(name) != null ?
-          parent.getOperatorMeta(name) : operators.get(name);
-      throw new IllegalArgumentException("duplicate operator id: " + ometa.getName());
-    }
-  }
-
-  @Override
   public <T extends Module> T addModule(String name, Class<T> moduleClass)
   {
     throw new RuntimeException("Not implemented");
@@ -121,96 +95,12 @@ public class DAGChangeTransactionImpl extends LogicalPlan implements DAG.DAGChan
   }
 
   @Override
-  public DAG.StreamMeta addStream(String id)
-  {
-    assertExistingStream(id);
-    TransactionStreamMeta meta = new TransactionStreamMeta(id, this);
-    newStreams.put(id, meta);
-    return meta;
-  }
-
-  private void assertExistingStream(Operator.OutputPort<?> port)
-  {
-    LogicalPlan.StreamMeta smeta = parent.getStreamBySource(port);
-    if (smeta != null) {
-      throw new IllegalArgumentException("Stream name already exists ");
-    }
-  }
-
-  private void assertExistingStream(String id)
-  {
-    if (parent.getStream(id) != null) {
-      throw new IllegalArgumentException("Stream already exists ");
-    }
-  }
-
-  @Override
-  public <T> DAG.StreamMeta addStream(String id, Operator.OutputPort<? extends T> source, Operator.InputPort<? super T>[]
-      sinks)
-  {
-    assertExistingStream(source);
-    assertExistingStream(id);
-    return super.addStream(id, source, sinks);
-  }
-
-  @Override
-  public <T> DAG.StreamMeta addStream(String id, Operator.OutputPort<? extends T> source, Operator.InputPort<? super T> sink1)
-  {
-    assertExistingStream(id);
-    assertExistingPort(source);
-    return super.addStream(id, source, sink1);
-  }
-
-  @Override
-  public <T> DAG.StreamMeta addStream(String id, Operator.OutputPort<? extends T> source, Operator.InputPort<? super T>
-      sink1, Operator.InputPort<? super T> sink2)
-  {
-    assertExistingStream(id);
-    assertExistingStream(source);
-    assertExistingPort(sink1);
-    assertExistingPort(sink2);
-    return super.addStream(id, source, sink1, sink2);
-  }
-
-  @Override
   public <T> void setAttribute(Attribute<T> key, T value)
   {
     // can't change existing attributes
     throw new IllegalArgumentException("SetAttribute not allowed while in transaction ");
   }
 
-  @Override
-  public <T> void setAttribute(Operator operator, Attribute<T> key, T value)
-  {
-    assertExistingOpeator(operator);
-    super.setAttribute(operator, key, value);
-  }
-
-  @Override
-  public <T> void setOperatorAttribute(Operator operator, Attribute<T> key, T value)
-  {
-    assertExistingOpeator(operator);
-    super.setAttribute(operator, key, value);
-  }
-
-  private void assertExistingOpeator(Operator operator)
-  {
-    if (operators.containsValue(operator)) {
-      throw new IllegalArgumentException("Can not set attribute of existing opeator " + operator);
-    }
-  }
-
-  @Override
-  public <T> void setOutputPortAttribute(Operator.OutputPort<?> port, Attribute<T> key, T value)
-  {
-    assertExistingPort(port);
-    super.setOutputPortAttribute(port, key, value);
-  }
-
-  /**
-   * check if port already exists in parent DAG and is connected to any stream.
-   * @param outputPort
-   */
   private void assertExistingPort(Operator.OutputPort<?> outputPort)
   {
     LogicalPlan.OutputPortMeta meta = parent.getPortMeta(outputPort);
@@ -237,7 +127,7 @@ public class DAGChangeTransactionImpl extends LogicalPlan implements DAG.DAGChan
 
   LogicalPlan.OutputPortMeta getLocalPortMeta(Operator.OutputPort<?> port)
   {
-    for (LogicalPlan.OperatorMeta o : getAllOperators()) {
+    for (LogicalPlan.OperatorMeta o : operators.values()) {
       LogicalPlan.OutputPortMeta opm = o.getPortMapping().getOutPortMap().get(port);
       if (opm != null) {
         return opm;
@@ -249,7 +139,7 @@ public class DAGChangeTransactionImpl extends LogicalPlan implements DAG.DAGChan
   @Override
   LogicalPlan.OutputPortMeta getPortMeta(Operator.OutputPort<?> port)
   {
-    LogicalPlan.OutputPortMeta meta = parent.getPortMeta(port);
+    LogicalPlan.OutputPortMeta meta = cloned.getPortMeta(port);
     if (meta == null) {
       meta = getLocalPortMeta(port);
     }
@@ -258,7 +148,7 @@ public class DAGChangeTransactionImpl extends LogicalPlan implements DAG.DAGChan
 
   LogicalPlan.InputPortMeta getLocalPortMeta(Operator.InputPort<?> port)
   {
-    for (LogicalPlan.OperatorMeta o : getAllOperators()) {
+    for (LogicalPlan.OperatorMeta o : operators.values()) {
       LogicalPlan.InputPortMeta opm = o.getPortMapping().getInPortMap().get(port);
       if (opm != null) {
         return opm;
@@ -270,25 +160,11 @@ public class DAGChangeTransactionImpl extends LogicalPlan implements DAG.DAGChan
   @Override
   public LogicalPlan.InputPortMeta getPortMeta(Operator.InputPort<?> port)
   {
-    LogicalPlan.InputPortMeta meta = parent.getPortMeta(port);
+    LogicalPlan.InputPortMeta meta = cloned.getPortMeta(port);
     if (meta == null) {
       meta = getLocalPortMeta(port);
     }
     return meta;
-  }
-
-  @Override
-  public <T> void setUnifierAttribute(Operator.OutputPort<?> port, Attribute<T> key, T value)
-  {
-    assertExistingPort(port);
-    super.setUnifierAttribute(port, key, value);
-  }
-
-  @Override
-  public <T> void setInputPortAttribute(Operator.InputPort<?> port, Attribute<T> key, T value)
-  {
-    assertExistingPort(port);
-    super.setInputPortAttribute(port, key, value);
   }
 
   public void commit()
@@ -302,29 +178,27 @@ public class DAGChangeTransactionImpl extends LogicalPlan implements DAG.DAGChan
    */
   void merge(LogicalPlan plan)
   {
+
+//    /**
+//     * process removed operator first
+//     * TODO: remove of operators needs to be from output to input.
+//     */
+//    for (DAG.OperatorMeta ometa : removedOperators) {
+//      plan.removeOperator(ometa.getOperator());
+//    }
+
     /**
      * Add newly added operators.
      */
-    for (LogicalPlan.OperatorMeta ometa : getAllOperators()) {
+    for (LogicalPlan.OperatorMeta ometa : operators.values()) {
       plan.addOperator(ometa);
     }
 
     /**
-     * Add new streams.
+     * Add stream, existing streams will be modified too.
      */
-    LOG.info("Number of new streams {}", getAllStreams().size());
-    for (DAG.StreamMeta psmeta : newStreams.values()) {
+    for (DAG.StreamMeta psmeta : streams.values()) {
       plan.addStream(psmeta);
-    }
-
-    /**
-     * Add newly connected port to existing streams.
-     */
-    for (ExtendableStreamMeta psmeta : changedStreams.values()) {
-      DAG.StreamMeta smeta = plan.getStream(psmeta.getName());
-      for (Operator.InputPort ip : psmeta.getNewSinks()) {
-        smeta.addSink(ip);
-      }
     }
   }
 
@@ -352,18 +226,99 @@ public class DAGChangeTransactionImpl extends LogicalPlan implements DAG.DAGChan
     removedStreams.add(streamMeta);
   }
 
+  @Override
+  public DAG.StreamMeta getStream(String id)
+  {
+    DAG.StreamMeta smeta = streams.get(id);
+    if (smeta != null) {
+      return smeta;
+    }
+    return cloned.getStream(id);
+  }
+
+  @Override
+  public List<LogicalPlan.OperatorMeta> getRootOperators()
+  {
+    List<LogicalPlan.OperatorMeta> thisrootOperators = super.getRootOperators();
+    List<LogicalPlan.OperatorMeta> rootOperators = new ArrayList<>();
+    rootOperators.addAll(thisrootOperators);
+    rootOperators.addAll(cloned.getRootOperators());
+    return Collections.unmodifiableList(rootOperators);
+  }
+
+  @Override
+  public List<LogicalPlan.OperatorMeta> getRootOperatorsMeta()
+  {
+    List<LogicalPlan.OperatorMeta> rootOperators = super.getRootOperatorsMeta();
+    rootOperators.addAll(cloned.getRootOperatorsMeta());
+    return rootOperators;
+  }
+
+  @Override
+  public List<LogicalPlan.OperatorMeta> getLeafOperators()
+  {
+    List<LogicalPlan.OperatorMeta> leafOperators = super.getLeafOperators();
+    leafOperators.addAll(cloned.getLeafOperators());
+    return leafOperators;
+  }
+
+  @Override
+  public Collection<LogicalPlan.OperatorMeta> getAllOperators()
+  {
+    Collection<LogicalPlan.OperatorMeta> allOperators = super.getAllOperators();
+    allOperators.addAll(cloned.getAllOperators());
+    return allOperators;
+  }
+
+  @Override
+  public Collection<LogicalPlan.OperatorMeta> getAllOperatorsMeta()
+  {
+    return super.getAllOperatorsMeta();
+  }
+
+  @Override
+  public Collection<LogicalPlan.ModuleMeta> getAllModules()
+  {
+    return super.getAllModules();
+  }
+
+  @Override
+  public Collection<LogicalPlan.StreamMeta> getAllStreams()
+  {
+    return super.getAllStreams();
+  }
+
+  @Override
+  public Collection<LogicalPlan.StreamMeta> getAllStreamsMeta()
+  {
+    return super.getAllStreamsMeta();
+  }
+
+  @Override
+  public LogicalPlan.OperatorMeta getOperatorMeta(String operatorName)
+  {
+    LogicalPlan.OperatorMeta ometa = super.getOperatorMeta(operatorName);
+    if (ometa != null) {
+      return ometa;
+    }
+    return cloned.getOperatorMeta(operatorName);
+  }
+
+  @Override
+  public LogicalPlan.OperatorMeta getMeta(Operator operator)
+  {
+    LogicalPlan.OperatorMeta ometa = super.getMeta(operator);
+    if (ometa != null) {
+      return ometa;
+    }
+    return cloned.getMeta(operator);
+  }
+
   public void validate() throws ConstraintViolationException
   {
-    try {
-      // copy plan for validation.
-      LogicalPlan plan = parent.copy();
-      merge(plan);
-      plan.validate();
-    } catch (CloneNotSupportedException e) {
-      e.printStackTrace();
-    }
-
-    super.validate();
+    LogicalPlan plan = parent.copy();
+    merge(plan);
+    plan.validate();
   }
 
   @Override

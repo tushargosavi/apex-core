@@ -215,7 +215,7 @@ public class LogicalPlanConfigurationTest
     assertEquals("number of operator confs", 5, dag.getAllOperators().size());
     assertEquals("number of root operators", 1, dag.getRootOperators().size());
 
-    StreamMeta s1 = dag.getStream("n1n2");
+    StreamMeta s1 = (StreamMeta)dag.getStream("n1n2");
     assertNotNull(s1);
     assertTrue("n1n2 inline", DAG.Locality.CONTAINER_LOCAL == s1.getLocality());
 
@@ -232,7 +232,7 @@ public class LogicalPlanConfigurationTest
     assertEquals("setterOnlyOperator4 " + doperator4, "setterOnlyOperator4", doperator4.propertySetterOnly);
     assertTrue("booleanProperty " + doperator4, doperator4.booleanProperty);
 
-    StreamMeta input1 = dag.getStream("inputStream");
+    StreamMeta input1 = (StreamMeta)dag.getStream("inputStream");
     assertNotNull(input1);
     Assert.assertEquals("input1 source", dag.getOperatorMeta("inputOperator"), input1.getSource().getOperatorMeta());
     Set<OperatorMeta> targetNodes = Sets.newHashSet();
@@ -273,7 +273,7 @@ public class LogicalPlanConfigurationTest
     assertEquals("number of operator confs", 5, dag.getAllOperators().size());
     assertEquals("number of root operators", 1, dag.getRootOperators().size());
 
-    StreamMeta s1 = dag.getStream("n1n2");
+    StreamMeta s1 = (StreamMeta)dag.getStream("n1n2");
     assertNotNull(s1);
     assertTrue("n1n2 inline", DAG.Locality.CONTAINER_LOCAL == s1.getLocality());
 
@@ -299,7 +299,7 @@ public class LogicalPlanConfigurationTest
     assertEquals("setterOnlyOperator4 " + doperator4, "setterOnlyOperator4", doperator4.propertySetterOnly);
     assertTrue("booleanProperty " + doperator4, doperator4.booleanProperty);
 
-    StreamMeta input1 = dag.getStream("inputStream");
+    StreamMeta input1 = (StreamMeta)dag.getStream("inputStream");
     assertNotNull(input1);
     OperatorMeta inputOperator = dag.getOperatorMeta("inputOperator");
     Assert.assertEquals("input1 source", inputOperator, input1.getSource().getOperatorMeta());
@@ -896,7 +896,7 @@ public class LogicalPlanConfigurationTest
     OperatorMeta operator1 = dag.getOperatorMeta("operator1");
     assertEquals("operator1.classname", SchemaTestOperator.class, operator1.getOperator().getClass());
 
-    StreamMeta input1 = dag.getStream("inputStream");
+    StreamMeta input1 = (StreamMeta)dag.getStream("inputStream");
     assertNotNull(input1);
     for (LogicalPlan.InputPortMeta targetPort : input1.getSinks()) {
       Assert.assertEquals("tuple class name required", TestSchema.class, targetPort.getAttributes().get(PortContext.TUPLE_CLASS));
