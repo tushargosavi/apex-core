@@ -239,9 +239,8 @@ public class DAGChangeTransactionImpl extends LogicalPlan implements DAG.DAGChan
   @Override
   public List<LogicalPlan.OperatorMeta> getRootOperators()
   {
-    List<LogicalPlan.OperatorMeta> thisrootOperators = super.getRootOperators();
     List<LogicalPlan.OperatorMeta> rootOperators = new ArrayList<>();
-    rootOperators.addAll(thisrootOperators);
+    rootOperators.addAll(super.getRootOperators());
     rootOperators.addAll(cloned.getRootOperators());
     return Collections.unmodifiableList(rootOperators);
   }
@@ -249,31 +248,37 @@ public class DAGChangeTransactionImpl extends LogicalPlan implements DAG.DAGChan
   @Override
   public List<LogicalPlan.OperatorMeta> getRootOperatorsMeta()
   {
-    List<LogicalPlan.OperatorMeta> rootOperators = super.getRootOperatorsMeta();
+    List<LogicalPlan.OperatorMeta> rootOperators = new ArrayList<>();
+    rootOperators.addAll(super.getRootOperatorsMeta());
     rootOperators.addAll(cloned.getRootOperatorsMeta());
-    return rootOperators;
+    return Collections.unmodifiableList(rootOperators);
   }
 
   @Override
   public List<LogicalPlan.OperatorMeta> getLeafOperators()
   {
-    List<LogicalPlan.OperatorMeta> leafOperators = super.getLeafOperators();
+    List<LogicalPlan.OperatorMeta> leafOperators = new ArrayList<>();
+    leafOperators.addAll(super.getLeafOperators());
     leafOperators.addAll(cloned.getLeafOperators());
-    return leafOperators;
+    return Collections.unmodifiableList(leafOperators);
   }
 
   @Override
   public Collection<LogicalPlan.OperatorMeta> getAllOperators()
   {
-    Collection<LogicalPlan.OperatorMeta> allOperators = super.getAllOperators();
+    List<LogicalPlan.OperatorMeta> allOperators = new ArrayList<>();
+    allOperators.addAll(super.getAllOperators());
     allOperators.addAll(cloned.getAllOperators());
-    return allOperators;
+    return Collections.unmodifiableList(allOperators);
   }
 
   @Override
   public Collection<LogicalPlan.OperatorMeta> getAllOperatorsMeta()
   {
-    return super.getAllOperatorsMeta();
+    List<LogicalPlan.OperatorMeta> allOperators = new ArrayList<>();
+    allOperators.addAll(super.getAllOperatorsMeta());
+    allOperators.addAll(cloned.getAllOperatorsMeta());
+    return Collections.unmodifiableList(allOperators);
   }
 
   @Override
@@ -285,13 +290,19 @@ public class DAGChangeTransactionImpl extends LogicalPlan implements DAG.DAGChan
   @Override
   public Collection<LogicalPlan.StreamMeta> getAllStreams()
   {
-    return super.getAllStreams();
+    List<LogicalPlan.StreamMeta> streams = new ArrayList<>();
+    streams.addAll(super.getAllStreams());
+    streams.addAll(cloned.getAllStreams());
+    return Collections.unmodifiableList(streams);
   }
 
   @Override
   public Collection<LogicalPlan.StreamMeta> getAllStreamsMeta()
   {
-    return super.getAllStreamsMeta();
+    List<LogicalPlan.StreamMeta> streams = new ArrayList<>();
+    streams.addAll(super.getAllStreamsMeta());
+    streams.addAll(cloned.getAllStreamsMeta());
+    return streams;
   }
 
   @Override

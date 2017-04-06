@@ -2523,7 +2523,7 @@ public class LogicalPlan implements Serializable, DAG
 
     // Add streams from existing operators here.
     for (LogicalPlan.StreamMeta psmeta : getAllStreams()) {
-      addStream(psmeta);
+      plan.addStream(psmeta);
     }
 
     return plan;
