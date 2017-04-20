@@ -21,9 +21,13 @@ package org.apache.apex.engine.plugin;
 import java.io.FileNotFoundException;
 import java.io.IOException;
 import java.net.URI;
+import java.net.URL;
 import java.util.Collection;
+import java.util.Enumeration;
 import java.util.HashMap;
 import java.util.Map;
+import java.util.Properties;
+import java.util.Set;
 
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
@@ -41,11 +45,15 @@ import org.apache.hadoop.service.AbstractService;
 import org.apache.hadoop.yarn.conf.YarnConfiguration;
 
 import com.google.common.collect.Lists;
+import com.google.common.collect.Maps;
+import com.google.common.collect.Sets;
 
 import com.datatorrent.stram.StramAppContext;
 import com.datatorrent.stram.StreamingContainerManager;
 import com.datatorrent.stram.plan.logical.LogicalPlan;
 import com.datatorrent.stram.webapp.AppInfo;
+
+import static com.datatorrent.stram.client.AppPackage.ATTRIBUTE_DT_ENGINE_VERSION;
 
 /**
  * A default implementation for ApexPluginDispatcher. It handler common tasks such as per handler
@@ -93,6 +101,9 @@ public abstract class ApexPluginManager extends AbstractService
     }
   }
 
+  private final Map<DAGExecutionPlugin, String> versionMap = Maps.newHashMap();
+  private final Set<DAGExecutionPlugin> activePlugins = Sets.newHashSet();
+
   @Override
   protected void serviceInit(Configuration conf) throws Exception
   {
@@ -109,8 +120,30 @@ public abstract class ApexPluginManager extends AbstractService
     }
 
     for (DAGExecutionPlugin plugin : plugins) {
+      String version = getPluginVersion(plugin);
+      if (version == null) {
+        LOG.warn("Unable to locate version of plugin {}, Plugin won't be used ", plugin.getClass().getName());
+      }
       plugin.setup(new PluginManagerImpl(plugin));
+      activePlugins.add(plugin);
+      LOG.info("Plugin {} with version {} initialize ", plugin.getClass().getName(), version);
+      versionMap.put(plugin, version);
     }
+  }
+
+  private String getPluginVersion(DAGExecutionPlugin plugin) throws IOException
+  {
+    Enumeration<URL> resources = plugin.getClass().getClassLoader().getResources("META-INF/MANIFEST.MF");
+    String version = null;
+    while (resources.hasMoreElements()) {
+      Properties pomInfo = new Properties();
+      pomInfo.load(resources.nextElement().openStream());
+      version = pomInfo.getProperty(ATTRIBUTE_DT_ENGINE_VERSION);
+      if (version != null) {
+        break;
+      }
+    }
+    return version;
   }
 
   @Override
