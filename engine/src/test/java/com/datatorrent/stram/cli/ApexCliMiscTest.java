@@ -26,6 +26,7 @@ import org.junit.Assert;
 import org.junit.Before;
 import org.junit.Test;
 
+import org.apache.apex.engine.ClusterProviderFactory;
 
 /**
  *
@@ -42,7 +43,7 @@ public class ApexCliMiscTest
   {
     try {
 
-      cli = new ApexCli();
+      cli = ClusterProviderFactory.getProvider().getApexCli();
       cli.init();
 
     } catch (Exception e) {
@@ -59,15 +60,15 @@ public class ApexCliMiscTest
   @Test
   public void testGetHighlightColorDefault() throws Exception
   {
-    cli.conf.clear();
+    cli.getConf().clear();
     Assert.assertEquals("\033[1m", cli.getHighlightColor());
   }
 
   @Test
   public void testGetHighlightColorFromConf() throws Exception
   {
-    cli.conf.clear();
-    cli.conf.set("apex.cli.color.highlight", "\033[0;93m");
+    cli.getConf().clear();
+    cli.getConf().set("apex.cli.color.highlight", "\033[0;93m");
     Assert.assertEquals("\033[0;93m", cli.getHighlightColor());
   }
 }

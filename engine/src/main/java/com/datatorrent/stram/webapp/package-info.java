@@ -27,7 +27,6 @@
  * <b>{@link com.datatorrent.stram.webapp.AppInfo}</b>: Provides application level data like user, appId, elapsed time, etc.<br>
  * <b>{@link com.datatorrent.stram.webapp.OperatorInfo}</b>: Provides data on the operator. This includes throughput, container id etc.<br>
  * <b>{@link com.datatorrent.stram.webapp.OperatorsInfo}</b>: Provides data on all the operators of the data.<br>
- * <b>{@link com.datatorrent.stram.webapp.StramWebApp}</b>: TBD<br>
  * <b>{@link com.datatorrent.stram.webapp.StramWebServices}</b>: TBD<br>
  * <b>Access and Authoriation</b>: TBD<br>
  * <br>

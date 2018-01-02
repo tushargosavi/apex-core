@@ -34,6 +34,8 @@ import org.junit.Test;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
+import org.apache.apex.engine.ClusterProviderFactory;
+
 import com.google.common.base.Throwables;
 import com.google.common.collect.Lists;
 import com.google.common.collect.Sets;
@@ -962,7 +964,7 @@ public class StreamPersistanceTests
     StramTestSupport.MemoryStorageAgent msa = new StramTestSupport.MemoryStorageAgent();
     dag.setAttribute(Context.OperatorContext.STORAGE_AGENT, msa);
 
-    StreamingContainerManager dnm = new StreamingContainerManager(dag);
+    StreamingContainerManager dnm = ClusterProviderFactory.getProvider().getStreamingContainerManager(dag);
     PhysicalPlan plan = dnm.getPhysicalPlan();
 
     List<PTContainer> containers = plan.getContainers();

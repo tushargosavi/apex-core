@@ -29,6 +29,7 @@ import org.slf4j.LoggerFactory;
 import org.apache.apex.api.plugin.Event;
 import org.apache.apex.api.plugin.Plugin;
 import org.apache.apex.api.plugin.Plugin.EventHandler;
+import org.apache.apex.engine.ClusterProviderFactory;
 import org.apache.apex.engine.api.plugin.DAGExecutionEvent;
 import org.apache.apex.engine.api.plugin.DAGExecutionPlugin;
 import org.apache.apex.engine.api.plugin.PluginLocator;
@@ -38,7 +39,6 @@ import org.apache.hadoop.fs.FSDataInputStream;
 import org.apache.hadoop.fs.FileContext;
 import org.apache.hadoop.fs.Path;
 import org.apache.hadoop.service.AbstractService;
-import org.apache.hadoop.yarn.conf.YarnConfiguration;
 
 import com.google.common.collect.HashBasedTable;
 import com.google.common.collect.Lists;
@@ -86,7 +86,7 @@ public abstract class AbstractApexPluginDispatcher extends AbstractService imple
     try {
       LOG.debug("Reading launch configuration file ");
       URI uri = appPath.toUri();
-      Configuration config = new YarnConfiguration();
+      Configuration config = ClusterProviderFactory.getProvider().getConfiguration().getNativeConfig();
       fileContext = uri.getScheme() == null ? FileContext.getFileContext(config) : FileContext.getFileContext(uri, config);
       FSDataInputStream is = fileContext.open(configFilePath);
       config.addResource(is);

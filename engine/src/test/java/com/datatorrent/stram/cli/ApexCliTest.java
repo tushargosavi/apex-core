@@ -30,8 +30,12 @@ import org.junit.BeforeClass;
 import org.junit.Test;
 import org.junit.rules.TemporaryFolder;
 
+import org.apache.apex.engine.ClusterProviderFactory;
 import org.apache.commons.io.FileUtils;
 
+import com.datatorrent.stram.cli.util.CliException;
+import com.datatorrent.stram.cli.util.GetOperatorClassesCommandLineInfo;
+import com.datatorrent.stram.cli.util.LaunchCommandLineInfo;
 import com.datatorrent.stram.client.AppPackage;
 import com.datatorrent.stram.client.ConfigPackage;
 import com.datatorrent.stram.client.DTConfiguration;
@@ -102,7 +106,7 @@ public class ApexCliTest
   {
     try {
 
-      cli = new ApexCli();
+      cli = ClusterProviderFactory.getProvider().getApexCli();
       cli.init();
 
       ap = new AppPackage(appFile, true);
@@ -124,7 +128,7 @@ public class ApexCliTest
   public void testLaunchAppPackagePropertyPrecedence() throws Exception
   {
     // set launch command options
-    ApexCli.LaunchCommandLineInfo commandLineInfo = ApexCli
+    LaunchCommandLineInfo commandLineInfo = LaunchCommandLineInfo
         .getLaunchCommandLineInfo(new String[]{"-D", "dt.test.1=launch-define", "-apconf", "my-app-conf1.xml", "-conf", "src/test/resources/testAppPackage/local-conf.xml"});
     // process and look at launch config
 
@@ -147,13 +151,13 @@ public class ApexCliTest
   @Test
   public void testLaunchAppPackageParametersWithConfigPackage() throws Exception
   {
-    ApexCli.LaunchCommandLineInfo commandLineInfo = ApexCli
+    LaunchCommandLineInfo commandLineInfo = LaunchCommandLineInfo
         .getLaunchCommandLineInfo(new String[]{"-exactMatch", "-conf", configFile.getAbsolutePath(), appFile.getAbsolutePath(), "MyFirstApplication"});
 
     commandLineInfo.args = new String[] {"testApp", "MyFirstApplication"};
 
     String[] args = cli.getLaunchAppPackageArgs(ap, cp, commandLineInfo, null);
-    commandLineInfo = ApexCli.getLaunchCommandLineInfo(args);
+    commandLineInfo = LaunchCommandLineInfo.getLaunchCommandLineInfo(args);
     StringBuilder sb = new StringBuilder();
     for (String f : ap.getClassPath()) {
       if (sb.length() != 0) {
@@ -185,7 +189,7 @@ public class ApexCliTest
   public void testLaunchAppPackagePrecedenceWithConfigPackage() throws Exception
   {
     // set launch command options
-    ApexCli.LaunchCommandLineInfo commandLineInfo = ApexCli
+    LaunchCommandLineInfo commandLineInfo = LaunchCommandLineInfo
         .getLaunchCommandLineInfo(new String[]{"-D", "dt.test.1=launch-define", "-apconf", "my-app-conf1.xml", "-conf", configFile.getAbsolutePath()});
     // process and look at launch config
 
@@ -209,7 +213,7 @@ public class ApexCliTest
   public void testLaunchAppPackagePrecedenceWithConfigPackageApps() throws Exception
   {
     // set launch command options
-    ApexCli.LaunchCommandLineInfo commandLineInfo = ApexCli
+    LaunchCommandLineInfo commandLineInfo = LaunchCommandLineInfo
         .getLaunchCommandLineInfo(new String[]{"-D", "dt.test.1=launch-define", "-apconf", "my-app-conf1.xml", "-conf", configFile.getAbsolutePath(), "-useConfigApps", "exclusive"});
     // process and look at launch config
 
@@ -224,10 +228,10 @@ public class ApexCliTest
   @Test
   public void testAppFromOnlyConfigPackage() throws Exception
   {
-    ApexCli.LaunchCommandLineInfo commandLineInfo = ApexCli
+    LaunchCommandLineInfo commandLineInfo = LaunchCommandLineInfo
         .getLaunchCommandLineInfo(new String[]{"-conf", configFile.getAbsolutePath(), appFile.getAbsolutePath(), "-useConfigApps", "exclusive"});
 
-    ApexCli apexCli = new ApexCli();
+    ApexCli apexCli = ClusterProviderFactory.getProvider().getApexCli();
     apexCli.init();
 
     Assert.assertEquals("configApps", "exclusive", commandLineInfo.useConfigApps);
@@ -242,17 +246,17 @@ public class ApexCliTest
   @Test
   public void testMergeAppFromConfigAndAppPackage() throws Exception
   {
-    ApexCli.LaunchCommandLineInfo commandLineInfo = ApexCli
+    LaunchCommandLineInfo commandLineInfo = LaunchCommandLineInfo
         .getLaunchCommandLineInfo(new String[]{"-conf", configFile.getAbsolutePath(), appFile.getAbsolutePath(), "-useConfigApps", "inclusive"});
 
     Assert.assertEquals("configApps", "inclusive", commandLineInfo.useConfigApps);
 
-    ApexCli apexCli = new ApexCli();
+    ApexCli apexCli = ClusterProviderFactory.getProvider().getApexCli();
     apexCli.init();
 
     try {
       apexCli.getLaunchAppPackageArgs(ap, cp, commandLineInfo, new ConsoleReader());
-    } catch (ApexCli.CliException cliException) {
+    } catch (CliException cliException) {
       return;
     }
 
@@ -265,8 +269,8 @@ public class ApexCliTest
     String arg2 = "option value";
     String arg3 = "regular parameter";
 
-    ApexCli.GetOperatorClassesCommandLineInfo commandLineOptions =
-        ApexCli.getGetOperatorClassesCommandLineInfo(new String[] {"-parent", arg2, arg3});
+    GetOperatorClassesCommandLineInfo commandLineOptions =
+        GetOperatorClassesCommandLineInfo.getGetOperatorClassesCommandLineInfo(new String[] {"-parent", arg2, arg3});
 
     Assert.assertEquals(commandLineOptions.parent, arg2);
     Assert.assertEquals(commandLineOptions.args.length, 1);

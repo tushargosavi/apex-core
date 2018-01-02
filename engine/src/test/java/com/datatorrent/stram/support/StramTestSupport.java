@@ -53,9 +53,8 @@ import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
 import org.apache.commons.io.FileUtils;
-import org.apache.hadoop.yarn.api.records.ApplicationAttemptId;
-import org.apache.hadoop.yarn.api.records.ApplicationId;
-import org.apache.hadoop.yarn.util.Clock;
+//import org.apache.hadoop.yarn.api.records.ApplicationAttemptId;
+//import org.apache.hadoop.yarn.api.records.ApplicationId;
 import org.apache.maven.cli.MavenCli;
 import org.apache.maven.cli.logging.Slf4jLogger;
 
@@ -488,8 +487,10 @@ public abstract class StramTestSupport
   public static class TestAppContext extends BaseContext implements StramAppContext
   {
 
-    final ApplicationAttemptId appAttemptID;
-    final ApplicationId appID;
+    //final ApplicationAttemptId appAttemptID;
+    //final ApplicationId appID;
+    final int appAttemptID;
+    final String appID;
     final String appPath = "/testPath";
     final String userId = "testUser";
     final long startTime = System.currentTimeMillis();
@@ -498,8 +499,10 @@ public abstract class StramTestSupport
     public TestAppContext(Attribute.AttributeMap attributeMap, int appid, int numJobs, int numTasks, int numAttempts)
     {
       super(attributeMap, null); // this needs to be done in a proper way - may cause application errors.
-      this.appID = ApplicationId.newInstance(0, appid);
-      this.appAttemptID = ApplicationAttemptId.newInstance(this.appID, numAttempts);
+      //this.appID = ApplicationId.newInstance(0, appid);
+      this.appID = "application_0000_" + appid;
+      //this.appAttemptID = ApplicationAttemptId.newInstance(this.appID, numAttempts);
+      this.appAttemptID = numAttempts;
     }
 
     public TestAppContext(Attribute.AttributeMap attributeMap)
@@ -508,15 +511,17 @@ public abstract class StramTestSupport
     }
 
     @Override
-    public ApplicationAttemptId getApplicationAttemptId()
+    public String getApplicationID()
     {
-      return appAttemptID;
+      //return appID.toString();
+      return appID;
     }
 
     @Override
-    public ApplicationId getApplicationID()
+    public int getApplicationAttemptId()
     {
-      return appID;
+      //return appAttemptID.getAttemptId();
+      return appAttemptID;
     }
 
     @Override
@@ -538,12 +543,6 @@ public abstract class StramTestSupport
     }
 
     @Override
-    public Clock getClock()
-    {
-      return null;
-    }
-
-    @Override
     public String getApplicationName()
     {
       return "TestApp";
@@ -559,6 +558,12 @@ public abstract class StramTestSupport
     public long getStartTime()
     {
       return startTime;
+    }
+
+    @Override
+    public long getElapsedTime()
+    {
+      return System.currentTimeMillis() - startTime;
     }
 
     @Override

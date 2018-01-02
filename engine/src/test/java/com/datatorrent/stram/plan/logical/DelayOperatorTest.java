@@ -39,9 +39,11 @@ import org.junit.Test;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
+import org.apache.apex.engine.ClusterProviderFactory;
+import org.apache.apex.engine.SystemClock;
+import org.apache.apex.engine.api.Clock;
+
 import org.apache.commons.lang.StringUtils;
-import org.apache.hadoop.yarn.util.Clock;
-import org.apache.hadoop.yarn.util.SystemClock;
 
 import com.google.common.collect.Sets;
 
@@ -472,7 +474,7 @@ public class DelayOperatorTest
     dag.validate();
 
     dag.setAttribute(com.datatorrent.api.Context.OperatorContext.STORAGE_AGENT, new MemoryStorageAgent());
-    StreamingContainerManager scm = new StreamingContainerManager(dag);
+    StreamingContainerManager scm = ClusterProviderFactory.getProvider().getStreamingContainerManager(dag);
     PhysicalPlan plan = scm.getPhysicalPlan();
     // set all operators as active to enable recovery window id update
     for (PTOperator oper : plan.getAllOperators().values()) {

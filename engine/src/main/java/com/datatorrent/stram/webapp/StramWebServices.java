@@ -63,13 +63,13 @@ import org.codehaus.jettison.json.JSONObject;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
+import org.apache.apex.engine.ClusterProviderFactory;
+import org.apache.apex.engine.api.Settings;
 import org.apache.commons.beanutils.BeanMap;
 import org.apache.commons.beanutils.BeanUtils;
 import org.apache.commons.codec.binary.Base64;
 import org.apache.commons.lang3.StringUtils;
 import org.apache.hadoop.security.UserGroupInformation;
-import org.apache.hadoop.yarn.api.ApplicationConstants;
-import org.apache.hadoop.yarn.webapp.NotFoundException;
 
 import com.google.common.collect.Maps;
 import com.google.inject.Inject;
@@ -260,7 +260,7 @@ public class StramWebServices
     init();
     OperatorInfo oi = dagManager.getOperatorInfo(operatorId);
     if (oi == null) {
-      throw new NotFoundException();
+      throw new RuntimeException("Operator is not found.");
     }
     return new JSONObject(objectMapper.writeValueAsString(oi));
   }
@@ -274,7 +274,7 @@ public class StramWebServices
     Map<String, Object> map = new HashMap<>();
     OperatorInfo oi = dagManager.getOperatorInfo(operatorId);
     if (oi == null) {
-      throw new NotFoundException();
+      throw new RuntimeException("Operator is not found.");
     }
     map.put("ports", oi.ports);
     return new JSONObject(objectMapper.writeValueAsString(map));
@@ -288,14 +288,14 @@ public class StramWebServices
     init();
     OperatorInfo oi = dagManager.getOperatorInfo(operatorId);
     if (oi == null) {
-      throw new NotFoundException();
+      throw new RuntimeException("Operator is not found.");
     }
     for (PortInfo pi : oi.ports) {
       if (pi.name.equals(portName)) {
         return new JSONObject(objectMapper.writeValueAsString(pi));
       }
     }
-    throw new NotFoundException();
+    throw new RuntimeException("Port is not found.");
   }
 
   @GET
@@ -326,7 +326,7 @@ public class StramWebServices
 
       result.put("operatorClasses", classNames);
     } catch (ClassNotFoundException ex) {
-      throw new NotFoundException();
+      throw new RuntimeException("Class is not found.");
     } catch (JSONException ex) {
       throw new RuntimeException(ex);
     }
@@ -348,10 +348,10 @@ public class StramWebServices
       if (Operator.class.isAssignableFrom(clazz)) {
         return operatorDiscoverer.describeOperator(className);
       } else {
-        throw new NotFoundException();
+        throw new RuntimeException("Incorrect operator class name.");
       }
     } catch (Exception ex) {
-      throw new NotFoundException();
+      throw new RuntimeException("Class is not found.");
     }
   }
 
@@ -480,7 +480,7 @@ public class StramWebServices
   {
     init();
     ContainerInfo ci = null;
-    if (containerId.equals(System.getenv(ApplicationConstants.Environment.CONTAINER_ID.toString()))) {
+    if (containerId.equals(ClusterProviderFactory.getProvider().getConfiguration().get(Settings.CONTAINER_ID))) {
       ci = dagManager.getAppMasterContainerInfo();
     } else {
       for (ContainerInfo containerInfo : dagManager.getCompletedContainerInfo()) {
@@ -491,7 +491,7 @@ public class StramWebServices
       if (ci == null) {
         StreamingContainerAgent sca = dagManager.getContainerAgent(containerId);
         if (sca == null) {
-          throw new NotFoundException();
+          throw new RuntimeException("Container is not found.");
         }
         ci = sca.getContainerInfo();
       }
@@ -506,18 +506,18 @@ public class StramWebServices
   {
     init();
 
-    if (containerId.equals(System.getenv(ApplicationConstants.Environment.CONTAINER_ID.toString()))) {
+    if (containerId.equals(ClusterProviderFactory.getProvider().getConfiguration().get(Settings.CONTAINER_ID))) {
       return StramUtils.getStackTrace();
     }
 
     StreamingContainerAgent sca = dagManager.getContainerAgent(containerId);
 
     if (sca == null) {
-      throw new NotFoundException("Container not found.");
+      throw new RuntimeException("Container is not found.");
     }
 
     if (!sca.getContainerInfo().state.equals("ACTIVE")) {
-      throw new NotFoundException("Container is not active.");
+      throw new RuntimeException("Container is not active.");
     }
 
     for (int i = 0; i < STACK_TRACE_ATTEMPTS; ++i) {
@@ -540,7 +540,7 @@ public class StramWebServices
   {
     init();
     JSONObject response = new JSONObject();
-    if (containerId.equals(System.getenv(ApplicationConstants.Environment.CONTAINER_ID.toString()))) {
+    if (containerId.equals(ClusterProviderFactory.getProvider().getConfiguration().get(Settings.CONTAINER_ID))) {
       LOG.info("Received a kill request on application master container. Exiting.");
       new Thread()
       {
@@ -581,7 +581,7 @@ public class StramWebServices
     init();
     OperatorMeta logicalOperator = dagManager.getLogicalPlan().getOperatorMeta(operatorName);
     if (logicalOperator == null) {
-      throw new NotFoundException();
+      throw new RuntimeException("Operator is not found.");
     }
 
     LogicalOperatorInfo logicalOperatorInfo = dagManager.getLogicalOperatorInfo(operatorName);
@@ -596,7 +596,7 @@ public class StramWebServices
     init();
     OperatorMeta logicalOperator = dagManager.getLogicalPlan().getOperatorMeta(operatorName);
     if (logicalOperator == null) {
-      throw new NotFoundException();
+      throw new RuntimeException("Operator is not found.");
     }
 
     OperatorAggregationInfo operatorAggregationInfo = dagManager.getOperatorAggregationInfo(operatorName);
@@ -612,7 +612,7 @@ public class StramWebServices
     init();
     OperatorMeta logicalOperator = dagManager.getLogicalPlan().getOperatorMeta(operatorName);
     if (logicalOperator == null) {
-      throw new NotFoundException();
+      throw new RuntimeException("Operator is not found.");
     }
     JSONObject response = new JSONObject();
     try {
@@ -663,7 +663,7 @@ public class StramWebServices
     init();
     OperatorMeta logicalOperator = dagManager.getLogicalPlan().getOperatorMeta(operatorName);
     if (logicalOperator == null) {
-      throw new NotFoundException();
+      throw new RuntimeException("Operator is not found.");
     }
     HashMap<String, String> map = new HashMap<>();
     for (Map.Entry<Attribute<?>, Object> entry : dagManager.getOperatorAttributes(operatorName).entrySet()) {
@@ -703,7 +703,7 @@ public class StramWebServices
     if (logicalOperator == null) {
       ModuleMeta logicalModule = dagManager.getModuleMeta(operatorName);
       if (logicalModule == null) {
-        throw new NotFoundException();
+        throw new RuntimeException("Operator is not found.");
       }
       inputPorts = logicalModule.getInputStreams().keySet();
       outputPorts = logicalModule.getOutputStreams().keySet();
@@ -776,7 +776,7 @@ public class StramWebServices
     if (logicalOperator == null) {
       ModuleMeta logicalModule = dagManager.getModuleMeta(operatorName);
       if (logicalModule == null) {
-        throw new NotFoundException();
+        throw new RuntimeException("Operator is not found.");
       }
       inputPorts = logicalModule.getInputStreams().keySet();
       outputPorts = logicalModule.getOutputStreams().keySet();
@@ -793,7 +793,7 @@ public class StramWebServices
     } catch (JSONException ex) {
       throw new RuntimeException(ex);
     }
-    throw new NotFoundException();
+    throw new RuntimeException("Port is not found.");
   }
 
   @GET
@@ -804,7 +804,7 @@ public class StramWebServices
     init();
     OperatorMeta logicalOperator = dagManager.getLogicalPlan().getOperatorMeta(operatorName);
     if (logicalOperator == null) {
-      throw new NotFoundException();
+      throw new RuntimeException("Operator is not found.");
     }
     HashMap<String, String> map = new HashMap<>();
     for (Map.Entry<Attribute<?>, Object> entry : dagManager.getPortAttributes(operatorName, portName).entrySet()) {
@@ -827,7 +827,7 @@ public class StramWebServices
     if (logicalOperator == null) {
       ModuleMeta logicalModule = dagManager.getModuleMeta(operatorName);
       if (logicalModule == null) {
-        throw new NotFoundException();
+        throw new RuntimeException("Operator is not found.");
       }
       operatorProperties = LogicalPlanConfiguration.getObjectProperties(logicalModule.getOperator());
     } else {

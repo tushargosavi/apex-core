@@ -24,17 +24,12 @@ import java.util.Map;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
+import org.apache.apex.engine.ClusterProviderFactory;
+import org.apache.apex.engine.StreamingAppMasterSetupContext;
 import org.apache.commons.cli.CommandLine;
 import org.apache.commons.cli.GnuParser;
 import org.apache.commons.cli.HelpFormatter;
 import org.apache.commons.cli.Options;
-import org.apache.hadoop.conf.Configuration;
-import org.apache.hadoop.yarn.api.ApplicationConstants.Environment;
-import org.apache.hadoop.yarn.api.records.ApplicationAttemptId;
-import org.apache.hadoop.yarn.api.records.ContainerId;
-import org.apache.hadoop.yarn.conf.YarnConfiguration;
-import org.apache.hadoop.yarn.util.ConverterUtils;
-import org.apache.hadoop.yarn.util.Records;
 
 import com.datatorrent.stram.debug.StdOutErrLog;
 import com.datatorrent.stram.util.LoggerUtil;
@@ -80,36 +75,21 @@ public class StreamingAppMaster extends StramUtils.YarnContainerMain
       return;
     }
 
-    Map<String, String> envs = System.getenv();
-    ApplicationAttemptId appAttemptID = Records.newRecord(ApplicationAttemptId.class);
-    if (!envs.containsKey(Environment.CONTAINER_ID.name())) {
-      if (cliParser.hasOption("app_attempt_id")) {
-        String appIdStr = cliParser.getOptionValue("app_attempt_id", "");
-        appAttemptID = ConverterUtils.toApplicationAttemptId(appIdStr);
-      } else {
-        throw new IllegalArgumentException("Application Attempt Id not set in the environment");
-      }
-    } else {
-      ContainerId containerId = ConverterUtils.toContainerId(envs.get(Environment.CONTAINER_ID.name()));
-      appAttemptID = containerId.getApplicationAttemptId();
-    }
-
     boolean result = false;
-    StreamingAppMasterService appMaster = null;
+    org.apache.apex.engine.api.StreamingAppMaster appMaster = null;
     try {
-      appMaster = new StreamingAppMasterService(appAttemptID);
+      // Look for a cluster provider
+      appMaster = ClusterProviderFactory.getProvider().getStreamingAppMaster();
       LOG.info("Initializing Application Master.");
 
-      Configuration conf = new YarnConfiguration();
-      appMaster.init(conf);
-      appMaster.start();
+      appMaster.setup(new StreamingAppMasterSetupContext(cliParser));
       result = appMaster.run();
     } catch (Throwable t) {
       LOG.error("Exiting Application Master", t);
       System.exit(1);
     } finally {
       if (appMaster != null) {
-        appMaster.stop();
+        appMaster.teardown();
       }
     }
 

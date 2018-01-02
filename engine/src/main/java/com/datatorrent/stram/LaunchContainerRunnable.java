@@ -19,10 +19,8 @@
 package com.datatorrent.stram;
 
 import java.io.IOException;
-import java.net.InetSocketAddress;
 import java.nio.ByteBuffer;
 import java.util.ArrayList;
-import java.util.Collection;
 import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
@@ -30,32 +28,14 @@ import java.util.Map;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
-import org.apache.apex.engine.security.ACLManager;
-
+import org.apache.apex.engine.ClusterProviderFactory;
+import org.apache.apex.engine.api.Configuration;
+import org.apache.apex.engine.api.Settings;
 import org.apache.commons.lang.StringUtils;
 import org.apache.commons.lang.text.StrSubstitutor;
-import org.apache.hadoop.fs.FileStatus;
-import org.apache.hadoop.fs.FileSystem;
 import org.apache.hadoop.fs.Path;
-import org.apache.hadoop.io.DataOutputBuffer;
-import org.apache.hadoop.io.Text;
-import org.apache.hadoop.security.Credentials;
 import org.apache.hadoop.security.HadoopKerberosName;
 import org.apache.hadoop.security.UserGroupInformation;
-import org.apache.hadoop.security.token.Token;
-import org.apache.hadoop.security.token.TokenIdentifier;
-import org.apache.hadoop.yarn.api.ApplicationConstants;
-import org.apache.hadoop.yarn.api.ApplicationConstants.Environment;
-import org.apache.hadoop.yarn.api.records.Container;
-import org.apache.hadoop.yarn.api.records.ContainerLaunchContext;
-import org.apache.hadoop.yarn.api.records.LocalResource;
-import org.apache.hadoop.yarn.api.records.LocalResourceType;
-import org.apache.hadoop.yarn.api.records.LocalResourceVisibility;
-import org.apache.hadoop.yarn.client.api.async.NMClientAsync;
-import org.apache.hadoop.yarn.conf.YarnConfiguration;
-import org.apache.hadoop.yarn.security.AMRMTokenIdentifier;
-import org.apache.hadoop.yarn.util.ConverterUtils;
-import org.apache.hadoop.yarn.util.Records;
 
 import com.google.common.collect.Lists;
 
@@ -66,8 +46,6 @@ import com.datatorrent.stram.client.StramClientUtils;
 import com.datatorrent.stram.engine.StreamingContainer;
 import com.datatorrent.stram.plan.logical.LogicalPlan;
 import com.datatorrent.stram.plan.physical.PTOperator;
-import com.datatorrent.stram.security.StramDelegationTokenIdentifier;
-import com.datatorrent.stram.security.StramDelegationTokenManager;
 
 /**
  *
@@ -83,21 +61,18 @@ public class LaunchContainerRunnable implements Runnable
   private final Map<String, String> containerEnv = new HashMap<>();
   private final LogicalPlan dag;
   private final ByteBuffer tokens;
-  private final Container container;
-  private final NMClientAsync nmClient;
+  private final IApexContainerLaunchContext containerLaunchContext;
   private final StreamingContainerAgent sca;
   private static final int MB_TO_B = 1024 * 1024;
 
   /**
-   * @param lcontainer Allocated container
-   * @param nmClient
+   * @param containerLaunchContext Container Launch Context
    * @param sca
    * @param tokens
    */
-  public LaunchContainerRunnable(Container lcontainer, NMClientAsync nmClient, StreamingContainerAgent sca, ByteBuffer tokens)
+  public LaunchContainerRunnable(IApexContainerLaunchContext containerLaunchContext, StreamingContainerAgent sca, ByteBuffer tokens)
   {
-    this.container = lcontainer;
-    this.nmClient = nmClient;
+    this.containerLaunchContext = containerLaunchContext;
     this.dag = sca.getContainer().getPlan().getLogicalPlan();
     this.tokens = tokens;
     this.sca = sca;
@@ -112,8 +87,11 @@ public class LaunchContainerRunnable implements Runnable
     // For now setting all required classpaths including
     // the classpath to "." for the application jar
     StringBuilder classPathEnv = new StringBuilder("./*");
-    String classpath = nmClient.getConfig().get(YarnConfiguration.YARN_APPLICATION_CLASSPATH);
-    for (String c : StringUtils.isBlank(classpath) ? YarnConfiguration.DEFAULT_YARN_APPLICATION_CLASSPATH : classpath.split(",")) {
+    //TODO:- Eventually the config returned from launch context should be apex configuration
+    //String classpath = containerLaunchContext.getConfig().get(Settings.Strings.APPLICATION_CLASSPATH.getValue());
+    Configuration configuration = ClusterProviderFactory.getProvider().getConfiguration();
+    String classpath = configuration.get(Settings.APPLICATION_CLASSPATH);
+    for (String c : StringUtils.isBlank(classpath) ? configuration.get(Settings.DEFAULT_APPLICATION_CLASSPATH) : classpath.split(",")) {
       if (c.equals("$HADOOP_CLIENT_CONF_DIR")) {
         // SPOI-2501
         continue;
@@ -127,21 +105,6 @@ public class LaunchContainerRunnable implements Runnable
     LOG.info("CLASSPATH: {}", classPathEnv);
   }
 
-  public static void addFileToLocalResources(final String name, final FileStatus fileStatus, final LocalResourceType type, final Map<String, LocalResource> localResources)
-  {
-    final LocalResource localResource = LocalResource.newInstance(ConverterUtils.getYarnUrlFromPath(fileStatus.getPath()),
-        type, LocalResourceVisibility.APPLICATION, fileStatus.getLen(), fileStatus.getModificationTime());
-    localResources.put(name, localResource);
-  }
-
-  public static void addFilesToLocalResources(LocalResourceType type, String commaSeparatedFileNames, Map<String, LocalResource> localResources, FileSystem fs) throws IOException
-  {
-    String[] files = StringUtils.splitByWholeSeparator(commaSeparatedFileNames, StramClient.LIB_JARS_SEP);
-    for (String file : files) {
-      final Path dst = new Path(file);
-      addFileToLocalResources(dst.getName(), fs.getFileStatus(dst), type, localResources);
-    }
-  }
 
   /**
    * Connects to CM, sets up container launch context and eventually dispatches the container start request to the CM.
@@ -149,8 +112,8 @@ public class LaunchContainerRunnable implements Runnable
   @Override
   public void run()
   {
-    LOG.info("Setting up container launch context for containerid={}", container.getId());
-    ContainerLaunchContext ctx = Records.newRecord(ContainerLaunchContext.class);
+    LOG.info("Setting up container launch context for containerid={}", containerLaunchContext.getContainerId());
+    containerLaunchContext.initContainerLaunchContext();
 
     setClasspath(containerEnv);
 
@@ -169,11 +132,11 @@ public class LaunchContainerRunnable implements Runnable
         }
         LOG.debug("ACL launch user {} current user {}", launchUserName, UserGroupInformation.getCurrentUser().getShortUserName());
         if (!UserGroupInformation.getCurrentUser().getShortUserName().equals(launchUserName)) {
-          ACLManager.setupUserACLs(ctx, launchUserName, nmClient.getConfig());
+          containerLaunchContext.setupUserACLs(launchUserName);
         }
       }
     } catch (IOException e) {
-      LOG.warn("Unable to setup user acls for container {}", container.getId(), e);
+      LOG.warn("Unable to setup user acls for container {}", containerLaunchContext.getContainerId(), e);
     }
     try {
       // propagate to replace node managers user name (effective in non-secure mode)
@@ -182,43 +145,33 @@ public class LaunchContainerRunnable implements Runnable
       LOG.error("Failed to retrieve principal name", e);
     }
     // Set the environment
-    ctx.setEnvironment(containerEnv);
-    ctx.setTokens(tokens);
+
+    containerLaunchContext.setEnvironment(containerEnv);
+    containerLaunchContext.setTokens(tokens);
 
     // Set the local resources
-    Map<String, LocalResource> localResources = new HashMap<>();
-
-    // add resources for child VM
     try {
-      // child VM dependencies
-      try (FileSystem fs = StramClientUtils.newFileSystemInstance(nmClient.getConfig())) {
-        addFilesToLocalResources(LocalResourceType.FILE, dag.getAttributes().get(Context.DAGContext.LIBRARY_JARS), localResources, fs);
-        String archives = dag.getAttributes().get(LogicalPlan.ARCHIVES);
-        if (archives != null) {
-          addFilesToLocalResources(LocalResourceType.ARCHIVE, archives, localResources, fs);
-        }
-        ctx.setLocalResources(localResources);
-      }
+      containerLaunchContext.setLocalResources(dag);
     } catch (IOException e) {
       LOG.error("Failed to prepare local resources.", e);
       return;
     }
 
     // Set the necessary command to execute on the allocated container
-    List<CharSequence> vargs = getChildVMCommand(container.getId().toString());
+    List<CharSequence> vargs = getChildVMCommand(containerLaunchContext.getContainerId());
 
     // Get final command
     StringBuilder command = new StringBuilder(1024);
     for (CharSequence str : vargs) {
       command.append(str).append(" ");
     }
-    LOG.info("Launching on node: {} command: {}", container.getNodeId(), command);
+    LOG.info("Launching on node: {} command: {}", containerLaunchContext.getNodeId(), command);
 
     List<String> commands = new ArrayList<>();
     commands.add(command.toString());
-    ctx.setCommands(commands);
+    containerLaunchContext.setCommands(commands);
 
-    nmClient.startContainerAsync(container, ctx);
+    containerLaunchContext.startContainerAsync();
   }
 
   /**
@@ -232,9 +185,11 @@ public class LaunchContainerRunnable implements Runnable
 
     List<CharSequence> vargs = new ArrayList<>(8);
 
-    if (!StringUtils.isBlank(System.getenv(Environment.JAVA_HOME.key()))) {
+    Configuration configuration = ClusterProviderFactory.getProvider().getConfiguration();
+
+    if (!StringUtils.isBlank(configuration.get(Settings.JAVA_HOME))) {
       // node manager provides JAVA_HOME
-      vargs.add(Environment.JAVA_HOME.$() + "/bin/java");
+      vargs.add(configuration.getVar(Settings.JAVA_HOME) + "/bin/java");
     } else {
       vargs.add("java");
     }
@@ -246,8 +201,8 @@ public class LaunchContainerRunnable implements Runnable
       }
     } else {
       Map<String, String> params = new HashMap<>();
-      params.put("applicationId", Integer.toString(container.getId().getApplicationAttemptId().getApplicationId().getId()));
-      params.put("containerId", Integer.toString(container.getId().getId()));
+      params.put("applicationId", containerLaunchContext.getApplicationId());
+      params.put("containerId", containerLaunchContext.getContainerIntegerId());
       StrSubstitutor sub = new StrSubstitutor(params, "%(", ")");
       vargs.add(sub.replace(jvmOpts));
       if (dag.isDebug() && !jvmOpts.contains("-agentlib:jdwp=")) {
@@ -264,15 +219,17 @@ public class LaunchContainerRunnable implements Runnable
     Context.ContainerOptConfigurator containerOptConfigurator = dag.getAttributes().get(LogicalPlan.CONTAINER_OPTS_CONFIGURATOR);
     jvmOpts = containerOptConfigurator.getJVMOptions(operatorMetaList);
     jvmOpts = parseJvmOpts(jvmOpts, ((long)bufferServerMemory) * MB_TO_B);
-    LOG.info("Jvm opts {} for container {}",jvmOpts,container.getId());
+    LOG.info("Jvm opts {} for container {}",jvmOpts,containerLaunchContext.getContainerId());
     vargs.add(jvmOpts);
 
-    Path childTmpDir = new Path(Environment.PWD.$(), YarnConfiguration.DEFAULT_CONTAINER_TEMP_DIR);
+    String logDirVar = configuration.getVar(Settings.LOG_DIR_EXPANSION);
+
+    Path childTmpDir = new Path(configuration.getVar(Settings.PWD), configuration.get(Settings.DEFAULT_CONTAINER_TEMP_DIR));
     vargs.add(String.format("-D%s=%s", StreamingContainer.PROP_APP_PATH, dag.assertAppPath()));
     vargs.add("-Djava.io.tmpdir=" + childTmpDir);
     vargs.add(String.format("-D%scid=%s", StreamingApplication.DT_PREFIX, jvmID));
     vargs.add("-Dhadoop.root.logger=" + (dag.isDebug() ? "DEBUG" : "INFO") + ",RFA");
-    vargs.add("-Dhadoop.log.dir=" + ApplicationConstants.LOG_DIR_EXPANSION_VAR);
+    vargs.add("-Dhadoop.log.dir=" + logDirVar);
     StramClientUtils.addAttributeToArgs(LogicalPlan.APPLICATION_NAME, dag, vargs);
     StramClientUtils.addAttributeToArgs(LogicalPlan.LOGGER_APPENDER, dag, vargs);
 
@@ -283,8 +240,8 @@ public class LaunchContainerRunnable implements Runnable
     // Add main class and its arguments
     vargs.add(StreamingContainer.class.getName());  // main of Child
 
-    vargs.add("1>" + ApplicationConstants.LOG_DIR_EXPANSION_VAR + "/stdout");
-    vargs.add("2>" + ApplicationConstants.LOG_DIR_EXPANSION_VAR + "/stderr");
+    vargs.add("1>" + logDirVar + "/stdout");
+    vargs.add("2>" + logDirVar + "/stderr");
 
     // Final commmand
     StringBuilder mergedCommand = new StringBuilder(256);
@@ -321,38 +278,16 @@ public class LaunchContainerRunnable implements Runnable
     return builder.toString();
   }
 
-  public static ByteBuffer getTokens(StramDelegationTokenManager delegationTokenManager, InetSocketAddress heartbeatAddress) throws IOException
-  {
-    if (UserGroupInformation.isSecurityEnabled()) {
-      UserGroupInformation ugi = UserGroupInformation.getLoginUser();
-      StramDelegationTokenIdentifier identifier = new StramDelegationTokenIdentifier(new Text(ugi.getUserName()), new Text(""), new Text(""));
-      String service = heartbeatAddress.getAddress().getHostAddress() + ":" + heartbeatAddress.getPort();
-      Token<StramDelegationTokenIdentifier> stramToken = new Token<>(identifier, delegationTokenManager);
-      stramToken.setService(new Text(service));
-      return getTokens(ugi, stramToken);
-    }
-    return null;
-  }
-
-  public static ByteBuffer getTokens(UserGroupInformation ugi, Token<StramDelegationTokenIdentifier> delegationToken)
-  {
-    try {
-      Collection<Token<? extends TokenIdentifier>> tokens = ugi.getCredentials().getAllTokens();
-      Credentials credentials = new Credentials();
-      for (Token<? extends TokenIdentifier> token : tokens) {
-        if (!token.getKind().equals(AMRMTokenIdentifier.KIND_NAME)) {
-          credentials.addToken(token.getService(), token);
-          LOG.debug("Passing container token {}", token);
-        }
-      }
-      credentials.addToken(delegationToken.getService(), delegationToken);
-      DataOutputBuffer dataOutput = new DataOutputBuffer();
-      credentials.writeTokenStorageToStream(dataOutput);
-      byte[] tokenBytes = dataOutput.getData();
-      ByteBuffer cTokenBuf = ByteBuffer.wrap(tokenBytes);
-      return cTokenBuf.duplicate();
-    } catch (IOException e) {
-      throw new RuntimeException("Error generating delegation token", e);
-    }
-  }
+//  public static ByteBuffer getTokens(StramDelegationTokenManager delegationTokenManager, InetSocketAddress heartbeatAddress) throws IOException
+//  {
+//    if (UserGroupInformation.isSecurityEnabled()) {
+//      UserGroupInformation ugi = UserGroupInformation.getLoginUser();
+//      StramDelegationTokenIdentifier identifier = new StramDelegationTokenIdentifier(new Text(ugi.getUserName()), new Text(""), new Text(""));
+//      String service = heartbeatAddress.getAddress().getHostAddress() + ":" + heartbeatAddress.getPort();
+//      Token<StramDelegationTokenIdentifier> stramToken = new Token<>(identifier, delegationTokenManager);
+//      stramToken.setService(new Text(service));
+//      return getTokens(ugi, stramToken);
+//    }
+//    return null;
+//  }
 }

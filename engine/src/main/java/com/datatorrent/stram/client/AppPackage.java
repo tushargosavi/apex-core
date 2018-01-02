@@ -45,6 +45,7 @@ import org.codehaus.jackson.map.SerializerProvider;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
+import org.apache.apex.engine.ClusterProviderFactory;
 import org.apache.commons.compress.archivers.zip.ZipArchiveEntry;
 import org.apache.commons.compress.archivers.zip.ZipArchiveInputStream;
 import org.apache.commons.io.FileUtils;
@@ -467,7 +468,7 @@ public class AppPackage implements Closeable
         appJars.add(entry.getName());
         StramAppLauncher stramAppLauncher = null;
         try {
-          stramAppLauncher = new StramAppLauncher(entry, config);
+          stramAppLauncher = ClusterProviderFactory.getProvider().getStramAppLauncher(entry, config);
           stramAppLauncher.loadDependencies();
           List<AppFactory> appFactories = stramAppLauncher.getBundledTopologies();
           for (AppFactory appFactory : appFactories) {
@@ -515,7 +516,7 @@ public class AppPackage implements Closeable
         appPropertiesFiles.add(entry.getName());
         try {
           AppFactory appFactory = new StramAppLauncher.PropertyFileAppFactory(entry);
-          StramAppLauncher stramAppLauncher = new StramAppLauncher(entry.getName(), config);
+          StramAppLauncher stramAppLauncher = ClusterProviderFactory.getProvider().getStramAppLauncher(entry.getName(), config);
           stramAppLauncher.loadDependencies();
           AppInfo appInfo = new AppInfo(appFactory.getName(), entry.getName(), "properties");
           appInfo.displayName = appFactory.getDisplayName();

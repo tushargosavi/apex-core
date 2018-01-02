@@ -35,6 +35,7 @@ import org.powermock.core.classloader.annotations.PrepareForTest;
 import org.powermock.modules.junit4.rule.PowerMockRule;
 import org.powermock.reflect.Whitebox;
 
+import org.apache.apex.engine.ClusterProviderFactory;
 import org.apache.commons.io.FileUtils;
 import org.apache.hadoop.conf.Configuration;
 import org.apache.hadoop.fs.FileSystem;
@@ -80,7 +81,7 @@ public class StramAppLauncherTest
       // Setup
       Configuration conf = new Configuration();
       FileSystem fs = FileSystem.newInstance(conf);
-      StramAppLauncher appLauncher = new StramAppLauncher(fs, conf);
+      StramAppLauncher appLauncher = ClusterProviderFactory.getProvider().getStramAppLauncher(fs, conf);
 
       Whitebox.setInternalState(appLauncher, "launchDependencies", new LinkedHashSet<URL>());
 
@@ -101,7 +102,7 @@ public class StramAppLauncherTest
       // Setup
       Configuration conf = new Configuration();
       FileSystem fs = FileSystem.newInstance(conf);
-      StramAppLauncher appLauncher = new StramAppLauncher(fs, conf);
+      StramAppLauncher appLauncher = ClusterProviderFactory.getProvider().getStramAppLauncher(fs, conf);
 
       Whitebox.setInternalState(appLauncher, "launchDependencies", new LinkedHashSet<URL>());
 
@@ -121,7 +122,7 @@ public class StramAppLauncherTest
       // Setup
       Configuration conf = new Configuration();
       FileSystem fs = FileSystem.newInstance(conf);
-      final StramAppLauncher appLauncher = new StramAppLauncher(fs, conf);
+      final StramAppLauncher appLauncher = ClusterProviderFactory.getProvider().getStramAppLauncher(fs, conf);
       Whitebox.setInternalState(appLauncher, "launchDependencies", new LinkedHashSet<URL>());
 
       new AsyncTester(new Runnable()
@@ -158,7 +159,7 @@ public class StramAppLauncherTest
       // Setup
       Configuration conf = new Configuration();
       FileSystem fs = FileSystem.newInstance(conf);
-      final StramAppLauncher appLauncher = new StramAppLauncher(fs, conf);
+      final StramAppLauncher appLauncher = ClusterProviderFactory.getProvider().getStramAppLauncher(fs, conf);
       Whitebox.setInternalState(appLauncher, "launchDependencies", new LinkedHashSet<URL>());
 
       new AsyncTester(new Runnable()
@@ -315,7 +316,7 @@ public class StramAppLauncherTest
     private LogicalPlan applyTokenRefreshKeytab(FileSystem fs, Configuration conf) throws Exception
     {
       LogicalPlan dag = new LogicalPlan();
-      StramAppLauncher appLauncher = new StramAppLauncher(fs, conf);
+      StramAppLauncher appLauncher = ClusterProviderFactory.getProvider().getStramAppLauncher(fs, conf);
       Whitebox.invokeMethod(appLauncher, SET_TOKEN_REFRESH_CREDENTIALS_METHOD, dag, conf);
       return dag;
     }

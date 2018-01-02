@@ -69,7 +69,6 @@ import org.apache.commons.lang.builder.ToStringBuilder;
 import org.apache.commons.lang.builder.ToStringStyle;
 import org.apache.hadoop.conf.Configuration;
 import org.apache.hadoop.util.ReflectionUtils;
-import org.apache.hadoop.yarn.conf.YarnConfiguration;
 
 import com.google.common.collect.Sets;
 
@@ -162,7 +161,6 @@ public class LogicalPlan implements Serializable, DAG
    */
   public static Attribute<Boolean> FAST_PUBLISHER_SUBSCRIBER = new Attribute<>(false);
   public static Attribute<Long> HDFS_TOKEN_LIFE_TIME = new Attribute<>(604800000L);
-  public static Attribute<Long> RM_TOKEN_LIFE_TIME = new Attribute<>(YarnConfiguration.DELEGATION_TOKEN_MAX_LIFETIME_DEFAULT);
   public static Attribute<String> PRINCIPAL = new Attribute<>(null, StringCodec.String2String.getInstance());
   public static Attribute<String> KEY_TAB_FILE = new Attribute<>((String)null, StringCodec.String2String.getInstance());
   public static Attribute<Double> TOKEN_REFRESH_ANTICIPATORY_FACTOR = new Attribute<>(0.7);

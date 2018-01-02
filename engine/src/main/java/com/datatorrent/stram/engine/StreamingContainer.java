@@ -42,6 +42,7 @@ import java.util.concurrent.ConcurrentHashMap;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
+import org.apache.apex.engine.ClusterProviderFactory;
 import org.apache.apex.log.LogFileInformation;
 import org.apache.commons.io.FileUtils;
 import org.apache.commons.lang.exception.ExceptionUtils;
@@ -51,7 +52,6 @@ import org.apache.hadoop.net.NetUtils;
 import org.apache.hadoop.security.Credentials;
 import org.apache.hadoop.security.UserGroupInformation;
 import org.apache.hadoop.security.token.Token;
-import org.apache.hadoop.yarn.conf.YarnConfiguration;
 import org.apache.log4j.LogManager;
 
 import com.datatorrent.api.Attribute;
@@ -607,7 +607,7 @@ public class StreamingContainer extends YarnContainerMain
   {
     logger.debug("Entering heartbeat loop (interval is {} ms)", this.heartbeatIntervalMillis);
     umbilical.log(containerId, "[" + containerId + "] Entering heartbeat loop..");
-    final YarnConfiguration conf = new YarnConfiguration();
+    final Configuration conf = ClusterProviderFactory.getProvider().getConfiguration().getNativeConfig();
     long tokenLifeTime = (long)(containerContext.getValue(LogicalPlan.TOKEN_REFRESH_ANTICIPATORY_FACTOR) * containerContext.getValue(LogicalPlan.HDFS_TOKEN_LIFE_TIME));
     long expiryTime = System.currentTimeMillis();
     final Credentials credentials = UserGroupInformation.getCurrentUser().getCredentials();

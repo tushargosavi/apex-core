@@ -34,6 +34,7 @@ import java.util.concurrent.atomic.AtomicInteger;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
+import org.apache.apex.engine.ClusterProviderFactory;
 import org.apache.apex.log.LogFileInformation;
 
 import org.apache.commons.lang3.SerializationUtils;
@@ -311,7 +312,8 @@ public class StramLocalCluster implements Runnable, Controller
     if (dag.getAttributes().get(OperatorContext.STORAGE_AGENT) == null) {
       dag.setAttribute(OperatorContext.STORAGE_AGENT, new AsyncFSStorageAgent(new Path(pathUri, LogicalPlan.SUBDIR_CHECKPOINTS).toString(), null));
     }
-    this.dnmgr = new StreamingContainerManager(dag);
+    // TODO: Provide a local implementation of container manager directly
+    this.dnmgr = ClusterProviderFactory.getProvider().getStreamingContainerManager(dag);
     this.umbilical = new UmbilicalProtocolLocalImpl();
   }
 

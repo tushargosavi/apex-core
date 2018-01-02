@@ -44,6 +44,7 @@ import org.mockito.stubbing.Answer;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
+import org.apache.apex.engine.ClusterProviderFactory;
 import org.apache.apex.engine.util.CascadeStorageAgent;
 import org.apache.commons.lang.mutable.MutableBoolean;
 import org.apache.commons.lang.mutable.MutableInt;
@@ -299,7 +300,7 @@ public class StramRecoveryTest
     dag.setAttribute(OperatorContext.STORAGE_AGENT, new FSStorageAgent(testMeta.getPath(), null));
 
     TestGeneratorInputOperator o1 = dag.addOperator("o1", TestGeneratorInputOperator.class);
-    StreamingContainerManager scm = new StreamingContainerManager(dag);
+    StreamingContainerManager scm = ClusterProviderFactory.getProvider().getStreamingContainerManager(dag);
     PhysicalPlan plan = scm.getPhysicalPlan();
     Journal j = scm.getJournal();
     ByteArrayOutputStream bos = new ByteArrayOutputStream()
@@ -433,7 +434,7 @@ public class StramRecoveryTest
     dag = new LogicalPlan();
     dag.setAttribute(LogicalPlan.APPLICATION_PATH, appPath2);
     dag.setAttribute(LogicalPlan.APPLICATION_ID, appId2);
-    StramClient sc = new StramClient(new Configuration(), dag);
+    StramClient sc = ClusterProviderFactory.getProvider().getStramClient(new Configuration(), dag);
     try {
       sc.start();
       sc.copyInitialState(new Path(appPath1));
@@ -467,7 +468,7 @@ public class StramRecoveryTest
     dag = new LogicalPlan();
     dag.setAttribute(LogicalPlan.APPLICATION_PATH, appPath3);
     dag.setAttribute(LogicalPlan.APPLICATION_ID, appId3);
-    sc = new StramClient(new Configuration(), dag);
+    sc = ClusterProviderFactory.getProvider().getStramClient(new Configuration(), dag);
     try {
       sc.start();
       sc.copyInitialState(new Path(appPath2)); // copy state from app2.

@@ -27,17 +27,16 @@ import java.util.Iterator;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
+import org.apache.apex.engine.ClusterProviderFactory;
+import org.apache.apex.engine.api.Settings;
 import org.apache.hadoop.conf.Configuration;
 import org.apache.hadoop.fs.FileSystem;
 import org.apache.hadoop.security.Credentials;
 import org.apache.hadoop.security.UserGroupInformation;
 import org.apache.hadoop.security.token.Token;
-import org.apache.hadoop.yarn.client.api.YarnClient;
-import org.apache.hadoop.yarn.conf.YarnConfiguration;
 
 import com.datatorrent.api.StreamingApplication;
 
-import com.datatorrent.stram.client.StramClientUtils;
 import com.datatorrent.stram.util.FSUtil;
 
 /**
@@ -89,7 +88,7 @@ public class StramUserLogin
   {
     long expiryTime = System.currentTimeMillis() + tokenLifeTime;
     //renew tokens
-    final String tokenRenewer = conf.get(YarnConfiguration.RM_PRINCIPAL);
+    final String tokenRenewer = conf.get(Settings.Strings.RM_PRINCIPAL.getValue());
     if (tokenRenewer == null || tokenRenewer.length() == 0) {
       throw new IOException("Can't get Master Kerberos principal for the RM to use as renewer");
     }
@@ -115,9 +114,7 @@ public class StramUserLogin
             fs1.addDelegationTokens(tokenRenewer, creds);
           }
           if (renewRMToken) {
-            try (YarnClient yarnClient = StramClientUtils.createYarnClient(conf)) {
-              new StramClientUtils.ClientRMHelper(yarnClient, conf).addRMDelegationToken(tokenRenewer, creds);
-            }
+            ClusterProviderFactory.getProvider().addRMDelegationToken(conf, tokenRenewer, creds);
           }
           credentials.addAll(creds);
 
