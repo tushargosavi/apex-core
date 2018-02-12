@@ -90,7 +90,7 @@ public class ApexCli extends com.datatorrent.stram.cli.ApexCli
       @Override
       protected StramAppLauncher.AppFactory checkNonTerminatedApplication(com.datatorrent.stram.cli.ApexCli apexCli, LaunchCommandLineInfo commandLineInfo, StramAppLauncher.AppFactory appFactory, StramAppLauncher submitApp, String matchString)
       {
-        return null;
+        return appFactory;
       }
 
       @Override
