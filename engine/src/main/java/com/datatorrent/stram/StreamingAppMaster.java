@@ -18,6 +18,7 @@
  */
 package com.datatorrent.stram;
 
+import java.io.PrintWriter;
 import java.io.StringWriter;
 import java.util.Map;
 
@@ -26,6 +27,7 @@ import org.slf4j.LoggerFactory;
 
 import org.apache.apex.engine.ClusterProviderFactory;
 import org.apache.apex.engine.StreamingAppMasterSetupContext;
+import org.apache.apex.engine.k8s.K8sClusterProvider;
 import org.apache.commons.cli.CommandLine;
 import org.apache.commons.cli.GnuParser;
 import org.apache.commons.cli.HelpFormatter;
@@ -52,6 +54,14 @@ public class StreamingAppMaster extends StramUtils.YarnContainerMain
    */
   public static void main(final String[] args) throws Throwable
   {
+    if (ClusterProviderFactory.getProvider() instanceof K8sClusterProvider) {
+      PrintWriter writer = new PrintWriter(System.out);
+      writer.println("Master started");
+      writer.flush();
+      writer.close();
+      System.exit(0);
+    }
+
     LoggerUtil.setupMDC("master");
     StdOutErrLog.tieSystemOutAndErrToLog();
     LOG.info("Master starting with classpath: {}", System.getProperty("java.class.path"));

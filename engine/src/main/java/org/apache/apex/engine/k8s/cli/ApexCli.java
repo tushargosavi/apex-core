@@ -1,36 +1,17 @@
 /**
- * Licensed to the Apache Software Foundation (ASF) under one
- * or more contributor license agreements.  See the NOTICE file
- * distributed with this work for additional information
- * regarding copyright ownership.  The ASF licenses this file
- * to you under the Apache License, Version 2.0 (the
- * "License"); you may not use this file except in compliance
- * with the License.  You may obtain a copy of the License at
- *
- *   http://www.apache.org/licenses/LICENSE-2.0
- *
- * Unless required by applicable law or agreed to in writing,
- * software distributed under the License is distributed on an
- * "AS IS" BASIS, WITHOUT WARRANTIES OR CONDITIONS OF ANY
- * KIND, either express or implied.  See the License for the
- * specific language governing permissions and limitations
- * under the License.
+ * Copyright (c) 2012-2018 DataTorrent, Inc.
+ * ALL Rights Reserved.
  */
-package org.apache.apex.engine.local.cli;
+package org.apache.apex.engine.k8s.cli;
 
 import org.codehaus.jettison.json.JSONObject;
 
-import org.apache.hadoop.conf.Configuration;
-
 import com.datatorrent.stram.cli.commands.Command;
-import com.datatorrent.stram.cli.commands.LaunchCommand;
-import com.datatorrent.stram.cli.util.LaunchCommandLineInfo;
 import com.datatorrent.stram.client.StramAgent;
-import com.datatorrent.stram.client.StramAppLauncher;
 import com.datatorrent.stram.util.WebServicesClient;
 
 /**
- * TODO: Replace trivial implementations of methods as needed
+ * Created by sergey on 2/2/18.
  */
 public class ApexCli extends com.datatorrent.stram.cli.ApexCli
 {
@@ -85,20 +66,7 @@ public class ApexCli extends com.datatorrent.stram.cli.ApexCli
   @Override
   protected Command getLaunchCommand()
   {
-    return new LaunchCommand()
-    {
-      @Override
-      protected StramAppLauncher.AppFactory checkNonTerminatedApplication(com.datatorrent.stram.cli.ApexCli apexCli, LaunchCommandLineInfo commandLineInfo, StramAppLauncher.AppFactory appFactory, StramAppLauncher submitApp, String matchString)
-      {
-        return appFactory;
-      }
-
-      @Override
-      protected void checkDuplicatesAndLaunchApplication(Configuration config, com.datatorrent.stram.cli.ApexCli apexCli, StramAppLauncher.AppFactory appFactory, StramAppLauncher submitApp) throws Exception
-      {
-        submitApp.runLocal(appFactory);
-      }
-    };
+    return new org.apache.apex.engine.k8s.cli.commands.LaunchCommand();
   }
 
   @Override
