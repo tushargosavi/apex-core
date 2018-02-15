@@ -24,6 +24,7 @@ import java.net.URL;
 import java.util.LinkedHashSet;
 
 import org.junit.Assert;
+import org.junit.Before;
 import org.junit.Rule;
 import org.junit.Test;
 import org.junit.experimental.runners.Enclosed;
@@ -55,6 +56,12 @@ public class StramAppLauncherTest
 {
 
   private static final String SET_TOKEN_REFRESH_CREDENTIALS_METHOD = "setTokenRefreshCredentials";
+
+  @Before
+  public void setup()
+  {
+    System.setProperty("providerType", "LOCAL");
+  }
 
   @PrepareForTest({StramAppLauncher.class})
   @PowerMockIgnore({"javax.xml.*", "org.w3c.*", "org.apache.hadoop.*", "org.apache.log4j.*"})

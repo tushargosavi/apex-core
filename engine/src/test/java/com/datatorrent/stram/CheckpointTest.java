@@ -123,6 +123,7 @@ public class CheckpointTest
   @Before
   public void setup()
   {
+    System.setProperty("providerType", "LOCAL");
     dag = StramTestSupport.createDAG(testMeta);
   }
 

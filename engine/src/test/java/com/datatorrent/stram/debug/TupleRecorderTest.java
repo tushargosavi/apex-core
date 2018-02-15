@@ -63,6 +63,7 @@ public class TupleRecorderTest
   @Before
   public void setup() throws IOException
   {
+    System.setProperty("providerType", "LOCAL");
     StreamingContainer.eventloop.start();
   }
 

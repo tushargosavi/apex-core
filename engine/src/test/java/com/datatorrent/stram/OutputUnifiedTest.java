@@ -57,6 +57,7 @@ public class OutputUnifiedTest
   @Before
   public void setup()
   {
+    System.setProperty("providerType", "LOCAL");
     dag = StramTestSupport.createDAG(testMeta);
     dag.setAttribute(OperatorContext.STORAGE_AGENT, new MemoryStorageAgent());
   }

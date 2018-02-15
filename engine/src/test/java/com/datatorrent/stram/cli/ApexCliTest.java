@@ -104,6 +104,7 @@ public class ApexCliTest
   @Before
   public void startingTest()
   {
+    System.setProperty("providerType", "LOCAL");
     try {
 
       cli = ClusterProviderFactory.getProvider().getApexCli();

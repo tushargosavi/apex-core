@@ -62,6 +62,7 @@ public class CustomControlTupleTest
     done = false;
     endApp = false;
     endingWindowId = 0;
+    System.setProperty("providerType", "LOCAL");
   }
 
   public static class Generator extends BaseOperator implements InputOperator

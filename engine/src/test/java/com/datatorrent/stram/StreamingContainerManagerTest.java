@@ -107,6 +107,7 @@ public class StreamingContainerManagerTest
   @Before
   public void setup()
   {
+    System.setProperty("providerType", "LOCAL");
     dag = StramTestSupport.createDAG(testMeta);
   }
 

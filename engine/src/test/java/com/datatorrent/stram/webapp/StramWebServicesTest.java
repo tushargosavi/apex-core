@@ -174,6 +174,7 @@ public class StramWebServicesTest extends JerseyTest
   @Override
   public void setUp() throws Exception
   {
+    System.setProperty("providerType", "LOCAL");
     super.setUp();
   }
 
