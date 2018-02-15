@@ -11,6 +11,7 @@ import java.io.FileInputStream;
 import java.io.FileOutputStream;
 import java.io.IOException;
 import java.io.PrintWriter;
+import java.nio.file.Paths;
 import java.util.ArrayList;
 import java.util.Arrays;
 import java.util.Collection;
@@ -28,6 +29,8 @@ import org.apache.tools.tar.TarEntry;
 import org.apache.tools.tar.TarOutputStream;
 
 import com.google.common.base.MoreObjects;
+import com.spotify.docker.client.DefaultDockerClient;
+import com.spotify.docker.client.DockerClient;
 
 import com.datatorrent.api.Context;
 import com.datatorrent.api.StorageAgent;
@@ -223,6 +226,11 @@ public class StramClient extends com.datatorrent.stram.StramClient
         .add("docker", dockerFileBody.toString())
         .toString());
 
+    // The current implementation uses the default docker uri
+    DefaultDockerClient.Builder builder = DefaultDockerClient.fromEnv();
+    DockerClient docker = builder.build();
+
+    String imageId = docker.build(Paths.get(localTmpFolder), appId);
     // TODO: Launch application
   }
 
