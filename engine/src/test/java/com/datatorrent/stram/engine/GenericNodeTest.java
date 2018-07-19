@@ -806,7 +806,7 @@ public class GenericNodeTest
     windowGenerator.setResetWindow(resetWindow);
     windowGenerator.setFirstWindow(firstWindowMillis);
     windowGenerator.setWindowWidth(windowWidth);
-    windowGenerator.setCheckpointCount(1, 0);
+    windowGenerator.setCheckpointCount(1);
 
     GenericOperator go = new GenericOperator();
 
@@ -900,7 +900,7 @@ public class GenericNodeTest
     final WindowGenerator windowGenerator = new WindowGenerator(executorService, 1024);
     windowGenerator.setWindowWidth(windowWidth);
     windowGenerator.setFirstWindow(executorService.getCurrentTimeMillis());
-    windowGenerator.setCheckpointCount(dagCheckPoint, 0);
+    windowGenerator.setCheckpointCount(dagCheckPoint);
     //GenericOperator go = new GenericOperator();
     CheckpointDistanceOperator go = new CheckpointDistanceOperator();
     go.maxWindows = maxWindows;

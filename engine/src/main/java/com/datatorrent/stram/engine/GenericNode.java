@@ -53,7 +53,6 @@ import com.datatorrent.stram.debug.TappedReservoir;
 import com.datatorrent.stram.plan.logical.LogicalPlan;
 import com.datatorrent.stram.plan.logical.Operators;
 import com.datatorrent.stram.tuple.CustomControlTuple;
-import com.datatorrent.stram.tuple.ResetWindowTuple;
 import com.datatorrent.stram.tuple.Tuple;
 
 /**
@@ -292,16 +291,6 @@ public class GenericNode extends Node<Operator>
                   receivedEndWindow = 0;
                   currentWindowId = t.getWindowId();
                   if (delay) {
-                    if (WindowGenerator.getBaseSecondsFromWindowId(windowAhead) > t.getBaseSeconds()) {
-                      // Buffer server code strips out the base seconds from BEGIN_WINDOW and END_WINDOW tuples for
-                      // serialization optimization.  That's why we need a reset window here to tell the buffer
-                      // server we are having a new baseSeconds now.
-                      Tuple resetWindowTuple = new ResetWindowTuple(windowAhead);
-                      for (int s = sinks.length; s-- > 0; ) {
-                        sinks[s].put(resetWindowTuple);
-                      }
-                    }
-                    controlTupleCount++;
                     t.setWindowId(windowAhead);
                   }
                   for (int s = sinks.length; s-- > 0; ) {

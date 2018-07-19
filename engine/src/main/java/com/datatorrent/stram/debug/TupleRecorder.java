@@ -47,7 +47,6 @@ import com.datatorrent.bufferserver.packet.MessageType;
 import com.datatorrent.common.codec.JsonStreamCodec;
 import com.datatorrent.common.util.ObjectMapperString;
 import com.datatorrent.netlet.util.Slice;
-import com.datatorrent.stram.engine.WindowGenerator;
 import com.datatorrent.stram.tuple.Tuple;
 import com.datatorrent.stram.util.FSPartFileCollection;
 import com.datatorrent.stram.util.SharedPubSubWebSocketClient;
@@ -65,7 +64,7 @@ public class TupleRecorder
   private long totalTupleCount = 0;
   private final HashMap<String, PortInfo> portMap = new HashMap<>(); // used for output portInfo <name, id> map
   private final HashMap<String, PortCount> portCountMap = new HashMap<>(); // used for tupleCount of each port <name, count> map
-  private transient long currentWindowId = WindowGenerator.MIN_WINDOW_ID - 1;
+  private transient long currentWindowId = Long.MIN_VALUE;
   private transient ArrayList<Range> windowIdRanges = new ArrayList<>();
   private long startTime = Stats.INVALID_TIME_MILLIS;
   private String id;
