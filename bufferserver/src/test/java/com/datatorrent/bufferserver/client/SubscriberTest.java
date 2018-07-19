@@ -25,7 +25,6 @@ import java.util.concurrent.atomic.AtomicBoolean;
 
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
-
 import org.testng.annotations.AfterClass;
 import org.testng.annotations.BeforeClass;
 import org.testng.annotations.Test;
@@ -33,7 +32,6 @@ import org.testng.annotations.Test;
 import com.datatorrent.bufferserver.packet.BeginWindowTuple;
 import com.datatorrent.bufferserver.packet.EndWindowTuple;
 import com.datatorrent.bufferserver.packet.PayloadTuple;
-import com.datatorrent.bufferserver.packet.ResetWindowTuple;
 import com.datatorrent.bufferserver.server.Server;
 import com.datatorrent.bufferserver.support.Publisher;
 import com.datatorrent.bufferserver.support.Subscriber;
@@ -90,7 +88,7 @@ public class SubscriberTest
     final Subscriber bss1 = new Subscriber("MySubscriber")
     {
       @Override
-      public void beginWindow(int windowId)
+      public void beginWindow(long windowId)
       {
         super.beginWindow(windowId);
         if (windowId > 9) {
@@ -120,8 +118,6 @@ public class SubscriberTest
       @SuppressWarnings("SleepWhileInLoop")
       public void run()
       {
-        bsp1.publishMessage(ResetWindowTuple.getSerializedTuple(baseWindow, 500));
-
         long windowId = 0x7afebabe00000000L;
         try {
           while (publisherRun.get()) {
@@ -164,7 +160,7 @@ public class SubscriberTest
     final Subscriber bss2 = new Subscriber("MyPublisher")
     {
       @Override
-      public void beginWindow(int windowId)
+      public void beginWindow(long windowId)
       {
         super.beginWindow(windowId);
         if (windowId > 14) {

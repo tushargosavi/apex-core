@@ -723,7 +723,7 @@ public class StreamingContainer extends YarnContainerMain
     umbilical.log(containerId, "[" + containerId + "] Exiting heartbeat loop..");
   }
 
-  private long lastCommittedWindowId = WindowGenerator.MIN_WINDOW_ID - 1;
+  private long lastCommittedWindowId = Long.MIN_VALUE;
 
   private void processNodeRequests(boolean flagInvalid)
   {
@@ -1342,11 +1342,11 @@ public class StreamingContainer extends YarnContainerMain
     windowGenerator.setResetWindow(firstWindowMillis);
 
     long millisAtFirstWindow = WindowGenerator.getNextWindowMillis(finishedWindowId, firstWindowMillis, windowWidthMillis);
-    windowGenerator.setFirstWindow(millisAtFirstWindow);
+    windowGenerator.setFirstWindow(finishedWindowId);
     windowGenerator.setWindowWidth(windowWidthMillis);
 
     long windowCount = WindowGenerator.getWindowCount(millisAtFirstWindow, firstWindowMillis, windowWidthMillis);
-    windowGenerator.setCheckpointCount(checkpointWindowCount, (int)(windowCount % checkpointWindowCount));
+    windowGenerator.setCheckpointCount(checkpointWindowCount);
     return windowGenerator;
   }
 

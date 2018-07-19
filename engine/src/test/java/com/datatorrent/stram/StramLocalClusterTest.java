@@ -152,7 +152,7 @@ public class StramLocalClusterTest
       public WindowGenerator setupWindowGenerator()
       {
         WindowGenerator wingen = StramTestSupport.setupWindowGenerator(wclock);
-        wingen.setCheckpointCount(2, 0);
+        wingen.setCheckpointCount(2);
         return wingen;
       }
 

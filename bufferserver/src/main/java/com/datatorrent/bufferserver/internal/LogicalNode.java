@@ -176,18 +176,8 @@ public class LogicalNode implements DataListener
               ++skippedPayloadTuples;
               break;
 
-            case MessageType.RESET_WINDOW_VALUE:
-              Tuple tuple = Tuple.getTuple(data.buffer, data.dataOffset, data.length - data.dataOffset + data.offset);
-              baseSeconds = (long)tuple.getBaseSeconds() << 32;
-              intervalMillis = tuple.getWindowWidth();
-              if (intervalMillis <= 0) {
-                logger.warn("Interval value set to non positive value = {}", intervalMillis);
-              }
-              ready = GiveAll.getInstance().distribute(physicalNodes, data);
-              break;
-
             case MessageType.BEGIN_WINDOW_VALUE:
-              tuple = Tuple.getTuple(data.buffer, data.dataOffset, data.length - data.dataOffset + data.offset);
+              Tuple tuple = Tuple.getTuple(data.buffer, data.dataOffset, data.length - data.dataOffset + data.offset);
               logger.debug("{}->{} condition {} =? {}", upstream, group,
                   Codec.getStringWindowId(baseSeconds | tuple.getWindowId()), Codec.getStringWindowId(skipWindowId));
               if ((baseSeconds | tuple.getWindowId()) > skipWindowId) {
@@ -244,13 +234,6 @@ public class LogicalNode implements DataListener
                 case MessageType.NO_MESSAGE_ODD_VALUE:
                   break;
 
-                case MessageType.RESET_WINDOW_VALUE:
-                  final int length = data.length - data.dataOffset + data.offset;
-                  Tuple resetWindow = Tuple.getTuple(data.buffer, data.dataOffset, length);
-                  baseSeconds = (long)resetWindow.getBaseSeconds() << 32;
-                  ready = GiveAll.getInstance().distribute(physicalNodes, data);
-                  break;
-
                 default:
                   //logger.debug("sending data of type {}", MessageType.valueOf(data.buffer[data.dataOffset]));
                   ready = GiveAll.getInstance().distribute(physicalNodes, data);
@@ -275,12 +258,6 @@ public class LogicalNode implements DataListener
 
                 case MessageType.NO_MESSAGE_VALUE:
                 case MessageType.NO_MESSAGE_ODD_VALUE:
-                  break;
-
-                case MessageType.RESET_WINDOW_VALUE:
-                  tuple = Tuple.getTuple(data.buffer, data.dataOffset, length);
-                  baseSeconds = (long)tuple.getBaseSeconds() << 32;
-                  ready = GiveAll.getInstance().distribute(physicalNodes, data);
                   break;
 
                 default:

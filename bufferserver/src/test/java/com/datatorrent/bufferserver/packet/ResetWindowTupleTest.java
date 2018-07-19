@@ -18,10 +18,6 @@
  */
 package com.datatorrent.bufferserver.packet;
 
-import org.testng.annotations.Test;
-
-import static org.testng.Assert.assertEquals;
-
 /**
  *
  */
@@ -31,6 +27,7 @@ public class ResetWindowTupleTest
   {
   }
 
+  /*
   @Test
   public void testGetSerializedTuple()
   {
@@ -40,4 +37,5 @@ public class ResetWindowTupleTest
     assertEquals(tuple.getBaseSeconds(), 0x7afebabe, "base seconds");
     assertEquals(tuple.getWindowWidth(), 500, "window width");
   }
+  */
 }

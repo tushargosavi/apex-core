@@ -70,16 +70,11 @@ public class FastDataList extends DataList
           case MessageType.BEGIN_WINDOW_VALUE:
             Tuple btw = Tuple.getTuple(last.data, processingOffset, size);
             if (last.starting_window == -1) {
-              last.starting_window = baseSeconds | btw.getWindowId();
+              last.starting_window = btw.getWindowId();
               last.ending_window = last.starting_window;
             } else {
-              last.ending_window = baseSeconds | btw.getWindowId();
+              last.ending_window = btw.getWindowId();
             }
-            break;
-
-          case MessageType.RESET_WINDOW_VALUE:
-            Tuple rwt = Tuple.getTuple(last.data, processingOffset, size);
-            baseSeconds = (long)rwt.getBaseSeconds() << 32;
             break;
 
           default:

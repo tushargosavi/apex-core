@@ -34,7 +34,6 @@ import com.datatorrent.bufferserver.packet.MessageType;
 import com.datatorrent.common.util.BaseOperator;
 import com.datatorrent.stram.engine.GenericNodeTest.FSTestWatcher;
 import com.datatorrent.stram.tuple.EndWindowTuple;
-import com.datatorrent.stram.tuple.ResetWindowTuple;
 import com.datatorrent.stram.tuple.Tuple;
 
 public class InputNodeTest
@@ -95,9 +94,7 @@ public class InputNodeTest
         Tuple controlTuple = (Tuple)tuple;
         MessageType tupleType = controlTuple.getType();
 
-        if (tupleType == MessageType.RESET_WINDOW) {
-          Assert.assertFalse(insideWindow);
-        } else if (tupleType == MessageType.BEGIN_WINDOW) {
+        if (tupleType == MessageType.BEGIN_WINDOW) {
           Assert.assertFalse(insideWindow);
           insideWindow = true;
         } else if (tupleType == MessageType.END_WINDOW) {
@@ -135,15 +132,13 @@ public class InputNodeTest
 
     private Tuple currentTuple;
     private Sink<Object> oldSink = null;
-    private State currentState = State.RESET_WINDOW_NO_TUPLE;
+    private State currentState = State.BEGIN_WINDOW;
     private long lastTime;
 
     public enum State
     {
-      RESET_WINDOW_NO_TUPLE,
-      RESET_WINDOW_TUPLE,
       BEGIN_WINDOW,
-      END_WINDOW;
+      END_WINDOW
     }
 
     public TestWindowGenerator()
@@ -162,17 +157,6 @@ public class InputNodeTest
     public Tuple sweep()
     {
       switch (currentState) {
-        case RESET_WINDOW_NO_TUPLE: {
-          currentTuple = new ResetWindowTuple(baseSeconds | 500L);
-          currentState = State.RESET_WINDOW_TUPLE;
-          break;
-        }
-        case RESET_WINDOW_TUPLE: {
-          if (currentTuple == null) {
-            currentState = State.BEGIN_WINDOW;
-          }
-          break;
-        }
         case BEGIN_WINDOW: {
           if (System.currentTimeMillis() - lastTime > 1000L) {
             lastTime = System.currentTimeMillis();

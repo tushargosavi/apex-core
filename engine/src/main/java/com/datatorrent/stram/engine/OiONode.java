@@ -49,8 +49,7 @@ import com.datatorrent.stram.tuple.Tuple;
  */
 public class OiONode extends GenericNode
 {
-  private long lastResetWindowId = WindowGenerator.MIN_WINDOW_ID - 1;
-  private long lastEndStreamWindowId = WindowGenerator.MAX_WINDOW_ID - 1;
+  private long lastEndStreamWindowId = Long.MIN_VALUE;
   private int expectingEndWindows = 0;
 
   public OiONode(Operator operator, OperatorContext context)
@@ -149,16 +148,6 @@ public class OiONode extends GenericNode
               doCheckpoint = true;
             }
 
-            for (int s = sinks.length; s-- > 0;) {
-              sinks[s].put(t);
-            }
-            controlTupleCount++;
-          }
-          break;
-
-        case RESET_WINDOW:
-          if (t.getWindowId() != lastResetWindowId) {
-            lastResetWindowId = t.getWindowId();
             for (int s = sinks.length; s-- > 0;) {
               sinks[s].put(t);
             }
