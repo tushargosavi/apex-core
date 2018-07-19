@@ -37,7 +37,6 @@ import org.apache.commons.lang.builder.ToStringBuilder;
 
 import com.datatorrent.bufferserver.packet.BeginWindowTuple;
 import com.datatorrent.bufferserver.packet.MessageType;
-import com.datatorrent.bufferserver.packet.ResetWindowTuple;
 import com.datatorrent.bufferserver.packet.Tuple;
 import com.datatorrent.bufferserver.storage.Storage;
 import com.datatorrent.bufferserver.util.BitVector;
@@ -72,7 +71,6 @@ public class DataList
   protected ExecutorService storageExecutor;
   protected int size;
   protected int processingOffset;
-  protected long baseSeconds;
   private final Set<AbstractClient> suspendedClients = newHashSet();
   private final AtomicInteger numberOfInMemBlockPermits;
   private MutableInt nextOffset = new MutableInt();
@@ -106,9 +104,9 @@ public class DataList
     return blockSize;
   }
 
-  public void rewind(final int baseSeconds, final int windowId) throws IOException
+  public void rewind(final int windowId) throws IOException
   {
-    final long longWindowId = (long)baseSeconds << 32 | windowId;
+    final long longWindowId = windowId;
     logger.debug("Rewinding {} from window ID {} to window ID {}", this, Codec.getStringWindowId(last.ending_window),
         Codec.getStringWindowId(longWindowId));
 
@@ -132,11 +130,11 @@ public class DataList
                   numberOfInMemBlockRewound++;
                 }
               }
-            } while (temp.next != null);
+            }
+            while (temp.next != null);
             last.next = null;
             last.acquire(true);
           }
-          this.baseSeconds = last.rewind(longWindowId);
           processingOffset = last.writingOffset;
           size = 0;
           break;
@@ -259,18 +257,13 @@ public class DataList
           case MessageType.BEGIN_WINDOW_VALUE:
             Tuple bwt = Tuple.getTuple(last.data, processingOffset, size);
             if (last.starting_window == -1) {
-              last.starting_window = baseSeconds | bwt.getWindowId();
+              last.starting_window = bwt.getWindowId();
               last.ending_window = last.starting_window;
               //logger.debug("assigned both window id {}", last);
             } else {
-              last.ending_window = baseSeconds | bwt.getWindowId();
+              last.ending_window = bwt.getWindowId();
               //logger.debug("assigned last window id {}", last);
             }
-            break;
-
-          case MessageType.RESET_WINDOW_VALUE:
-            Tuple rwt = Tuple.getTuple(last.data, processingOffset, size);
-            baseSeconds = (long)rwt.getBaseSeconds() << 32;
             break;
 
           default:
@@ -479,7 +472,6 @@ public class DataList
     if (last.starting_window == -1) {
       last.starting_window = windowId;
       last.ending_window = windowId;
-      baseSeconds = windowId & 0xffffffff00000000L;
     }
     return last.data;
   }
@@ -630,25 +622,16 @@ public class DataList
 
     public long rewind(long windowId)
     {
-      long bs = starting_window & 0x7fffffff00000000L;
+      long bs = starting_window;
       try (DataListIterator dli = getIterator(this)) {
         done:
         while (dli.hasNext()) {
           final SerializedData sd = dli.next();
           final int length = sd.length - sd.dataOffset + sd.offset;
           switch (sd.buffer[sd.dataOffset]) {
-            case MessageType.RESET_WINDOW_VALUE:
-              final ResetWindowTuple rwt = (ResetWindowTuple)Tuple.getTuple(sd.buffer, sd.dataOffset, length);
-              bs = (long)rwt.getBaseSeconds() << 32;
-              if (bs > windowId) {
-                writingOffset = sd.offset;
-                break done;
-              }
-              break;
-
             case MessageType.BEGIN_WINDOW_VALUE:
               BeginWindowTuple bwt = (BeginWindowTuple)Tuple.getTuple(sd.buffer, sd.dataOffset, length);
-              if ((bs | bwt.getWindowId()) >= windowId) {
+              if (bwt.getWindowId() >= windowId) {
                 writingOffset = sd.offset;
                 break done;
               }
@@ -680,7 +663,6 @@ public class DataList
       //    VarInt.getStringWindowId(starting_window), VarInt.getStringWindowId(longWindowId),
       //    VarInt.getStringWindowId(ending_window));
       boolean found = false;
-      long bs = starting_window & 0xffffffff00000000L;
       SerializedData lastReset = null;
 
       try (DataListIterator dli = getIterator(this)) {
@@ -689,15 +671,9 @@ public class DataList
           SerializedData sd = dli.next();
           final int length = sd.length - sd.dataOffset + sd.offset;
           switch (sd.buffer[sd.dataOffset]) {
-            case MessageType.RESET_WINDOW_VALUE:
-              ResetWindowTuple rwt = (ResetWindowTuple)Tuple.getTuple(sd.buffer, sd.dataOffset, length);
-              bs = (long)rwt.getBaseSeconds() << 32;
-              lastReset = sd;
-              break;
-
             case MessageType.BEGIN_WINDOW_VALUE:
               BeginWindowTuple bwt = (BeginWindowTuple)Tuple.getTuple(sd.buffer, sd.dataOffset, length);
-              if ((bs | bwt.getWindowId()) > longWindowId) {
+              if (bwt.getWindowId() > longWindowId) {
                 found = true;
                 if (lastReset != null) {
                   /*
@@ -711,7 +687,7 @@ public class DataList
                     }
                   }
 
-                  this.starting_window = bs | bwt.getWindowId();
+                  this.starting_window = bwt.getWindowId();
                   this.readingOffset = sd.offset;
                   //logger.debug("assigned starting window id {}", this);
                 }
@@ -737,7 +713,7 @@ public class DataList
         if (lastReset != null && lastReset.offset != 0) {
           this.readingOffset = this.writingOffset - lastReset.length;
           System.arraycopy(lastReset.buffer, lastReset.offset, this.data, this.readingOffset, lastReset.length);
-          this.starting_window = this.ending_window = bs;
+          this.starting_window = this.ending_window = longWindowId;
           //logger.debug("=20140220= reassign the windowids {}", this);
         } else {
           this.readingOffset = this.writingOffset;

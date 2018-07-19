@@ -461,7 +461,7 @@ public class Server extends AbstractServer
       }
 
       try {
-        dl.rewind(request.getBaseSeconds(), request.getWindowId());
+        dl.rewind(request.getWindowId());
       } catch (IOException ie) {
         throw new RuntimeException(ie);
       }

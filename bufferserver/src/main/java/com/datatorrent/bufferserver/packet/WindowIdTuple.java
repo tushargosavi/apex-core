@@ -28,13 +28,14 @@ import com.datatorrent.netlet.util.VarInt;
 public class WindowIdTuple extends Tuple
 {
   private final MessageType messageType;
-  private final int windowId;
+  private final long windowId;
 
   public WindowIdTuple(byte[] array, int offset, int length)
   {
     super(array, offset, length);
     messageType = MessageType.valueOf(array[offset]);
-    windowId = readVarInt();
+    int base = readVarInt();
+    windowId = (base << 32) | readVarInt();
   }
 
   @Override
@@ -44,7 +45,7 @@ public class WindowIdTuple extends Tuple
   }
 
   @Override
-  public int getWindowId()
+  public long getWindowId()
   {
     return windowId;
   }
@@ -59,10 +60,12 @@ public class WindowIdTuple extends Tuple
   {
     int offset = 1; /* for type */
 
+    int base = (windowId << 32) >> 32;
     int bits = 32 - Integer.numberOfLeadingZeros(windowId);
     offset += bits / 7 + 1;
 
     byte[] array = new byte[offset];
+    VarInt.write()
     VarInt.write(windowId, array, 1);
 
     return array;
