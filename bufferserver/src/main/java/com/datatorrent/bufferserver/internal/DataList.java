@@ -104,7 +104,7 @@ public class DataList
     return blockSize;
   }
 
-  public void rewind(final int windowId) throws IOException
+  public void rewind(final long windowId) throws IOException
   {
     final long longWindowId = windowId;
     logger.debug("Rewinding {} from window ID {} to window ID {}", this, Codec.getStringWindowId(last.ending_window),

@@ -37,8 +37,7 @@ public class SubscribeRequestTuple extends RequestTuple
   public static final String EMPTY_STRING = new String();
   private String version;
   private String identifier;
-  private int baseSeconds;
-  private int windowId;
+  private long windowId;
   private String streamType;
   private String upstreamIdentifier;
   private int mask;
@@ -81,9 +80,9 @@ public class SubscribeRequestTuple extends RequestTuple
         return;
       }
 
-      baseSeconds = readVarInt();
+      int baseSeconds = readVarInt();
 
-      windowId = readVarInt();
+      windowId = (long)baseSeconds << 32 | readVarInt();
       /*
        * read the type
        */
@@ -154,15 +153,9 @@ public class SubscribeRequestTuple extends RequestTuple
   }
 
   @Override
-  public int getWindowId()
+  public long getWindowId()
   {
     return windowId;
-  }
-
-  @Override
-  public int getBaseSeconds()
-  {
-    return baseSeconds;
   }
 
   /**
@@ -264,7 +257,7 @@ public class SubscribeRequestTuple extends RequestTuple
   public String toString()
   {
     return "SubscribeRequestTuple{" + "version=" + version + ", identifier=" + identifier +
-        ", windowId=" + Codec.getStringWindowId((long)baseSeconds << 32 | windowId) + ", type=" + streamType +
+        ", windowId=" + Codec.getStringWindowId(windowId) + ", type=" + streamType +
         ", upstreamIdentifier=" + upstreamIdentifier + ", mask=" + mask +
         ", partitions=" + (partitions == null ? "null" : Arrays.toString(partitions)) +
         ", bufferSize=" + bufferSize + '}';

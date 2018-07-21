@@ -31,7 +31,6 @@ import org.testng.annotations.Test;
 import com.datatorrent.bufferserver.packet.BeginWindowTuple;
 import com.datatorrent.bufferserver.packet.EndWindowTuple;
 import com.datatorrent.bufferserver.packet.PayloadTuple;
-import com.datatorrent.bufferserver.packet.ResetWindowTuple;
 import com.datatorrent.bufferserver.support.Controller;
 import com.datatorrent.bufferserver.support.Publisher;
 import com.datatorrent.bufferserver.support.Subscriber;
@@ -123,8 +122,6 @@ public class ServerTest
     bss.activate(null, "BufferServerOutput/BufferServerSubscriber", "MyPublisher", 0, null, 0L, 0);
 
     long resetInfo = 0x7afebabe000000faL;
-
-    bsp.publishMessage(ResetWindowTuple.getSerializedTuple((int)(resetInfo >> 32), 500));
 
     for (int i = 0; i < spinCount; i++) {
       Thread.sleep(10);
@@ -477,8 +474,6 @@ public class ServerTest
 
     long resetInfo = 0x7afebabe000000faL;
 
-    bsp.publishMessage(ResetWindowTuple.getSerializedTuple((int)(resetInfo >> 32), 500));
-
     for (int i = 0; i < spinCount; i++) {
       Thread.sleep(10);
       if (!bss.resetPayloads.isEmpty()) {
@@ -512,8 +507,6 @@ public class ServerTest
     bss.activate(null, "BufferServerOutput/BufferServerSubscriber", "MyPublisher", 0, null, 0L, 0);
 
     long resetInfo = 0x7afebabe000000faL;
-
-    bsp.publishMessage(ResetWindowTuple.getSerializedTuple((int)(resetInfo >> 32), 500));
 
     for (int i = 0; i < spinCount; i++) {
       Thread.sleep(10);

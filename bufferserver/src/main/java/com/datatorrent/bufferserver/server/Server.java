@@ -273,7 +273,7 @@ public class Server extends AbstractServer
     if (dl == null) {
       message = ("Invalid identifier '" + request.getIdentifier() + "'").getBytes();
     } else {
-      dl.purge((long)request.getBaseSeconds() << 32 | request.getWindowId());
+      dl.purge(request.getWindowId());
       message = ("Request sent for processing: " + request).getBytes();
     }
 
@@ -354,7 +354,7 @@ public class Server extends AbstractServer
 
           final String identifier = request.getIdentifier();
           final String type = request.getStreamType();
-          final long skipWindowId = (long)request.getBaseSeconds() << 32 | request.getWindowId();
+          final long skipWindowId = request.getWindowId();
           final LogicalNode ln = new LogicalNode(identifier, upstream_identifier, type, dl
               .newIterator(skipWindowId), skipWindowId, eventloop);
 
@@ -559,7 +559,7 @@ public class Server extends AbstractServer
 
           Publisher publisher;
           if (publisherRequest.getVersion().equals(Tuple.FAST_VERSION)) {
-            publisher = new Publisher(dl, (long)request.getBaseSeconds() << 32 | request.getWindowId())
+            publisher = new Publisher(dl, request.getWindowId())
             {
               @Override
               public int readSize()
@@ -574,7 +574,7 @@ public class Server extends AbstractServer
 
             };
           } else {
-            publisher = new Publisher(dl, (long)request.getBaseSeconds() << 32 | request.getWindowId());
+            publisher = new Publisher(dl, request.getWindowId());
           }
 
           key.attach(publisher);

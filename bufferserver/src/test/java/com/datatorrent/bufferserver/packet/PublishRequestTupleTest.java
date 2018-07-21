@@ -40,7 +40,7 @@ public class PublishRequestTupleTest
     PublishRequestTuple request = (PublishRequestTuple)Tuple.getTuple(serial, 0, serial.length);
 
     assertEquals(request.identifier, pubId, "Identifier");
-    assertEquals((long)request.baseSeconds << 32 | request.windowId, windowId, "Window");
+    assertEquals(request.windowId, windowId, "Window");
   }
 
 }

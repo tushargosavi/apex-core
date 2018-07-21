@@ -35,7 +35,7 @@ public class WindowIdTuple extends Tuple
     super(array, offset, length);
     messageType = MessageType.valueOf(array[offset]);
     int base = readVarInt();
-    windowId = (base << 32) | readVarInt();
+    windowId = (long)base << 32 | readVarInt();
   }
 
   @Override
@@ -53,20 +53,25 @@ public class WindowIdTuple extends Tuple
   @Override
   public String toString()
   {
-    return "WindowIdTuple{" + getType() + ", " + Integer.toHexString(getWindowId()) + '}';
+    return "WindowIdTuple{" + getType() + ", " + Long.toHexString(getWindowId()) + '}';
   }
 
-  public static byte[] getSerializedTuple(int windowId)
+  public static byte[] getSerializedTuple(long windowId)
   {
     int offset = 1; /* for type */
 
-    int base = (windowId << 32) >> 32;
-    int bits = 32 - Integer.numberOfLeadingZeros(windowId);
+    int base = (int)((windowId & 0xFFFFFFFF00000000L) >> 32);
+    int bits = 32 - Integer.numberOfLeadingZeros(base);
+    offset += bits / 7 + 1;
+    int offset1 = offset;
+
+    int lsb = (int)(windowId & 0xFFFFFFFF);
+    bits = 32 - Integer.numberOfLeadingZeros(lsb);
     offset += bits / 7 + 1;
 
     byte[] array = new byte[offset];
-    VarInt.write()
-    VarInt.write(windowId, array, 1);
+    VarInt.write(base, array, 1);
+    VarInt.write(lsb, array, offset1);
 
     return array;
   }
