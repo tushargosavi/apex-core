@@ -800,7 +800,7 @@ public class GenericNodeTest
 
     WindowGenerator windowGenerator = new WindowGenerator(new ScheduledThreadPoolExecutor(1, "WindowGenerator"), 1024);
     long resetWindow = 0L;
-    long firstWindowMillis = 1448909287863L;
+    long firstWindowMillis = 0L;
     int windowWidth = 100;
 
     windowGenerator.setResetWindow(resetWindow);
@@ -833,16 +833,11 @@ public class GenericNodeTest
 
     windowGenerator.activate(null);
 
-    Thread t = new Thread()
-    {
-      @Override
-      public void run()
-      {
-        gn.activate();
-        gn.run();
-        gn.deactivate();
-      }
-    };
+    Thread t = new Thread(() -> {
+      gn.activate();
+      gn.run();
+      gn.deactivate();
+    });
 
     t.start();
 
@@ -879,13 +874,13 @@ public class GenericNodeTest
   @Test
   public void testDAGGreaterCheckPointDistance() throws InterruptedException
   {
-    testCheckpointDistance(7, 5);
+    testCheckpointDistance(10, 10);
   }
 
   @Test
   public void testOpGreaterCheckPointDistance() throws InterruptedException
   {
-    testCheckpointDistance(3, 5);
+    testCheckpointDistance(10, 20);
   }
 
   private void testCheckpointDistance(int dagCheckPoint, int opCheckPoint) throws InterruptedException
@@ -899,7 +894,7 @@ public class GenericNodeTest
     ScheduledExecutorService executorService = new ScheduledThreadPoolExecutor(1, "default");
     final WindowGenerator windowGenerator = new WindowGenerator(executorService, 1024);
     windowGenerator.setWindowWidth(windowWidth);
-    windowGenerator.setFirstWindow(executorService.getCurrentTimeMillis());
+    windowGenerator.setFirstWindow(-1);
     windowGenerator.setCheckpointCount(dagCheckPoint);
     //GenericOperator go = new GenericOperator();
     CheckpointDistanceOperator go = new CheckpointDistanceOperator();
@@ -932,21 +927,16 @@ public class GenericNodeTest
     gn.connectOutputPort("op", Sink.BLACKHOLE);
 
     final AtomicBoolean ab = new AtomicBoolean(false);
-    Thread t = new Thread()
-    {
-      @Override
-      public void run()
-      {
-        gn.setup(context);
-        windowGenerator.activate(stcontext);
-        gn.activate();
-        ab.set(true);
-        gn.run();
-        windowGenerator.deactivate();
-        gn.deactivate();
-        gn.teardown();
-      }
-    };
+    Thread t = new Thread(() -> {
+      gn.setup(context);
+      windowGenerator.activate(stcontext);
+      gn.activate();
+      ab.set(true);
+      gn.run();
+      windowGenerator.deactivate();
+      gn.deactivate();
+      gn.teardown();
+    });
     t.start();
 
     long interval = 0;

@@ -105,6 +105,8 @@ public class WindowGenerator extends MuxReservoir implements Stream
   @Override
   public void activate(StreamContext context)
   {
+    logger.info("activating WindowGenerator with resetWindowMillis {} windowId {} windowWidthMillis {}",
+        resetWindowMillis, windowId, windowWidthMillis);
     Runnable subsequentRun = () -> {
       try {
         endCurrentBeginNewWindow();
@@ -114,7 +116,8 @@ public class WindowGenerator extends MuxReservoir implements Stream
     };
 
     long currentTms = ses.getCurrentTimeMillis();
-    long delay = getWindowTime(windowId) - currentTms;
+    long diff = getWindowTime(windowId) - currentTms;
+    long delay = (diff > 0) ? diff : 0;
     long targetWindowId = getWindowId(currentTms);
     if (windowId < targetWindowId) {
       logger.info("Catching up from {} to {}", windowId, targetWindowId);
@@ -147,7 +150,7 @@ public class WindowGenerator extends MuxReservoir implements Stream
 
   public void setFirstWindow(long w)
   {
-    this.windowId = w;
+    this.windowId = w + 1;
   }
 
   private void sendBeginWindow() throws InterruptedException
