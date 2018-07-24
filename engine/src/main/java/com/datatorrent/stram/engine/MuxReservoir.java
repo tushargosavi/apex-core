@@ -18,12 +18,10 @@
  */
 package com.datatorrent.stram.engine;
 
-import java.util.HashMap;
 import java.util.Iterator;
 import java.util.Queue;
-
-import org.slf4j.Logger;
-import org.slf4j.LoggerFactory;
+import java.util.concurrent.ConcurrentHashMap;
+import java.util.concurrent.ConcurrentMap;
 
 import com.datatorrent.api.Sink;
 import com.datatorrent.netlet.util.CircularBuffer;
@@ -37,42 +35,21 @@ import com.datatorrent.stram.tuple.Tuple;
 public abstract class MuxReservoir
 {
   @SuppressWarnings("VolatileArrayField")
-  private volatile SubReservoir[] reservoirs = new SubReservoir[0];
-  private HashMap<String, SubReservoir> reservoirMap = new HashMap<>();
+  private ConcurrentMap<String, SubReservoir> reservoirMap = new ConcurrentHashMap<>();
 
   public SweepableReservoir acquireReservoir(String id, int capacity)
   {
     SubReservoir r = reservoirMap.get(id);
     if (r == null) {
-      reservoirMap.put(id, r = new SubReservoir(capacity));
-      SubReservoir[] newReservoirs = new SubReservoir[reservoirs.length + 1];
-      newReservoirs[reservoirs.length] = r;
-      for (int i = reservoirs.length; i-- > 0;) {
-        newReservoirs[i] = reservoirs[i];
-      }
-      reservoirs = newReservoirs;
+      r = new SubReservoir(capacity);
+      reservoirMap.putIfAbsent(id, r);
     }
-
     return r;
   }
 
   public SweepableReservoir releaseReservoir(String id)
   {
-    SubReservoir r = reservoirMap.remove(id);
-    if (r != null) {
-      SubReservoir[] newReservoirs = new SubReservoir[reservoirs.length - 1];
-
-      int j = 0;
-      for (int i = 0; i < reservoirs.length; i++) {
-        if (reservoirs[i] != r) {
-          newReservoirs[j++] = reservoirs[i];
-        }
-      }
-
-      reservoirs = newReservoirs;
-    }
-
-    return r;
+    return reservoirMap.remove(id);
   }
 
   protected abstract Queue getQueue();
@@ -136,9 +113,9 @@ public abstract class MuxReservoir
 
         /* find out the minimum remaining capacity in all the other buffers and consume those many tuples from bufferserver */
         int min = Integer.MAX_VALUE;
-        for (int i = reservoirs.length; i-- > 0;) {
-          if (reservoirs[i].remainingCapacity() < min) {
-            min = reservoirs[i].remainingCapacity();
+        for (SubReservoir r : reservoirMap.values()) {
+          if (r.remainingCapacity() < min) {
+            min = r.remainingCapacity();
           }
         }
 
@@ -147,8 +124,8 @@ public abstract class MuxReservoir
           if (o == null) {
             break;
           }
-          for (int i = reservoirs.length; i-- > 0;) {
-            reservoirs[i].add(o);
+          for (SubReservoir r  : reservoirMap.values()) {
+            r.add(o);
           }
         }
       }
@@ -167,8 +144,5 @@ public abstract class MuxReservoir
         }
       }
     }
-
   }
-
-  private static final Logger logger = LoggerFactory.getLogger(MuxReservoir.class);
 }

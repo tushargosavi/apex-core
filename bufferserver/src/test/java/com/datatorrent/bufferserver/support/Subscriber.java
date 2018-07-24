@@ -66,21 +66,17 @@ public class Subscriber extends com.datatorrent.bufferserver.client.Subscriber
         endWindow(tuple.getWindowId());
         break;
 
-      case RESET_WINDOW:
-        resetWindow(tuple.getBaseSeconds(), tuple.getWindowWidth());
-        break;
-
       default:
         break;
     }
   }
 
-  public void beginWindow(final int windowId)
+  public void beginWindow(final long windowId)
   {
     WindowIdHolder payload = new WindowIdHolder()
     {
       @Override
-      public int getWindowId()
+      public long getWindowId()
       {
         return windowId;
       }
@@ -94,12 +90,12 @@ public class Subscriber extends com.datatorrent.bufferserver.client.Subscriber
     lastPayload = payload;
   }
 
-  public void endWindow(final int windowId)
+  public void endWindow(final long windowId)
   {
     WindowIdHolder payload = new WindowIdHolder()
     {
       @Override
-      public int getWindowId()
+      public long getWindowId()
       {
         return windowId;
       }
@@ -134,7 +130,7 @@ public class Subscriber extends com.datatorrent.bufferserver.client.Subscriber
 
   public interface WindowIdHolder
   {
-    int getWindowId();
+    long getWindowId();
 
   }
 

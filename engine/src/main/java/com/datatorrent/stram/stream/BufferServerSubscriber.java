@@ -41,12 +41,10 @@ import com.datatorrent.stram.codec.StatefulStreamCodec.DataStatePair;
 import com.datatorrent.stram.engine.ByteCounterStream;
 import com.datatorrent.stram.engine.StreamContext;
 import com.datatorrent.stram.engine.SweepableReservoir;
-import com.datatorrent.stram.engine.WindowGenerator;
 import com.datatorrent.stram.plan.logical.StreamCodecWrapperForPersistance;
 import com.datatorrent.stram.tuple.CheckpointTuple;
 import com.datatorrent.stram.tuple.EndStreamTuple;
 import com.datatorrent.stram.tuple.EndWindowTuple;
-import com.datatorrent.stram.tuple.ResetWindowTuple;
 import com.datatorrent.stram.tuple.Tuple;
 
 /**
@@ -60,7 +58,6 @@ import com.datatorrent.stram.tuple.Tuple;
 public class BufferServerSubscriber extends Subscriber implements ByteCounterStream
 {
   private boolean suspended;
-  private long baseSeconds;
   protected StreamCodec<Object> serde;
   protected StatefulStreamCodec<Object> statefulSerde;
   protected EventLoop eventloop;
@@ -69,7 +66,6 @@ public class BufferServerSubscriber extends Subscriber implements ByteCounterStr
   CircularBuffer<Slice> polledFragments;
   CircularBuffer<Slice> freeFragments;
   private final ArrayDeque<CircularBuffer<Slice>> backlog;
-  private int lastWindowId = WindowGenerator.MAX_WINDOW_ID;
   private final AtomicLong readByteCount;
 
   public BufferServerSubscriber(String id, int queueCapacity)
@@ -141,7 +137,6 @@ public class BufferServerSubscriber extends Subscriber implements ByteCounterStr
     } else {
       serde = (StreamCodec<Object>)codec;
     }
-    baseSeconds = context.getFinishedWindowId() & 0xffffffff00000000L;
   }
 
   @Override
@@ -326,15 +321,6 @@ public class BufferServerSubscriber extends Subscriber implements ByteCounterStr
               freeFragments.offer(fm);
               continue;
 
-            case RESET_WINDOW:
-              baseSeconds = (long)data.getBaseSeconds() << 32;
-              if (lastWindowId < WindowGenerator.MAX_WINDOW_ID) {
-                freeFragments.offer(fm);
-                continue;
-              }
-              o = new ResetWindowTuple(baseSeconds | data.getWindowWidth());
-              break;
-
             case PAYLOAD:
               o = processPayload(data);
               break;
@@ -343,12 +329,12 @@ public class BufferServerSubscriber extends Subscriber implements ByteCounterStr
               if (statefulSerde != null) {
                 statefulSerde.resetState();
               }
-              o = new CheckpointTuple(baseSeconds | data.getWindowId());
+              o = new CheckpointTuple(data.getWindowId());
               break;
 
             case END_WINDOW:
               //logger.debug("received {}", data);
-              o = new EndWindowTuple(baseSeconds | (lastWindowId = data.getWindowId()));
+              o = new EndWindowTuple(data.getWindowId());
               break;
 
             case CUSTOM_CONTROL:
@@ -356,11 +342,11 @@ public class BufferServerSubscriber extends Subscriber implements ByteCounterStr
               break;
 
             case END_STREAM:
-              o = new EndStreamTuple(baseSeconds | data.getWindowId());
+              o = new EndStreamTuple(data.getWindowId());
               break;
 
             case BEGIN_WINDOW:
-              o = new Tuple(data.getType(), baseSeconds | data.getWindowId());
+              o = new Tuple(data.getType(), data.getWindowId());
               break;
 
             default:

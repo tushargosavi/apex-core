@@ -36,8 +36,7 @@ public class GenericRequestTuple extends RequestTuple
   public static final String EMPTY_STRING = new String();
   public String version;
   protected String identifier;
-  protected int baseSeconds;
-  protected int windowId;
+  protected long windowId;
 
   public GenericRequestTuple(byte[] buffer, int offset, int length)
   {
@@ -87,9 +86,8 @@ public class GenericRequestTuple extends RequestTuple
         return;
       }
 
-      baseSeconds = readVarInt();
-
-      windowId = readVarInt();
+      int baseSeconds = readVarInt();
+      windowId = (baseSeconds << 32) | readVarInt();
 
       valid = true;
     } catch (NumberFormatException nfe) {
@@ -98,15 +96,9 @@ public class GenericRequestTuple extends RequestTuple
   }
 
   @Override
-  public int getWindowId()
+  public long getWindowId()
   {
     return windowId;
-  }
-
-  @Override
-  public int getBaseSeconds()
-  {
-    return baseSeconds;
   }
 
   @Override
@@ -153,7 +145,7 @@ public class GenericRequestTuple extends RequestTuple
   public String toString()
   {
     return getClass().getSimpleName() + "{" + "version=" + version + ", identifier=" + identifier + ", windowId=" +
-        Codec.getStringWindowId((long)baseSeconds << 32 | windowId) + '}';
+        Codec.getStringWindowId(windowId) + '}';
   }
 
   private static final Logger logger = LoggerFactory.getLogger(GenericRequestTuple.class);

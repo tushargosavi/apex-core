@@ -16,33 +16,21 @@
  * specific language governing permissions and limitations
  * under the License.
  */
-package com.datatorrent.stram.tuple;
+package com.datatorrent.bufferserver.packet;
 
-import com.datatorrent.bufferserver.packet.MessageType;
+import org.junit.Test;
+import org.testng.Assert;
 
-/**
- *
- * ResetWindow ids<p>
- * <br>
- *
- * @since 0.3.2
- */
-public class ResetWindowTuple extends Tuple
+public class WindowIdTupleTest
 {
-  public ResetWindowTuple(long windowId)
+  @Test
+  public void testWindowTuple()
   {
-    super(MessageType.RESET_WINDOW, windowId);
-  }
+    long wid = 0x887192881ab73L;
+    byte[] serialized = WindowIdTuple.getSerializedTuple(wid);
 
-  @Override
-  public final long getWindowId()
-  {
-    return super.windowId & 0xffffffff00000000L;
-  }
-
-  public final int getIntervalMillis()
-  {
-    return (int)super.windowId;
+    WindowIdTuple tuple = new WindowIdTuple(serialized, 0, serialized.length);
+    Assert.assertEquals(tuple.getWindowId(), wid);
   }
 
 }

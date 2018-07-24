@@ -27,7 +27,6 @@ public enum MessageType
 {
   NO_MESSAGE(0),
   PAYLOAD(1),
-  RESET_WINDOW(2),
   BEGIN_WINDOW(3),
   END_WINDOW(4),
   END_STREAM(5),
@@ -42,7 +41,6 @@ public enum MessageType
 
   public static final byte NO_MESSAGE_VALUE = 0;
   public static final byte PAYLOAD_VALUE = 1;
-  public static final byte RESET_WINDOW_VALUE = 2;
   public static final byte BEGIN_WINDOW_VALUE = 3;
   public static final byte END_WINDOW_VALUE = 4;
   public static final byte END_STREAM_VALUE = 5;
@@ -67,8 +65,6 @@ public enum MessageType
         return NO_MESSAGE;
       case 1:
         return PAYLOAD;
-      case 2:
-        return RESET_WINDOW;
       case 3:
         return BEGIN_WINDOW;
       case 4:

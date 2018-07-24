@@ -276,7 +276,7 @@ public class NodeTest
     windowGenerator.setResetWindow(0L);
     windowGenerator.setFirstWindow(0L);
     windowGenerator.setWindowWidth(100);
-    windowGenerator.setCheckpointCount(1, 0);
+    windowGenerator.setCheckpointCount(1);
 
     CheckpointTestOperator checkpointTestOperator;
 

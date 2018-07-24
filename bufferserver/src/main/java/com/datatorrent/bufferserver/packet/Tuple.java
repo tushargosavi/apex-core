@@ -64,9 +64,6 @@ public abstract class Tuple
       case PAYLOAD:
         return new PayloadTuple(buffer, offset, length);
 
-      case RESET_WINDOW:
-        return new ResetWindowTuple(buffer, offset, length);
-
       case BEGIN_WINDOW:
         return new BeginWindowTuple(buffer, offset, length);
 
@@ -147,7 +144,7 @@ public abstract class Tuple
 
   public abstract MessageType getType();
 
-  public int getWindowId()
+  public long getWindowId()
   {
     throw new UnsupportedOperationException("Not supported yet.");
   }
@@ -158,11 +155,6 @@ public abstract class Tuple
   }
 
   public Slice getData()
-  {
-    throw new UnsupportedOperationException("Not supported yet.");
-  }
-
-  public int getBaseSeconds()
   {
     throw new UnsupportedOperationException("Not supported yet.");
   }

@@ -58,7 +58,7 @@ public class SubscribeRequestTupleTest
     assertNotNull(parts);
     assertEquals(parts.length, 1);
     assertEquals(parts[0], 5);
-    assertEquals((long)tuple.getBaseSeconds() << 32 | tuple.getWindowId(), startingWindowId, "Window");
+    assertEquals(tuple.getWindowId(), startingWindowId, "Window");
 
     serial = getSerializedRequest(null, id, down_type, upstream_id, 0, null, startingWindowId, 32 * 1024);
     tuple = (SubscribeRequestTuple)Tuple.getTuple(serial, 0, serial.length);
@@ -69,6 +69,6 @@ public class SubscribeRequestTupleTest
     assertEquals(tuple.getMask(), 0, "Mask");
     assertEquals(tuple.getBufferSize(), 32 * 1024, "BufferSize");
     assertNull(tuple.getPartitions());
-    assertEquals((long)tuple.getBaseSeconds() << 32 | tuple.getWindowId(), startingWindowId, "Window");
+    assertEquals(tuple.getWindowId(), startingWindowId, "Window");
   }
 }

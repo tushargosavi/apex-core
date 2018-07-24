@@ -39,7 +39,6 @@ import com.datatorrent.bufferserver.packet.EndStreamTuple;
 import com.datatorrent.bufferserver.packet.EndWindowTuple;
 import com.datatorrent.bufferserver.packet.MessageType;
 import com.datatorrent.bufferserver.packet.PublishRequestTuple;
-import com.datatorrent.bufferserver.packet.ResetWindowTuple;
 import com.datatorrent.bufferserver.packet.WindowIdTuple;
 import com.datatorrent.netlet.EventLoop;
 import com.datatorrent.netlet.Listener;
@@ -238,11 +237,6 @@ public class FastPublisher extends Kryo implements ClientListener, Stream
 
         case END_STREAM:
           array = EndStreamTuple.getSerializedTuple((int)t.getWindowId());
-          break;
-
-        case RESET_WINDOW:
-          com.datatorrent.stram.tuple.ResetWindowTuple rwt = (com.datatorrent.stram.tuple.ResetWindowTuple)t;
-          array = ResetWindowTuple.getSerializedTuple(rwt.getBaseSeconds(), rwt.getIntervalMillis());
           break;
 
         default:

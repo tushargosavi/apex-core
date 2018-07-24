@@ -16,26 +16,26 @@
  * specific language governing permissions and limitations
  * under the License.
  */
-package com.datatorrent.bufferserver.packet;
+package com.datatorrent.stram.engine;
 
-/**
- *
- */
-public class ResetWindowTupleTest
+import java.io.IOException;
+import java.util.List;
+
+import com.datatorrent.stram.api.ContainerEvent;
+
+public interface ContainerContext1
 {
-  public ResetWindowTupleTest()
-  {
-  }
+  String getContainerId();
 
-  /*
-  @Test
-  public void testGetSerializedTuple()
-  {
-    byte[] serial = ResetWindowTuple.getSerializedTuple(0x7afebabe, 500);
-    ResetWindowTuple tuple = (ResetWindowTuple)Tuple.getTuple(serial, 0, serial.length);
+  void reportError(int[] operatorId, String message) throws IOException;
 
-    assertEquals(tuple.getBaseSeconds(), 0x7afebabe, "base seconds");
-    assertEquals(tuple.getWindowWidth(), 500, "window width");
-  }
-  */
+  void publish(ContainerEvent event);
+
+  List<Integer> getOiOGroup(int id);
+
+  void processNodeRequests(boolean b);
+
+  void setFailedNode(int id);
+
+  Node<?> getNode(int id);
 }

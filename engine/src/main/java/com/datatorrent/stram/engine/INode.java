@@ -16,26 +16,31 @@
  * specific language governing permissions and limitations
  * under the License.
  */
-package com.datatorrent.bufferserver.packet;
+package com.datatorrent.stram.engine;
 
-/**
- *
- */
-public class ResetWindowTupleTest
+import com.datatorrent.stram.tuple.Tuple;
+
+public interface INode
 {
-  public ResetWindowTupleTest()
-  {
-  }
+  /**
+   * Handle a begin window tuple received on a provided port.
+   * @param port
+   * @param t
+   */
+  void handleBeginWindowTuple(SweepableReservoir port, Tuple t);
 
-  /*
-  @Test
-  public void testGetSerializedTuple()
-  {
-    byte[] serial = ResetWindowTuple.getSerializedTuple(0x7afebabe, 500);
-    ResetWindowTuple tuple = (ResetWindowTuple)Tuple.getTuple(serial, 0, serial.length);
+  /**
+   * Handle EndWindow tuple received on given port
+   * @param port
+   * @param t
+   */
+  void handleEndWindowTuple(SweepableReservoir port, Tuple t);
 
-    assertEquals(tuple.getBaseSeconds(), 0x7afebabe, "base seconds");
-    assertEquals(tuple.getWindowWidth(), 500, "window width");
-  }
-  */
+  /**
+   * Handle checkpoint tuple received on the port
+   * @param port
+   * @param t
+   */
+  void handleCheckpointTuple(SweepableReservoir port, Tuple t);
+
 }
