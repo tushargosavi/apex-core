@@ -31,7 +31,6 @@ import java.util.Collections;
 import java.util.HashMap;
 import java.util.HashSet;
 import java.util.Iterator;
-import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Map;
 import java.util.Map.Entry;
@@ -57,8 +56,6 @@ import com.datatorrent.api.Component;
 import com.datatorrent.api.Context;
 import com.datatorrent.api.DAG.Locality;
 import com.datatorrent.api.Operator;
-import com.datatorrent.api.Operator.InputPort;
-import com.datatorrent.api.Operator.OutputPort;
 import com.datatorrent.api.Operator.ProcessingMode;
 import com.datatorrent.api.StatsListener;
 import com.datatorrent.api.StatsListener.OperatorRequest;
@@ -83,7 +80,6 @@ import com.datatorrent.stram.api.Checkpoint;
 import com.datatorrent.stram.api.ContainerContext;
 import com.datatorrent.stram.api.ContainerEvent;
 import com.datatorrent.stram.api.ContainerEvent.ContainerStatsEvent;
-import com.datatorrent.stram.api.ContainerEvent.NodeActivationEvent;
 import com.datatorrent.stram.api.ContainerEvent.NodeDeactivationEvent;
 import com.datatorrent.stram.api.ContainerEvent.StreamActivationEvent;
 import com.datatorrent.stram.api.ContainerEvent.StreamDeactivationEvent;
@@ -102,7 +98,6 @@ import com.datatorrent.stram.api.StreamingContainerUmbilicalProtocol.StramToNode
 import com.datatorrent.stram.api.StreamingContainerUmbilicalProtocol.StreamingContainerContext;
 import com.datatorrent.stram.debug.StdOutErrLog;
 import com.datatorrent.stram.plan.logical.LogicalPlan;
-import com.datatorrent.stram.plan.logical.Operators.PortContextPair;
 import com.datatorrent.stram.plan.logical.Operators.PortMappingDescriptor;
 import com.datatorrent.stram.plan.logical.StreamCodecWrapperForPersistance;
 import com.datatorrent.stram.stream.BufferServerPublisher;
@@ -148,7 +143,7 @@ public class StreamingContainer extends YarnContainerMain
   private final Object heartbeatTrigger = new Object();
   public static DefaultEventLoop eventloop;
   /**
-   * List of listeners interested in listening into the status change of the nodes.
+   * List of listeners interestoed in listening into the status change of the nodes.
    */
   private long firstWindowMillis;
   private int windowWidthMillis;
@@ -456,6 +451,7 @@ public class StreamingContainer extends YarnContainerMain
   {
     String[] sinks = muxpair.context.getSinkId().split(MuxStream.MULTI_SINK_ID_CONCAT_SEPARATOR);
     boolean found = false;
+    //Arrays.stream(sinks).filter(x -> x == sinkIdentifier).findFirst().get();
     for (int i = sinks.length; i-- > 0; ) {
       if (sinks[i].equals(sinkIdentifier)) {
         sinks[i] = null;
@@ -506,13 +502,7 @@ public class StreamingContainer extends YarnContainerMain
       chosen1.releaseReservoir(Integer.toString(nodeid).concat(Component.CONCAT_SEPARATOR).concat(Node.INPUT));
       // should we send the closure of the port to the node?
 
-      int count = 0;
-      for (WindowGenerator wg : generators.values()) {
-        if (chosen1 == wg) {
-          count++;
-        }
-      }
-
+      long count = generators.values().stream().filter((x) -> x == chosen1).count();
       if (count == 0) {
         activeGenerators.remove(chosen1);
         chosen1.deactivate();
@@ -733,6 +723,7 @@ public class StreamingContainer extends YarnContainerMain
       }
       if (req instanceof StramToNodeChangeLoggersRequest) {
         handleChangeLoggersRequest((StramToNodeChangeLoggersRequest)req);
+        req.setDeleted(true);
         continue;
       }
 
@@ -786,15 +777,9 @@ public class StreamingContainer extends YarnContainerMain
 
         if (e.getValue().getOperator() instanceof Operator.CheckpointListener) {
           if (nr == null) {
-            nr = new OperatorRequest()
-            {
-              @Override
-              public StatsListener.OperatorResponse execute(Operator operator, int operatorId, long windowId) throws IOException
-              {
-                ((Operator.CheckpointListener)operator).committed(lastCommittedWindowId);
-                return null;
-              }
-
+            nr = (operator, operatorId, windowId) -> {
+              ((Operator.CheckpointListener)operator).committed(lastCommittedWindowId);
+              return null;
             };
           }
           e.getValue().context.request(nr);
@@ -955,7 +940,6 @@ public class StreamingContainer extends YarnContainerMain
         reuseOpNodes.remove(ndi.id);
       }
       node.currentWindowId = ndi.checkpoint.windowId;
-      node.applicationWindowCount = ndi.checkpoint.applicationWindowCount;
       node.firstWindowMillis = firstWindowMillis;
       node.windowWidthMillis = windowWidthMillis;
 
@@ -1350,42 +1334,6 @@ public class StreamingContainer extends YarnContainerMain
     return windowGenerator;
   }
 
-  private void setupNode(OperatorDeployInfo ndi)
-  {
-    failedNodes.remove(ndi.id);
-    final Node<?> node = nodes.get(ndi.id);
-
-    node.setup(node.context);
-
-    /* setup context for all the input ports */
-    LinkedHashMap<String, PortContextPair<InputPort<?>>> inputPorts = node.getPortMappingDescriptor().inputPorts;
-    LinkedHashMap<String, PortContextPair<InputPort<?>>> newInputPorts = new LinkedHashMap<>(inputPorts.size());
-    for (OperatorDeployInfo.InputDeployInfo idi : ndi.inputs) {
-      InputPort<?> port = inputPorts.get(idi.portName).component;
-      PortContext context = new PortContext(idi.contextAttributes, node.context);
-      newInputPorts.put(idi.portName, new PortContextPair<InputPort<?>>(port, context));
-      port.setup(context);
-    }
-    inputPorts.putAll(newInputPorts);
-
-    /* setup context for all the output ports */
-    LinkedHashMap<String, PortContextPair<OutputPort<?>>> outputPorts = node.getPortMappingDescriptor().outputPorts;
-    LinkedHashMap<String, PortContextPair<OutputPort<?>>> newOutputPorts = new LinkedHashMap<>(outputPorts.size());
-    for (OperatorDeployInfo.OutputDeployInfo odi : ndi.outputs) {
-      OutputPort<?> port = outputPorts.get(odi.portName).component;
-      PortContext context = new PortContext(odi.contextAttributes, node.context);
-      newOutputPorts.put(odi.portName, new PortContextPair<OutputPort<?>>(port, context));
-      port.setup(context);
-    }
-    outputPorts.putAll(newOutputPorts);
-
-    logger.debug("activating {} in container {}", node, containerId);
-    /* This introduces need for synchronization on processNodeRequest which was solved by adding deleted field in StramToNodeRequest  */
-    processNodeRequests(false);
-    node.activate();
-    eventBus.publish(new NodeActivationEvent(node));
-  }
-
   private void teardownNode(OperatorDeployInfo ndi)
   {
     final Node<?> node = nodes.get(ndi.id);
@@ -1422,102 +1370,9 @@ public class StreamingContainer extends YarnContainerMain
           .append(':')
           .append(node.getOperator().getClass().getSimpleName())
           .toString();
-      final Thread thread = new Thread(name)
-      {
-        @Override
-        public void run()
-        {
-          HashSet<OperatorDeployInfo> setOperators = new HashSet<>();
-          OperatorDeployInfo currentdi = ndi;
-          try {
-            /* primary operator initialization */
-            setupNode(currentdi);
-            setOperators.add(currentdi);
-
-            /* lets go for OiO operator initialization */
-            List<Integer> oioNodeIdList = oioGroups.get(ndi.id);
-            if (oioNodeIdList != null) {
-              for (Integer oioNodeId : oioNodeIdList) {
-                currentdi = nodeMap.get(oioNodeId);
-                setupNode(currentdi);
-                setOperators.add(currentdi);
-              }
-            }
-
-            currentdi = null;
-
-            node.run(); /* this is a blocking call */
-          } catch (Error error) {
-            int[] operators;
-            //fetch logFileInfo before logging exception, to get offset before exception
-            LogFileInformation logFileInfo = LoggerUtil.getLogFileInformation();
-            if (currentdi == null) {
-              logger.error("Voluntary container termination due to an error in operator set {}.", setOperators, error);
-              operators = new int[setOperators.size()];
-              int i = 0;
-              for (Iterator<OperatorDeployInfo> it = setOperators.iterator(); it.hasNext(); i++) {
-                operators[i] = it.next().id;
-              }
-            } else {
-              logger.error("Voluntary container termination due to an error in operator {}.", currentdi, error);
-              operators = new int[]{currentdi.id};
-            }
-            try {
-              umbilical.reportError(containerId, operators, "Voluntary container termination due to an error. " + ExceptionUtils.getStackTrace(error), logFileInfo);
-            } catch (Exception e) {
-              logger.debug("Fail to log", e);
-            } finally {
-              System.exit(1);
-            }
-          } catch (Exception ex) {
-            //fetch logFileInfo before logging exception, to get offset before exception
-            LogFileInformation logFileInfo = LoggerUtil.getLogFileInformation();
-            if (currentdi == null) {
-              failedNodes.add(ndi.id);
-              logger.error("Operator set {} stopped running due to an exception.", setOperators, ex);
-              int[] operators = new int[]{ndi.id};
-              try {
-                umbilical.reportError(containerId, operators, "Stopped running due to an exception. " + ExceptionUtils.getStackTrace(ex), logFileInfo);
-              } catch (Exception e) {
-                logger.debug("Fail to log", e);
-              }
-            } else {
-              failedNodes.add(currentdi.id);
-              logger.error("Abandoning deployment of operator {} due to setup failure.", currentdi, ex);
-              int[] operators = new int[]{currentdi.id};
-              try {
-                umbilical.reportError(containerId, operators, "Abandoning deployment due to setup failure. " + ExceptionUtils.getStackTrace(ex), logFileInfo);
-              } catch (Exception e) {
-                logger.debug("Fail to log", e);
-              }
-            }
-          } finally {
-            if (setOperators.contains(ndi)) {
-              try {
-                teardownNode(ndi);
-              } catch (Exception ex) {
-                failedNodes.add(ndi.id);
-                logger.error("Shutdown of operator {} failed due to an exception.", ndi, ex);
-              }
-            }
-
-            List<Integer> oioNodeIdList = oioGroups.get(ndi.id);
-            if (oioNodeIdList != null) {
-              for (Integer oioNodeId : oioNodeIdList) {
-                OperatorDeployInfo oiodi = nodeMap.get(oioNodeId);
-                if (setOperators.contains(oiodi)) {
-                  try {
-                    teardownNode(oiodi);
-                  } catch (Exception ex) {
-                    failedNodes.add(oiodi.id);
-                    logger.error("Shutdown of operator {} failed due to an exception.", oiodi, ex);
-                  }
-                }
-              }
-            }
-          }
-        }
-      };
+      OperatorThread runbale = new OperatorThread(ndi, node, new ContainerContextImpl(), nodeMap);
+      final Thread thread = new Thread(runbale);
+      thread.setName(name);
       node.context.setThread(thread);
       List<Integer> oioNodeIdList = oioGroups.get(ndi.id);
       if (oioNodeIdList != null) {
@@ -1682,6 +1537,52 @@ public class StreamingContainer extends YarnContainerMain
       return o.hashCode();
     }
   };
+
+  class ContainerContextImpl implements ContainerContext1
+  {
+    @Override
+    public String getContainerId()
+    {
+      return containerId;
+    }
+
+    @Override
+    public void reportError(int[] operatorId, String message) throws IOException
+    {
+      LogFileInformation logFileInfo = LoggerUtil.getLogFileInformation();
+      umbilical.reportError(containerId, operatorId, message, logFileInfo);
+    }
+
+    @Override
+    public void publish(ContainerEvent event)
+    {
+      eventBus.publish(event);
+    }
+
+    @Override
+    public List<Integer> getOiOGroup(int id)
+    {
+      return oioGroups.get(id);
+    }
+
+    @Override
+    public void processNodeRequests(boolean b)
+    {
+      StreamingContainer.this.processNodeRequests(b);
+    }
+
+    @Override
+    public void setFailedNode(int id)
+    {
+      failedNodes.add(id);
+    }
+
+    @Override
+    public Node<?> getNode(int id)
+    {
+      return nodes.get(id);
+    }
+  }
 
   private static final Logger logger = LoggerFactory.getLogger(StreamingContainer.class);
 }

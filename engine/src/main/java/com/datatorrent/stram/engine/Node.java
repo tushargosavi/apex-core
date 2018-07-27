@@ -120,10 +120,7 @@ public abstract class Node<OPERATOR extends Operator> implements Component<Opera
   protected ThreadMXBean tmb;
   protected HashMap<SweepableReservoir, Long> endWindowDequeueTimes; // end window dequeue time for input ports
   protected Checkpoint checkpoint;
-  public int applicationWindowCount;
   public int checkpointWindowCount;
-  public int nextCheckpointWindowCount;
-  public int dagCheckpointOffsetCount;
   protected int controlTupleCount;
   public final OperatorContext context;
   public final BlockingQueue<StatsListener.OperatorResponse> commandResponse;
@@ -350,15 +347,9 @@ public abstract class Node<OPERATOR extends Operator> implements Component<Opera
        * Since alive is non-volatile this code explicitly unsets it in the operator lifecycle theread thereby notifying
        * it even when the thread is reading it from the cache
        */
-      context.request(new OperatorRequest()
-      {
-        @Override
-        public StatsListener.OperatorResponse execute(Operator operator, int operatorId, long windowId) throws IOException
-        {
-          alive = false;
-          return null;
-        }
-
+      context.request((operator, operatorId, windowId) -> {
+        alive = false;
+        return null;
       });
     }
   }
@@ -534,7 +525,6 @@ public abstract class Node<OPERATOR extends Operator> implements Component<Opera
               if (PROCESSING_MODE != ProcessingMode.EXACTLY_ONCE) {
                 CheckpointWindowInfo checkpointWindowInfo = new CheckpointWindowInfo();
                 checkpointWindowInfo.windowId = windowId;
-                checkpointWindowInfo.applicationWindowCount = applicationWindowCount;
                 checkpointWindowInfo.checkpointWindowCount = checkpointWindowCount;
                 CheckpointHandler checkpointHandler = new CheckpointHandler();
                 checkpointHandler.agent = asyncStorageAgent;
@@ -566,20 +556,9 @@ public abstract class Node<OPERATOR extends Operator> implements Component<Opera
       }
     }
 
-    calculateNextCheckpointWindow();
-    dagCheckpointOffsetCount = 0;
-    checkpoint = new Checkpoint(windowId, applicationWindowCount, checkpointWindowCount);
+    checkpoint = new Checkpoint(windowId, checkpointWindowCount, checkpointWindowCount);
     if (operator instanceof Operator.CheckpointListener) {
       ((Operator.CheckpointListener)operator).checkpointed(windowId);
-    }
-  }
-
-  protected void calculateNextCheckpointWindow()
-  {
-    if (PROCESSING_MODE != ProcessingMode.EXACTLY_ONCE) {
-      nextCheckpointWindowCount = ((DAG_CHECKPOINT_WINDOW_COUNT - dagCheckpointOffsetCount + CHECKPOINT_WINDOW_COUNT - 1) / CHECKPOINT_WINDOW_COUNT) * CHECKPOINT_WINDOW_COUNT;
-    } else {
-      nextCheckpointWindowCount = 1;
     }
   }
 

@@ -77,22 +77,16 @@ public class OiONode extends GenericNode
           expectingEndWindows++;
           if (t.getWindowId() != currentWindowId) {
             currentWindowId = t.getWindowId();
-            for (int s = sinks.length; s-- > 0;) {
-              sinks[s].put(t);
-            }
-            controlTupleCount++;
-
-            if (applicationWindowCount == 0) {
-              insideWindow = true;
-              operator.beginWindow(currentWindowId);
-            }
+            forward(t);
+            insideWindow = true;
+            operator.beginWindow(currentWindowId);
           }
           break;
 
         case END_WINDOW:
           endWindowDequeueTimes.put(reservoir, System.currentTimeMillis());
           if (--expectingEndWindows == 0) {
-
+            //deliverControlTuples();
             /* process custom control tuples here */
             for (CustomControlTuple cct : endWindowControlTuples) {
               Sink sink = ((OiOStream.OiOReservoir)reservoir).getSink();
@@ -139,19 +133,11 @@ public class OiONode extends GenericNode
           break;
 
         case CHECKPOINT:
-          dagCheckpointOffsetCount = 0;
-          if (lastCheckpointWindowId < t.getWindowId() && !doCheckpoint) {
-            if (checkpointWindowCount == 0) {
-              checkpoint(t.getWindowId());
-              lastCheckpointWindowId = t.getWindowId();
-            } else {
-              doCheckpoint = true;
-            }
-
-            for (int s = sinks.length; s-- > 0;) {
-              sinks[s].put(t);
-            }
-            controlTupleCount++;
+          if (lastCheckpointWindowId < t.getWindowId()) {
+            checkpoint(t.getWindowId());
+            lastCheckpointWindowId = t.getWindowId();
+            //Forward on only first checkpoint tuple
+            forward(t);
           }
           break;
 
@@ -177,7 +163,6 @@ public class OiONode extends GenericNode
 
             if (inputs.isEmpty()) {
               if (insideWindow) {
-                applicationWindowCount = APPLICATION_WINDOW_COUNT - 1;
                 expectingEndWindows = 0;
                 endWindowDequeueTimes.put(reservoir, System.currentTimeMillis());
                 processEndWindow(null);

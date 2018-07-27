@@ -71,11 +71,8 @@ public class InputNode extends Node<InputOperator>
     long spinMillis = 0;
     final boolean handleIdleTime = operator instanceof IdleTimeHandler;
 
-    boolean insideApplicationWindow = applicationWindowCount != 0;
     boolean doCheckpoint = false;
     boolean insideStreamingWindow = false;
-
-    calculateNextCheckpointWindow();
 
     try {
       while (alive) {
@@ -117,21 +114,14 @@ public class InputNode extends Node<InputOperator>
               controlTupleCount++;
               currentWindowId = t.getWindowId();
               insideStreamingWindow = true;
-              if (applicationWindowCount == 0) {
-                insideApplicationWindow = true;
-                operator.beginWindow(currentWindowId);
-              }
+              operator.beginWindow(currentWindowId);
               operator.emitTuples(); /* give at least one chance to emit the tuples */
 
               break;
 
             case END_WINDOW:
               insideStreamingWindow = false;
-              if (++applicationWindowCount == APPLICATION_WINDOW_COUNT) {
-                insideApplicationWindow = false;
-                operator.endWindow();
-                applicationWindowCount = 0;
-              }
+              operator.endWindow();
               endWindowEmitTime = System.currentTimeMillis();
 
               for (int i = sinks.length; i-- > 0;) {
@@ -139,32 +129,13 @@ public class InputNode extends Node<InputOperator>
               }
               controlTupleCount++;
 
-              if (doCheckpoint) {
-                dagCheckpointOffsetCount = (dagCheckpointOffsetCount + 1) % DAG_CHECKPOINT_WINDOW_COUNT;
-              }
-
-              if (++checkpointWindowCount == CHECKPOINT_WINDOW_COUNT) {
-                checkpointWindowCount = 0;
-                if (doCheckpoint) {
-                  checkpoint(currentWindowId);
-                  lastCheckpointWindowId = currentWindowId;
-                  doCheckpoint = false;
-                } else if (PROCESSING_MODE == ProcessingMode.EXACTLY_ONCE) {
-                  checkpoint(currentWindowId);
-                  lastCheckpointWindowId = currentWindowId;
-                }
-              }
-
               ContainerStats.OperatorStats stats = new ContainerStats.OperatorStats();
               reportStats(stats, currentWindowId);
-              if (!insideApplicationWindow) {
-                stats.metrics = collectMetrics();
-              }
+              stats.metrics = collectMetrics();
               handleRequests(currentWindowId);
               break;
 
             case CHECKPOINT:
-              dagCheckpointOffsetCount = 0;
               if (lastCheckpointWindowId < currentWindowId) {
                 if (checkpointWindowCount == 0 && PROCESSING_MODE != ProcessingMode.EXACTLY_ONCE) {
                   checkpoint(currentWindowId);
@@ -225,24 +196,13 @@ public class InputNode extends Node<InputOperator>
       }
     }
 
-    if (insideApplicationWindow) {
+    if (insideStreamingWindow) {
       operator.endWindow();
       endWindowEmitTime = System.currentTimeMillis();
-      if (++applicationWindowCount == APPLICATION_WINDOW_COUNT) {
-        applicationWindowCount = 0;
-      }
 
       if (lastCheckpointWindowId < currentWindowId) {
-        //This check is here because if the node is shutdown after a checkpoint is completed for a window,
-        //but before the next window begins a double checkpoint could happen if the CheckpointWindowCount
-        //is 1
-        if (++checkpointWindowCount == CHECKPOINT_WINDOW_COUNT) {
-          checkpointWindowCount = 0;
-          if (doCheckpoint || PROCESSING_MODE == ProcessingMode.EXACTLY_ONCE) {
-            checkpoint(currentWindowId);
-            lastCheckpointWindowId = currentWindowId;
-          }
-        }
+        checkpoint(currentWindowId);
+        lastCheckpointWindowId = currentWindowId;
       }
 
       ContainerStats.OperatorStats stats = new ContainerStats.OperatorStats();

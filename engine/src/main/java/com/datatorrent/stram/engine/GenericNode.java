@@ -34,6 +34,7 @@ import org.apache.apex.api.ControlAwareDefaultInputPort;
 import org.apache.apex.api.operator.ControlTuple;
 import org.apache.commons.lang.UnhandledException;
 
+import com.google.common.base.Preconditions;
 import com.google.common.base.Throwables;
 import com.google.common.collect.Maps;
 
@@ -146,36 +147,15 @@ public class GenericNode extends Node<Operator>
    */
   protected void processEndWindow(Tuple endWindowTuple)
   {
-    if (++applicationWindowCount == APPLICATION_WINDOW_COUNT) {
-      insideWindow = false;
-      operator.endWindow();
-      applicationWindowCount = 0;
-    }
+    logger.info("Calling process end window {} windowID {}", id, endWindowTuple.getWindowId());
+    insideWindow = false;
+    operator.endWindow();
     endWindowEmitTime = System.currentTimeMillis();
 
     if (endWindowTuple == null) {
       emitEndWindow();
     } else {
-      for (int s = sinks.length; s-- > 0; ) {
-        sinks[s].put(endWindowTuple);
-      }
-      controlTupleCount++;
-    }
-
-    if (doCheckpoint) {
-      dagCheckpointOffsetCount = (dagCheckpointOffsetCount + 1) % DAG_CHECKPOINT_WINDOW_COUNT;
-    }
-
-    if (++checkpointWindowCount == CHECKPOINT_WINDOW_COUNT) {
-      checkpointWindowCount = 0;
-      if (doCheckpoint) {
-        checkpoint(currentWindowId);
-        lastCheckpointWindowId = currentWindowId;
-        doCheckpoint = false;
-      } else if (PROCESSING_MODE == ProcessingMode.EXACTLY_ONCE) {
-        checkpoint(currentWindowId);
-        lastCheckpointWindowId = currentWindowId;
-      }
+      forward(endWindowTuple);
     }
 
     ContainerStats.OperatorStats stats = new ContainerStats.OperatorStats();
@@ -197,7 +177,6 @@ public class GenericNode extends Node<Operator>
       tuple = base;
       ports = new SweepableReservoir[count];
     }
-
   }
 
   boolean insideWindow;
@@ -208,7 +187,6 @@ public class GenericNode extends Node<Operator>
   public void activate()
   {
     super.activate();
-    insideWindow = applicationWindowCount != 0;
   }
 
   private boolean isInputPortConnectedToDelayOperator(String portName)
@@ -218,6 +196,205 @@ public class GenericNode extends Node<Operator>
       return false;
     }
     return pcPair.context.getValue(LogicalPlan.IS_CONNECTED_TO_DELAY_OPERATOR);
+  }
+
+  enum Action
+  {
+    BREAK,
+    CONTINUE,
+    PORT_MAPPING_CHANGED
+  }
+
+  long expectingBeginWindows = 0;
+  long receivedEndWindow = 0;
+  long totalQueues = 0;
+  boolean delay;
+  ArrayList<Map.Entry<String, SweepableReservoir>> activeQueues = new ArrayList<>();
+  Map<SweepableReservoir, LinkedHashSet<CustomControlTuple>> immediateDeliveryTuples = Maps.newHashMap();
+  Map<SweepableReservoir,LinkedHashSet<CustomControlTuple>> endWindowDeliveryTuples = Maps.newHashMap();
+
+  /**
+   * Forward tuple on all out going sinks.
+   * @param t
+   */
+  void forward(Tuple t)
+  {
+    for (int s = sinks.length; s-- > 0;) {
+      sinks[s].put(t);
+    }
+  }
+
+  Action handleBeginWindowTuple(String portName, SweepableReservoir port, Tuple t)
+  {
+    Preconditions.checkArgument(t.getType() == MessageType.BEGIN_WINDOW);
+    totalQueues = inputs.size();
+    logger.info("Begin window tuple id {} received {} expecting {} total {}", id, t.getWindowId(), expectingBeginWindows, totalQueues);
+    if (expectingBeginWindows == totalQueues) {
+      logger.info("Starting window {} in operator {}", t.getWindowId(), id);
+      currentWindowId = t.getWindowId();
+      port.remove();
+      expectingBeginWindows--;
+      forward(t);
+      insideWindow = true;
+      operator.beginWindow(currentWindowId);
+    } else if (t.getWindowId() == currentWindowId) {
+      port.remove();
+      expectingBeginWindows--;
+    } else {
+      return handleOutOfOrderBeginWindow(portName, port, t);
+    }
+    return Action.CONTINUE;
+  }
+
+  Action handleOutOfOrderBeginWindow(String portName, SweepableReservoir port, Tuple t)
+  {
+    // there is a begin window tuple, but other port received begin window with different
+    // windowId. This is allowed only in AT_MOST_ONCE processing, in other mode this is
+    // a serious error.
+    // This is special case, when operator is working in AT_MOST_ONCE processing mode.
+    port.remove();
+    if (PROCESSING_MODE == ProcessingMode.AT_MOST_ONCE) {
+      if (t.getWindowId() < currentWindowId) {
+        // skip messages from this port till we get current window id.
+        Sink<Object> sink = port.setSink(Sink.BLACKHOLE);
+        deferredInputConnections.add(0, new DeferredInputConnection(
+            portName, port));
+        WindowIdActivatedReservoir wiar = new WindowIdActivatedReservoir(portName, port, currentWindowId);
+        wiar.setSink(sink);
+        inputs.put(portName, wiar);
+        activeQueues.add(new AbstractMap.SimpleEntry<>(portName, wiar));
+        return Action.PORT_MAPPING_CHANGED;
+      } else {
+        expectingBeginWindows--;
+        if (++receivedEndWindow == totalQueues) {
+          processEndWindow(null);
+          activeQueues.addAll(inputs.entrySet());
+          expectingBeginWindows = activeQueues.size();
+          return Action.PORT_MAPPING_CHANGED;
+        }
+      }
+    } else {
+      logger.error("Catastrophic Error: Out of sequence {} tuple {} on port {} while expecting {}",
+          t.getType(), Codec.getStringWindowId(t.getWindowId()), port, Codec.getStringWindowId(currentWindowId));
+      System.exit(2);
+    }
+    return null;
+  }
+
+  void deliverControlTuples()
+  {
+    for (Entry<SweepableReservoir, LinkedHashSet<CustomControlTuple>> portSet : endWindowDeliveryTuples.entrySet()) {
+      Sink activeSink = reservoirPortMap.get(portSet.getKey());
+      // activeSink may not be null
+      if (activeSink instanceof ControlAwareDefaultInputPort) {
+        ControlTupleEnabledSink sink = (ControlTupleEnabledSink)activeSink;
+        for (CustomControlTuple cct : portSet.getValue()) {
+          if (!sink.putControl((ControlTuple)cct.getUserObject())) {
+            // operator cannot handle control tuple; forward to sinks
+            forwardToSinks(delay, cct);
+          }
+        }
+      } else {
+        // Not a ControlAwarePort. Operator cannot handle a custom control tuple.
+        for (CustomControlTuple cct : portSet.getValue()) {
+          forwardToSinks(delay, cct);
+        }
+      }
+    }
+
+    immediateDeliveryTuples.clear();
+    endWindowDeliveryTuples.clear();
+
+  }
+
+  Action handleEndWindowTuple(Map.Entry<String, SweepableReservoir> port, Tuple t)
+  {
+    Preconditions.checkArgument(t.getType() == MessageType.END_WINDOW);
+    SweepableReservoir activePort = port.getValue();
+    logger.info("handleEndWindowTuple id {} currentWid {} wid {} receivedEndWindows {} totalQueue {}",
+        id, currentWindowId, t.getWindowId(),receivedEndWindow, totalQueues);
+    if (t.getWindowId() == currentWindowId) {
+      activePort.remove();
+      endWindowDequeueTimes.put(activePort, System.currentTimeMillis());
+      if (++receivedEndWindow == totalQueues) {
+        assert (activeQueues.isEmpty());
+        if (reservoirPortMap.isEmpty()) {
+          populateReservoirInputPortMap();
+        }
+        deliverControlTuples();
+        processEndWindow(t);
+        activeQueues.addAll(inputs.entrySet());
+        expectingBeginWindows = activeQueues.size();
+        receivedEndWindow = 0;
+        return  Action.PORT_MAPPING_CHANGED;
+      }
+    }
+    return Action.CONTINUE;
+  }
+
+  Action handleCustomControlTuple(Map.Entry<String, SweepableReservoir> port, Tuple t)
+  {
+    Preconditions.checkArgument(t.getType() == MessageType.CUSTOM_CONTROL);
+    SweepableReservoir activePort = port.getValue();
+    activePort.remove();
+    /* All custom control tuples are expected to be arriving in the current window only.*/
+    /* Buffer control tuples until end of the window */
+    CustomControlTuple cct = (CustomControlTuple)t;
+    ControlTuple udct = (ControlTuple)cct.getUserObject();
+    boolean forward = false;
+
+    // Handle Immediate Delivery Control Tuples
+    if (udct.getDeliveryType().equals(ControlTuple.DeliveryType.IMMEDIATE)) {
+      if (!isDuplicate(immediateDeliveryTuples.get(activePort), cct)) {
+        // Forward immediately
+        if (reservoirPortMap.isEmpty()) {
+          populateReservoirInputPortMap();
+        }
+
+        Sink activeSink = reservoirPortMap.get(activePort);
+        // activeSink may not be null
+        if (activeSink instanceof ControlAwareDefaultInputPort) {
+          ControlTupleEnabledSink sink = (ControlTupleEnabledSink)activeSink;
+          if (!sink.putControl((ControlTuple)cct.getUserObject())) {
+            forward = true;
+          }
+        } else {
+          forward = true;
+        }
+
+        if (forward) {
+          forwardToSinks(delay, cct);
+        }
+        // Add to set
+        if (!immediateDeliveryTuples.containsKey(activePort)) {
+          immediateDeliveryTuples.put(activePort, new LinkedHashSet<CustomControlTuple>());
+        }
+        immediateDeliveryTuples.get(activePort).add(cct);
+      }
+    } else {
+      // Buffer EndWindow Delivery Control Tuples
+      if (!endWindowDeliveryTuples.containsKey(activePort)) {
+        endWindowDeliveryTuples.put(activePort, new LinkedHashSet<CustomControlTuple>());
+      }
+      if (!isDuplicate(endWindowDeliveryTuples.get(activePort), cct)) {
+        endWindowDeliveryTuples.get(activePort).add(cct);
+      }
+    }
+    return Action.CONTINUE;
+  }
+
+  Action handleCheckpointTuple(Map.Entry<String, SweepableReservoir> port, Tuple t)
+  {
+    Preconditions.checkArgument(t.getType() == MessageType.CHECKPOINT);
+    SweepableReservoir activePort = port.getValue();
+    activePort.remove();
+    long checkpointWindow = t.getWindowId();
+    if (lastCheckpointWindowId < checkpointWindow) {
+      checkpoint(checkpointWindow);
+      lastCheckpointWindowId = checkpointWindow;
+      forwardToSinks(delay, t);
+    }
+    return Action.CONTINUE;
   }
 
   /**
@@ -243,19 +420,12 @@ public class GenericNode extends Node<Operator>
       }
     }
 
-    ArrayList<Map.Entry<String, SweepableReservoir>> activeQueues = new ArrayList<>();
     activeQueues.addAll(inputs.entrySet());
-
-    int expectingBeginWindow = activeQueues.size();
-    int receivedEndWindow = 0;
+    expectingBeginWindows = activeQueues.size();
     long firstWindowId = -1;
-
-    calculateNextCheckpointWindow();
 
     TupleTracker tracker;
     LinkedList<TupleTracker> resetTupleTracker = new LinkedList<>();
-    Map<SweepableReservoir, LinkedHashSet<CustomControlTuple>> immediateDeliveryTuples = Maps.newHashMap();
-    Map<SweepableReservoir,LinkedHashSet<CustomControlTuple>> endWindowDeliveryTuples = Maps.newHashMap();
 
     try {
       do {
@@ -274,191 +444,27 @@ public class GenericNode extends Node<Operator>
             }
             switch (t.getType()) {
               case BEGIN_WINDOW:
-                if (expectingBeginWindow == totalQueues) {
-                  // This is the first begin window tuple among all ports
-                  if (isInputPortConnectedToDelayOperator(activePortEntry.getKey())) {
-                    // We need to wait for the first BEGIN_WINDOW from a port not connected to DelayOperator before
-                    // we can do anything with it, because otherwise if a CHECKPOINT tuple arrives from
-                    // upstream after the BEGIN_WINDOW tuple for the next window from the delay operator, it would end
-                    // up checkpointing in the middle of the window.  This code is assuming we have at least one
-                    // input port that is not connected to a DelayOperator, and we might have to change this later.
-                    // In the future, this condition will not be needed if we get rid of the CHECKPOINT tuple.
-                    continue;
-                  }
-                  activePort.remove();
-                  expectingBeginWindow--;
-                  receivedEndWindow = 0;
-                  currentWindowId = t.getWindowId();
-                  if (delay) {
-                    t.setWindowId(windowAhead);
-                  }
-                  for (int s = sinks.length; s-- > 0; ) {
-                    sinks[s].put(t);
-                  }
-                  controlTupleCount++;
-
-                  context.setWindowsFromCheckpoint(nextCheckpointWindowCount--);
-
-                  if (applicationWindowCount == 0) {
-                    insideWindow = true;
-                    operator.beginWindow(currentWindowId);
-                  }
-                } else if (t.getWindowId() == currentWindowId) {
-                  activePort.remove();
-                  expectingBeginWindow--;
-                } else {
-                  buffers.remove();
-                  String port = activePortEntry.getKey();
-                  if (PROCESSING_MODE == ProcessingMode.AT_MOST_ONCE) {
-                    if (t.getWindowId() < currentWindowId) {
-                      /*
-                       * we need to fast forward this stream till we find the current
-                       * window or the window which is bigger than the current window.
-                       */
-
-                      /* lets move the current reservoir in the background */
-                      Sink<Object> sink = activePort.setSink(Sink.BLACKHOLE);
-                      deferredInputConnections.add(0, new DeferredInputConnection(port, activePort));
-
-                      /* replace it with the reservoir which blocks the tuples in the past */
-                      WindowIdActivatedReservoir wiar = new WindowIdActivatedReservoir(port, activePort, currentWindowId);
-                      wiar.setSink(sink);
-                      inputs.put(port, wiar);
-                      activeQueues.add(new AbstractMap.SimpleEntry<String, SweepableReservoir>(port, wiar));
-                      break activequeue;
-                    } else {
-                      expectingBeginWindow--;
-                      if (++receivedEndWindow == totalQueues) {
-                        processEndWindow(null);
-                        activeQueues.addAll(inputs.entrySet());
-                        expectingBeginWindow = activeQueues.size();
-                        break activequeue;
-                      }
-                    }
-                  } else {
-                    logger.error("Catastrophic Error: Out of sequence {} tuple {} on port {} while expecting {}", t.getType(), Codec.getStringWindowId(t.getWindowId()), port, Codec.getStringWindowId(currentWindowId));
-                    System.exit(2);
-                  }
+                Action ret = handleBeginWindowTuple(activePortEntry.getKey(), activePort, t);
+                if (ret == Action.PORT_MAPPING_CHANGED) {
+                  break activequeue;
                 }
                 break;
 
               case END_WINDOW:
+                logger.info("end window received id {} window {}", id, t.getWindowId());
                 buffers.remove();
-                if (t.getWindowId() == currentWindowId) {
-                  activePort.remove();
-                  endWindowDequeueTimes.put(activePort, System.currentTimeMillis());
-                  if (++receivedEndWindow == totalQueues) {
-                    assert (activeQueues.isEmpty());
-                    if (delay) {
-                      t.setWindowId(windowAhead);
-                    }
-
-                    /* Emit control tuples here */
-                    if (reservoirPortMap.isEmpty()) {
-                      populateReservoirInputPortMap();
-                    }
-
-
-                    for (Entry<SweepableReservoir,LinkedHashSet<CustomControlTuple>> portSet: endWindowDeliveryTuples.entrySet()) {
-                      Sink activeSink = reservoirPortMap.get(portSet.getKey());
-                      // activeSink may not be null
-                      if (activeSink instanceof ControlAwareDefaultInputPort) {
-                        ControlTupleEnabledSink sink = (ControlTupleEnabledSink)activeSink;
-                        for (CustomControlTuple cct : portSet.getValue()) {
-                          if (!sink.putControl((ControlTuple)cct.getUserObject())) {
-                            // operator cannot handle control tuple; forward to sinks
-                            forwardToSinks(delay, cct);
-                          }
-                        }
-                      } else {
-                        // Not a ControlAwarePort. Operator cannot handle a custom control tuple.
-                        for (CustomControlTuple cct : portSet.getValue()) {
-                          forwardToSinks(delay, cct);
-                        }
-                      }
-                    }
-
-                    immediateDeliveryTuples.clear();
-                    endWindowDeliveryTuples.clear();
-
-                    /* Now call endWindow() */
-                    processEndWindow(t);
-                    activeQueues.addAll(inputs.entrySet());
-                    expectingBeginWindow = activeQueues.size();
-                    break activequeue;
-                  }
+                ret = handleEndWindowTuple(activePortEntry, t);
+                if (ret == Action.PORT_MAPPING_CHANGED) {
+                  break activequeue;
                 }
                 break;
 
               case CUSTOM_CONTROL:
-                activePort.remove();
-                /* All custom control tuples are expected to be arriving in the current window only.*/
-                /* Buffer control tuples until end of the window */
-                CustomControlTuple cct = (CustomControlTuple)t;
-                ControlTuple udct = (ControlTuple)cct.getUserObject();
-                boolean forward = false;
-
-                // Handle Immediate Delivery Control Tuples
-                if (udct.getDeliveryType().equals(ControlTuple.DeliveryType.IMMEDIATE)) {
-                  if (!isDuplicate(immediateDeliveryTuples.get(activePort), cct)) {
-                    // Forward immediately
-                    if (reservoirPortMap.isEmpty()) {
-                      populateReservoirInputPortMap();
-                    }
-
-                    Sink activeSink = reservoirPortMap.get(activePort);
-                    // activeSink may not be null
-                    if (activeSink instanceof ControlAwareDefaultInputPort) {
-                      ControlTupleEnabledSink sink = (ControlTupleEnabledSink)activeSink;
-                      if (!sink.putControl((ControlTuple)cct.getUserObject())) {
-                        forward = true;
-                      }
-                    } else {
-                      forward = true;
-                    }
-
-                    if (forward) {
-                      forwardToSinks(delay, cct);
-                    }
-                    // Add to set
-                    if (!immediateDeliveryTuples.containsKey(activePort)) {
-                      immediateDeliveryTuples.put(activePort, new LinkedHashSet<CustomControlTuple>());
-                    }
-                    immediateDeliveryTuples.get(activePort).add(cct);
-                  }
-                } else {
-                  // Buffer EndWindow Delivery Control Tuples
-                  if (!endWindowDeliveryTuples.containsKey(activePort)) {
-                    endWindowDeliveryTuples.put(activePort, new LinkedHashSet<CustomControlTuple>());
-                  }
-                  if (!isDuplicate(endWindowDeliveryTuples.get(activePort), cct)) {
-                    endWindowDeliveryTuples.get(activePort).add(cct);
-                  }
-                }
+                handleCustomControlTuple(activePortEntry, t);
                 break;
 
               case CHECKPOINT:
-                activePort.remove();
-                long checkpointWindow = t.getWindowId();
-                if (lastCheckpointWindowId < checkpointWindow) {
-                  dagCheckpointOffsetCount = 0;
-                  if (PROCESSING_MODE == ProcessingMode.EXACTLY_ONCE) {
-                    lastCheckpointWindowId = checkpointWindow;
-                  } else if (!doCheckpoint) {
-                    if (checkpointWindowCount == 0) {
-                      checkpoint(checkpointWindow);
-                      lastCheckpointWindowId = checkpointWindow;
-                    } else {
-                      doCheckpoint = true;
-                    }
-                  }
-                  if (!delay) {
-                    for (int s = sinks.length; s-- > 0; ) {
-                      sinks[s].put(t);
-                    }
-                    controlTupleCount++;
-                  }
-                }
+                handleCheckpointTuple(activePortEntry, t);
                 break;
 
               case END_STREAM:
@@ -500,7 +506,7 @@ public class GenericNode extends Node<Operator>
                 /**
                  * We are not going to receive begin window on this ever!
                  */
-                expectingBeginWindow--;
+                expectingBeginWindows--;
 
                 /**
                  * Since one of the operators we care about it gone, we should relook at our ports.
@@ -517,7 +523,7 @@ public class GenericNode extends Node<Operator>
                   assert (!inputs.isEmpty());
                   processEndWindow(null);
                   activeQueues.addAll(inputs.entrySet());
-                  expectingBeginWindow = activeQueues.size();
+                  expectingBeginWindows = activeQueues.size();
                   break_activequeue = true;
                 }
 
@@ -533,7 +539,7 @@ public class GenericNode extends Node<Operator>
         }
 
         if (activeQueues.isEmpty() && alive) {
-          logger.error("Catastrophic Error: Invalid State - the operator blocked forever!");
+          logger.error("Catastrophic Error: Invalid State - the operator {} blocked forever!", id);
           System.exit(2);
         } else {
           boolean need2sleep = true;
@@ -587,15 +593,9 @@ public class GenericNode extends Node<Operator>
     if (insideWindow && !shutdown) {
       operator.endWindow();
       endWindowEmitTime = System.currentTimeMillis();
-      if (++applicationWindowCount == APPLICATION_WINDOW_COUNT) {
-        applicationWindowCount = 0;
-      }
-
       if (++checkpointWindowCount == CHECKPOINT_WINDOW_COUNT) {
         checkpointWindowCount = 0;
-        if (doCheckpoint || PROCESSING_MODE == ProcessingMode.EXACTLY_ONCE) {
-          checkpoint(currentWindowId);
-        }
+        checkpoint(currentWindowId);
       }
 
       ContainerStats.OperatorStats stats = new ContainerStats.OperatorStats();
@@ -699,7 +699,6 @@ public class GenericNode extends Node<Operator>
       this.portname = portname;
       this.reservoir = reservoir;
     }
-
   }
 
   private static final Logger logger = LoggerFactory.getLogger(GenericNode.class);
