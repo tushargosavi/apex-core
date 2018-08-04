@@ -105,7 +105,6 @@ import com.datatorrent.stram.engine.DefaultUnifier;
 import com.datatorrent.stram.engine.Slider;
 
 import static com.datatorrent.api.Context.PortContext.STREAM_CODEC;
-
 import static com.google.common.base.Preconditions.checkArgument;
 import static com.google.common.base.Strings.isNullOrEmpty;
 
@@ -2329,6 +2328,27 @@ public class LogicalPlan implements Serializable, DAG
       }
     }
     stack.pop();
+  }
+
+  private Set<OperatorMeta> getImmediateUpstream(OperatorMeta meta)
+  {
+    Set<OperatorMeta> upstream = new HashSet<>();
+    for (StreamMeta sm: meta.getInputStreams().values()) {
+      OutputPortMeta opm = sm.getSource();
+      upstream.add(opm.getOperatorMeta());
+    }
+    return upstream;
+  }
+
+  private Set<OperatorMeta> getImmediateDownstream(OperatorMeta meta)
+  {
+    Set<OperatorMeta> downstreams = new HashSet<>();
+    for (StreamMeta sm : meta.getOutputStreams().values()) {
+      for (InputPortMeta ipm : sm.getSinks()) {
+        downstreams.add(ipm.getOperatorMeta());
+      }
+    }
+    return downstreams;
   }
 
   private void validateProcessingMode(OperatorMeta om, Set<OperatorMeta> visited)
