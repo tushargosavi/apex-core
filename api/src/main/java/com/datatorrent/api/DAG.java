@@ -44,7 +44,7 @@ import com.datatorrent.api.annotation.OperatorAnnotation;
  */
 public interface DAG extends DAGContext, Serializable
 {
-  interface InputPortMeta extends Serializable, PortContext
+  interface InputPortMeta extends Serializable, PortContext, NameableEntity
   {
     /**
      * Return port object represented by this InputPortMeta
@@ -55,7 +55,7 @@ public interface DAG extends DAGContext, Serializable
     <T extends OperatorMeta> T getOperatorMeta();
   }
 
-  interface OutputPortMeta extends Serializable, PortContext
+  interface OutputPortMeta extends Serializable, PortContext, NameableEntity
   {
     OperatorMeta getUnifierMeta();
 
@@ -181,7 +181,7 @@ public interface DAG extends DAGContext, Serializable
   /**
    * Operator meta object.
    */
-  interface OperatorMeta extends Serializable, Context
+  interface OperatorMeta extends Serializable, Context, NameableEntity
   {
     String getName();
 

@@ -16,7 +16,7 @@
  * specific language governing permissions and limitations
  * under the License.
  */
-package com.datatorrent.stram.plan.logical;
+package com.datatorrent.stram.plan.logical.visitor;
 
 import java.util.HashSet;
 import java.util.Map;
@@ -25,8 +25,8 @@ import java.util.Stack;
 
 import com.datatorrent.api.DAG;
 import com.datatorrent.stram.engine.Stream;
+import com.datatorrent.stram.plan.logical.LogicalPlan;
 import com.datatorrent.stram.plan.logical.LogicalPlan.OperatorMeta;
-
 
 public abstract class DAGOrderDFSTraversal implements DAGTraverser
 {

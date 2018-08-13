@@ -16,21 +16,20 @@
  * specific language governing permissions and limitations
  * under the License.
  */
-package com.datatorrent.stram.plan.logical;
+package com.datatorrent.stram.plan.logical.validation;
 
-public interface DAGTraverser
+import org.junit.Before;
+
+import com.datatorrent.stram.plan.logical.LogicalPlan;
+
+public class LogicalPlanTestBase
 {
 
-  /**
-   * Traverse the entire DAG.w
-   * @return
-   */
-  DAGVisitor traverse();
+  protected LogicalPlan dag;
 
-  /**
-   * Traverse the DAG from given node.
-   * @param root
-   * @return
-   */
-  DAGVisitor traverseFrom(LogicalPlan.OperatorMeta root);
+  @Before
+  public void beginTest()
+  {
+    dag = new LogicalPlan();
+  }
 }

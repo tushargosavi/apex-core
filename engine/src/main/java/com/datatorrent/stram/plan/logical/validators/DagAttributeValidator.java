@@ -16,13 +16,17 @@
  * specific language governing permissions and limitations
  * under the License.
  */
-package com.datatorrent.stram.plan.logical;
+package com.datatorrent.stram.plan.logical.validators;
 
-public interface DAGVisitor
+import java.util.Collection;
+
+import com.datatorrent.stram.plan.logical.LogicalPlan;
+
+public class DagAttributeValidator implements ComponentValidator<LogicalPlan>
 {
-  void init(LogicalPlan dag);
-
-  boolean visit(LogicalPlan.OperatorMeta operator);
-
-  boolean done();
+  @Override
+  public Collection<? extends ValidationIssue> validate(LogicalPlan dag)
+  {
+    return AttributeSerializationValidator.validateStatic(dag.getAttributes(), null);
+  }
 }

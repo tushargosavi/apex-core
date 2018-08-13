@@ -160,6 +160,7 @@ import com.datatorrent.stram.plan.logical.LogicalPlanConfiguration;
 import com.datatorrent.stram.plan.logical.Operators;
 import com.datatorrent.stram.plan.logical.Operators.PortContextPair;
 import com.datatorrent.stram.plan.logical.requests.LogicalPlanRequest;
+import com.datatorrent.stram.plan.logical.visitor.CycleDetector;
 import com.datatorrent.stram.plan.physical.OperatorStatus;
 import com.datatorrent.stram.plan.physical.OperatorStatus.PortStatus;
 import com.datatorrent.stram.plan.physical.PTContainer;
@@ -2214,10 +2215,8 @@ public class StreamingContainerManager implements PlanContext
       this.checkpointGroups = new HashMap<>();
       LogicalPlan dag = this.plan.getLogicalPlan();
       dag.resetNIndex();
-      LogicalPlan.ValidationContext vc = new LogicalPlan.ValidationContext();
-      for (OperatorMeta om : dag.getRootOperators()) {
-        this.plan.getLogicalPlan().findStronglyConnected(om, vc);
-      }
+      CycleDetector detector = new CycleDetector();
+      CycleDetector.ValidationContext vc = detector.findStronglyConnected(dag);
       for (Set<OperatorMeta> checkpointGroup : vc.stronglyConnected) {
         for (OperatorMeta om : checkpointGroup) {
           this.checkpointGroups.put(om, checkpointGroup);
@@ -2277,16 +2276,11 @@ public class StreamingContainerManager implements PlanContext
       final PTOperator operator = p.getFirst();
       if (!operator.isOperatorStateLess()) {
         final long windowId = p.getSecond();
-        Runnable r = new Runnable()
-        {
-          @Override
-          public void run()
-          {
-            try {
-              operator.getOperatorMeta().getValue(OperatorContext.STORAGE_AGENT).delete(operator.getId(), windowId);
-            } catch (IOException ex) {
-              LOG.error("Failed to purge checkpoint for operator {} for windowId {}", operator, windowId, ex);
-            }
+        Runnable r = () -> {
+          try {
+            operator.getOperatorMeta().getValue(OperatorContext.STORAGE_AGENT).delete(operator.getId(), windowId);
+          } catch (IOException ex) {
+            LOG.error("Failed to purge checkpoint for operator {} for windowId {}", operator, windowId, ex);
           }
         };
         poolExecutor.submit(r);
@@ -3075,7 +3069,7 @@ public class StreamingContainerManager implements PlanContext
         request.execute(pm);
       }
 
-      lp.validate();
+      lp.validate2();
 
       // perform changes on live plan
       pm = new PlanModifier(plan);

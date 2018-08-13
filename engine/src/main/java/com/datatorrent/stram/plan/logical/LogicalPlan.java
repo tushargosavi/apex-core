@@ -46,18 +46,15 @@ import java.util.LinkedList;
 import java.util.List;
 import java.util.Map;
 import java.util.Map.Entry;
+import java.util.Objects;
 import java.util.Set;
 import java.util.Stack;
 import java.util.concurrent.atomic.AtomicInteger;
-import java.util.regex.Pattern;
+import java.util.stream.Collectors;
 
 import javax.annotation.Nonnull;
-import javax.validation.ConstraintViolation;
 import javax.validation.ConstraintViolationException;
-import javax.validation.Validation;
 import javax.validation.ValidationException;
-import javax.validation.Validator;
-import javax.validation.ValidatorFactory;
 import javax.validation.constraints.NotNull;
 
 import org.slf4j.Logger;
@@ -73,22 +70,19 @@ import org.apache.hadoop.yarn.conf.YarnConfiguration;
 
 import com.google.common.collect.Sets;
 
-import com.datatorrent.api.AffinityRule;
-import com.datatorrent.api.AffinityRulesSet;
 import com.datatorrent.api.Attribute;
 import com.datatorrent.api.Attribute.AttributeMap;
 import com.datatorrent.api.Attribute.AttributeMap.DefaultAttributeMap;
 import com.datatorrent.api.AutoMetric;
 import com.datatorrent.api.DAG;
-import com.datatorrent.api.InputOperator;
 import com.datatorrent.api.Module;
 import com.datatorrent.api.Module.ProxyInputPort;
 import com.datatorrent.api.Module.ProxyOutputPort;
+import com.datatorrent.api.NameableEntity;
 import com.datatorrent.api.Operator;
 import com.datatorrent.api.Operator.InputPort;
 import com.datatorrent.api.Operator.OutputPort;
 import com.datatorrent.api.Operator.Unifier;
-import com.datatorrent.api.Partitioner;
 import com.datatorrent.api.StreamCodec;
 import com.datatorrent.api.StringCodec;
 import com.datatorrent.api.annotation.InputPortFieldAnnotation;
@@ -100,9 +94,18 @@ import com.datatorrent.common.metric.SingleMetricAggregator;
 import com.datatorrent.common.metric.sum.DoubleSumAggregator;
 import com.datatorrent.common.metric.sum.LongSumAggregator;
 import com.datatorrent.common.util.FSStorageAgent;
-import com.datatorrent.common.util.Pair;
 import com.datatorrent.stram.engine.DefaultUnifier;
 import com.datatorrent.stram.engine.Slider;
+import com.datatorrent.stram.plan.logical.validators.ComponentValidator;
+import com.datatorrent.stram.plan.logical.validators.DagAttributeValidator;
+import com.datatorrent.stram.plan.logical.validators.DelayOperatorValidator;
+import com.datatorrent.stram.plan.logical.validators.InvalidLoopValidator;
+import com.datatorrent.stram.plan.logical.validators.OperatorValidator;
+import com.datatorrent.stram.plan.logical.validators.StreamConnectedValidator;
+import com.datatorrent.stram.plan.logical.validators.ThreadLocalValidator;
+import com.datatorrent.stram.plan.logical.validators.ValidateAffinityRules;
+import com.datatorrent.stram.plan.logical.validators.ValidateRootOperators;
+import com.datatorrent.stram.plan.logical.validators.ValidatingProcessingMode;
 
 import static com.datatorrent.api.Context.PortContext.STREAM_CODEC;
 import static com.google.common.base.Preconditions.checkArgument;
@@ -121,7 +124,7 @@ import static com.google.common.base.Strings.isNullOrEmpty;
  *
  * @since 0.3.2
  */
-public class LogicalPlan implements Serializable, DAG
+public class LogicalPlan implements Serializable, DAG, NameableEntity
 {
   /**
    * Attribute of input port.
@@ -237,6 +240,11 @@ public class LogicalPlan implements Serializable, DAG
     throw new UnsupportedOperationException("Not supported yet.");
   }
 
+  public String getName()
+  {
+    return "dag";
+  }
+
   public final class InputPortMeta implements DAG.InputPortMeta, Serializable
   {
     @SuppressWarnings("FieldNameHidesFieldInSuperclass")
@@ -329,6 +337,32 @@ public class LogicalPlan implements Serializable, DAG
           LOG.warn("Operator {} input port {} stream codec was changed from {} to {}", getOperatorMeta().getName(), getPortName(), oldStreamCodec, streamCodec);
         }
       }
+    }
+
+    @Override
+    public String getName()
+    {
+      return fieldName;
+    }
+
+    public boolean isOptional()
+    {
+      return !isRequired();
+    }
+
+    public boolean isRequired()
+    {
+      return ((portAnnotation == null || !portAnnotation.optional()) && classDeclaringHiddenPort == null);
+    }
+
+    public boolean isPortHidden()
+    {
+      return (classDeclaringHiddenPort != null);
+    }
+
+    public String getHidingOperatorClassName()
+    {
+      return classDeclaringHiddenPort != null ? classDeclaringHiddenPort.getName() : null;
     }
   }
 
@@ -460,6 +494,31 @@ public class LogicalPlan implements Serializable, DAG
       throw new UnsupportedOperationException("Not supported yet.");
     }
 
+    @Override
+    public String getName()
+    {
+      return fieldName;
+    }
+
+    public boolean isOptional()
+    {
+      return !isRequired();
+    }
+
+    public boolean isRequired()
+    {
+      return ((portAnnotation != null && !portAnnotation.optional()) && classDeclaringHiddenPort == null);
+    }
+
+    public boolean isHidden()
+    {
+      return (classDeclaringHiddenPort != null);
+    }
+
+    public String getHidingOperatorClassName()
+    {
+      return classDeclaringHiddenPort != null ? classDeclaringHiddenPort.getName() : null;
+    }
   }
 
   /**
@@ -1064,11 +1123,11 @@ public class LogicalPlan implements Serializable, DAG
     }
 
 
-    private class PortMapping implements Operators.OperatorDescriptor
+    public class PortMapping implements Operators.OperatorDescriptor
     {
-      private final Map<Operator.InputPort<?>, InputPortMeta> inPortMap = new HashMap<>();
-      private final Map<Operator.OutputPort<?>, OutputPortMeta> outPortMap = new HashMap<>();
-      private final Map<String, Object> portNameMap = new HashMap<>();
+      public final Map<Operator.InputPort<?>, InputPortMeta> inPortMap = new HashMap<>();
+      public final Map<Operator.OutputPort<?>, OutputPortMeta> outPortMap = new HashMap<>();
+      public final Map<String, Object> portNameMap = new HashMap<>();
 
       @Override
       public void addInputPort(InputPort<?> portObject, Field field, InputPortFieldAnnotation portAnnotation, AppData.QueryPort adqAnnotation)
@@ -1149,7 +1208,7 @@ public class LogicalPlan implements Serializable, DAG
      */
     private transient PortMapping portMapping = null;
 
-    private PortMapping getPortMapping()
+    public PortMapping getPortMapping()
     {
       if (this.portMapping == null) {
         this.portMapping = new PortMapping();
@@ -1241,6 +1300,26 @@ public class LogicalPlan implements Serializable, DAG
 
     @SuppressWarnings("FieldNameHidesFieldInSuperclass")
     private static final long serialVersionUID = 201401091635L;
+
+    public Integer getNindex()
+    {
+      return nindex;
+    }
+
+    public void setNindex(Integer nindex)
+    {
+      this.nindex = nindex;
+    }
+
+    public Integer getLowlink()
+    {
+      return lowlink;
+    }
+
+    public void setLowlink(Integer lowlink)
+    {
+      this.lowlink = lowlink;
+    }
   }
 
   @Override
@@ -1685,16 +1764,6 @@ public class LogicalPlan implements Serializable, DAG
     return classNames;
   }
 
-  public static class ValidationContext
-  {
-    public int nodeIndex = 0;
-    public Stack<OperatorMeta> stack = new Stack<>();
-    public Stack<OperatorMeta> path = new Stack<>();
-    public List<Set<OperatorMeta>> stronglyConnected = new ArrayList<>();
-    public OperatorMeta invalidLoopAt;
-    public List<Set<OperatorMeta>> invalidCycles = new ArrayList<>();
-  }
-
   public void resetNIndex()
   {
     for (OperatorMeta om : getAllOperators()) {
@@ -1703,439 +1772,34 @@ public class LogicalPlan implements Serializable, DAG
     }
   }
 
-  /**
-   * Validate the plan. Includes checks that required ports are connected,
-   * required configuration parameters specified, graph free of cycles etc.
-   *
-   * @throws ConstraintViolationException
-   */
-  public void validate() throws ConstraintViolationException
+  public List<ComponentValidator.ValidationIssue> validate2() throws ConstraintViolationException
   {
-    ValidatorFactory factory = Validation.buildDefaultValidatorFactory();
-    Validator validator = factory.getValidator();
+    List<ComponentValidator<LogicalPlan>> validators = new ArrayList<>();
+    validators.add(new DagAttributeValidator());
+    validators.add(new OperatorValidator());
+    validators.add(new ThreadLocalValidator());
+    validators.add(new InvalidLoopValidator());
+    validators.add(new ValidateAffinityRules());
+    validators.add(new ValidateRootOperators());
+    validators.add(new ValidatingProcessingMode());
+    validators.add(new DelayOperatorValidator());
+    validators.add(new StreamConnectedValidator());
 
-    checkAttributeValueSerializable(this.getAttributes(), DAG.class.getName());
+    List<ComponentValidator.ValidationIssue> issues =
+        validators.stream()
+            .flatMap(v -> v.validate(this).stream())
+            .filter(Objects::nonNull)
+            .collect(Collectors.toList());
 
-    // clear oioRoot values in all operators
-    for (OperatorMeta n : operators.values()) {
-      n.oioRoot = null;
-    }
-
-    // clear visited on all operators
-    for (OperatorMeta n : operators.values()) {
-      n.nindex = null;
-      n.lowlink = null;
-
-      // validate configuration
-      Set<ConstraintViolation<Operator>> constraintViolations = validator.validate(n.getOperator());
-      if (!constraintViolations.isEmpty()) {
-        Set<ConstraintViolation<?>> copySet = new HashSet<>(constraintViolations.size());
-        // workaround bug in ConstraintViolationException constructor
-        // (should be public <T> ConstraintViolationException(String message, Set<ConstraintViolation<T>> constraintViolations) { ... })
-        for (ConstraintViolation<Operator> cv: constraintViolations) {
-          copySet.add(cv);
-        }
-        throw new ConstraintViolationException("Operator " + n.getName() + " violates constraints " + copySet, copySet);
-      }
-
-      OperatorMeta.PortMapping portMapping = n.getPortMapping();
-
-      checkAttributeValueSerializable(n.getAttributes(), n.getName());
-
-      // Check operator annotation
-      if (n.operatorAnnotation != null) {
-        // Check if partition property of the operator is being honored
-        if (!n.operatorAnnotation.partitionable()) {
-          // Check if any of the input ports have partition attributes set
-          for (InputPortMeta pm: portMapping.inPortMap.values()) {
-            Boolean paralellPartition = pm.getValue(PortContext.PARTITION_PARALLEL);
-            if (paralellPartition) {
-              throw new ValidationException("Operator " + n.getName() + " is not partitionable but PARTITION_PARALLEL attribute is set");
-            }
-          }
-
-          // Check if the operator implements Partitioner
-          if (n.getValue(OperatorContext.PARTITIONER) != null
-              || n.attributes != null && !n.attributes.contains(OperatorContext.PARTITIONER) && Partitioner.class.isAssignableFrom(n.getOperator().getClass())) {
-            throw new ValidationException("Operator " + n.getName() + " provides partitioning capabilities but the annotation on the operator class declares it non partitionable!");
-          }
-        }
-
-        //If operator can not be check-pointed in middle of application window then the checkpoint window count should be
-        // a multiple of application window count
-        if (!n.operatorAnnotation.checkpointableWithinAppWindow()) {
-          if (n.getValue(OperatorContext.CHECKPOINT_WINDOW_COUNT) % n.getValue(OperatorContext.APPLICATION_WINDOW_COUNT) != 0) {
-            throw new ValidationException("Operator " + n.getName() + " cannot be check-pointed between an application window " +
-              "but the checkpoint-window-count " + n.getValue(OperatorContext.CHECKPOINT_WINDOW_COUNT) +
-              " is not a multiple application-window-count " + n.getValue(OperatorContext.APPLICATION_WINDOW_COUNT));
-          }
-        }
-      }
-
-      // check that non-optional ports are connected
-      for (InputPortMeta pm: portMapping.inPortMap.values()) {
-        checkAttributeValueSerializable(pm.getAttributes(), n.getName() + "." + pm.getPortName());
-        StreamMeta sm = n.inputStreams.get(pm);
-        if (sm == null) {
-          if ((pm.portAnnotation == null || !pm.portAnnotation.optional()) && pm.classDeclaringHiddenPort == null) {
-            throw new ValidationException("Input port connection required: " + n.name + "." + pm.getPortName());
-          }
-        } else {
-          if (pm.classDeclaringHiddenPort != null) {
-            throw new ValidationException(String.format("Invalid port connected: %s.%s is hidden by %s.%s", pm.classDeclaringHiddenPort.getName(),
-              pm.getPortName(), pm.operatorMeta.getOperator().getClass().getName(), pm.getPortName()));
-          }
-          // check locality constraints
-          DAG.Locality locality = sm.getLocality();
-          if (locality == DAG.Locality.THREAD_LOCAL) {
-            if (n.inputStreams.size() > 1) {
-              validateThreadLocal(n);
-            }
-          }
-
-          if (pm.portAnnotation != null && pm.portAnnotation.schemaRequired()) {
-            //since schema is required, the port attribute TUPLE_CLASS should be present
-            if (pm.attributes.get(PortContext.TUPLE_CLASS) == null) {
-              throw new ValidationException("Attribute " + PortContext.TUPLE_CLASS.getName() + " missing on port : " + n.name + "." + pm.getPortName());
-            }
-          }
-        }
-      }
-
-      for (OutputPortMeta pm: portMapping.outPortMap.values()) {
-        checkAttributeValueSerializable(pm.getAttributes(), n.getName() + "." + pm.getPortName());
-        if (!n.outputStreams.containsKey(pm)) {
-          if ((pm.portAnnotation != null && !pm.portAnnotation.optional()) && pm.classDeclaringHiddenPort == null) {
-            throw new ValidationException("Output port connection required: " + n.name + "." + pm.getPortName());
-          }
-        } else {
-          //port is connected
-          if (pm.classDeclaringHiddenPort != null) {
-            throw new ValidationException(String.format("Invalid port connected: %s.%s is hidden by %s.%s", pm.classDeclaringHiddenPort.getName(),
-              pm.getPortName(), pm.operatorMeta.getOperator().getClass().getName(), pm.getPortName()));
-          }
-          if (pm.portAnnotation != null && pm.portAnnotation.schemaRequired()) {
-            //since schema is required, the port attribute TUPLE_CLASS should be present
-            if (pm.attributes.get(PortContext.TUPLE_CLASS) == null) {
-              throw new ValidationException("Attribute " + PortContext.TUPLE_CLASS.getName() + " missing on port : " + n.name + "." + pm.getPortName());
-            }
-          }
-        }
-      }
-    }
-
-    ValidationContext validatonContext = new ValidationContext();
-    for (OperatorMeta n: operators.values()) {
-      if (n.nindex == null) {
-        findStronglyConnected(n, validatonContext);
-      }
-    }
-    if (!validatonContext.invalidCycles.isEmpty()) {
-      throw new ValidationException("Loops in graph: " + validatonContext.invalidCycles);
-    }
-
-    List<List<String>> invalidDelays = new ArrayList<>();
-    for (OperatorMeta n : rootOperators) {
-      findInvalidDelays(n, invalidDelays, new Stack<OperatorMeta>());
-    }
-    if (!invalidDelays.isEmpty()) {
-      throw new ValidationException("Invalid delays in graph: " + invalidDelays);
-    }
-
-    for (StreamMeta s: streams.values()) {
-      if (s.source == null) {
-        throw new ValidationException("Stream source not connected: " + s.getName());
-      }
-
-      if (s.sinks.isEmpty()) {
-        throw new ValidationException("Stream sink not connected: " + s.getName());
-      }
-    }
-
-    // Validate root operators are input operators
-    for (OperatorMeta om : this.rootOperators) {
-      if (!(om.getOperator() instanceof InputOperator)) {
-        throw new ValidationException(String.format("Root operator: %s is not a Input operator",
-            om.getName()));
-      }
-    }
-
-    // processing mode
-    Set<OperatorMeta> visited = Sets.newHashSet();
-    for (OperatorMeta om : this.rootOperators) {
-      validateProcessingMode(om, visited);
-    }
-
-    validateAffinityRules();
+    return issues;
   }
 
-  /**
-   * Pair of operator names to specify affinity rule
-   * The order of operators is not considered in this class
-   * i.e. OperatorPair("O1", "O2") is equal to OperatorPair("O2", "O1")
-   */
-  public static class OperatorPair extends Pair<String, String>
+
+  public void validate()
   {
-    private static final long serialVersionUID = 4636942499106381268L;
-
-    public OperatorPair(String first, String second)
-    {
-      super(first, second);
-    }
-
-    @Override
-    public boolean equals(Object obj)
-    {
-      if (obj instanceof OperatorPair) {
-        OperatorPair pairObj = (OperatorPair)obj;
-        // The pair objects are equal if same 2 operators are present in both pairs
-        // Order does not matter
-        return ((this.first.equals(pairObj.first)) && (this.second.equals(pairObj.second)))
-            || (this.first.equals(pairObj.second) && this.second.equals(pairObj.first));
-      }
-      return super.equals(obj);
-    }
-  }
-
-  /**
-   * validation for affinity rules validates following:
-   *  1. The operator names specified in affinity rule are part of the dag
-   *  2. Affinity rules do not conflict with anti-affinity rules directly or indirectly
-   *  3. Anti-affinity rules do not conflict with Stream Locality
-   *  4. Anti-affinity rules do not conflict with host-locality attribute
-   *  5. Affinity rule between non stream operators does not have Thread_Local locality
-   *  6. Affinity rules do not conflict with host-locality attribute
-   */
-  private void validateAffinityRules()
-  {
-    AffinityRulesSet affinityRuleSet = getAttributes().get(DAGContext.AFFINITY_RULES_SET);
-    if (affinityRuleSet == null || affinityRuleSet.getAffinityRules() == null) {
-      return;
-    }
-
-    Collection<AffinityRule> affinityRules = affinityRuleSet.getAffinityRules();
-
-    HashMap<String, Set<String>> containerAffinities = new HashMap<>();
-    HashMap<String, Set<String>> nodeAffinities = new HashMap<>();
-    HashMap<String, String> hostNamesMapping = new HashMap<>();
-
-    HashMap<OperatorPair, AffinityRule> affinities = new HashMap<>();
-    HashMap<OperatorPair, AffinityRule> antiAffinities = new HashMap<>();
-    HashMap<OperatorPair, AffinityRule> threadLocalAffinities = new HashMap<>();
-
-    List<String> operatorNames = new ArrayList<>();
-
-    for (OperatorMeta operator : getAllOperators()) {
-      operatorNames.add(operator.getName());
-      Set<String> containerSet = new HashSet<>();
-      containerSet.add(operator.getName());
-      containerAffinities.put(operator.getName(), containerSet);
-      Set<String> nodeSet = new HashSet<>();
-      nodeSet.add(operator.getName());
-      nodeAffinities.put(operator.getName(), nodeSet);
-
-      if (operator.getAttributes().get(OperatorContext.LOCALITY_HOST) != null) {
-        hostNamesMapping.put(operator.getName(), operator.getAttributes().get(OperatorContext.LOCALITY_HOST));
-      }
-    }
-
-    // Identify operators set as Regex and add to list
-    for (AffinityRule rule : affinityRules) {
-      if (rule.getOperatorRegex() != null) {
-        convertRegexToList(operatorNames, rule);
-      }
-    }
-    // Convert operators with list of operator to rules with operator pairs for validation
-    for (AffinityRule rule : affinityRules) {
-      if (rule.getOperatorsList() != null) {
-        List<String> list = rule.getOperatorsList();
-        for (int i = 0; i < list.size(); i++) {
-          for (int j = i + 1; j < list.size(); j++) {
-            OperatorPair pair = new OperatorPair(list.get(i), list.get(j));
-            if (rule.getType() == com.datatorrent.api.AffinityRule.Type.AFFINITY) {
-              addToMap(affinities, rule, pair);
-            } else {
-              addToMap(antiAffinities, rule, pair);
-            }
-          }
-        }
-      }
-    }
-
-    for (Entry<OperatorPair, AffinityRule> ruleEntry : affinities.entrySet()) {
-      OperatorPair pair = ruleEntry.getKey();
-      AffinityRule rule = ruleEntry.getValue();
-      if (hostNamesMapping.containsKey(pair.first) && hostNamesMapping.containsKey(pair.second) && !hostNamesMapping.get(pair.first).equals(hostNamesMapping.get(pair.second))) {
-        throw new ValidationException(String.format("Host Locality for operators: %s(host: %s) & %s(host: %s) conflicts with affinity rules", pair.first, hostNamesMapping.get(pair.first), pair.second, hostNamesMapping.get(pair.second)));
-      }
-      if (rule.getLocality() == Locality.THREAD_LOCAL) {
-        addToMap(threadLocalAffinities, rule, pair);
-      } else if (rule.getLocality() == Locality.CONTAINER_LOCAL) {
-        // Combine the sets
-        combineSets(containerAffinities, pair);
-        // Also update node list
-        combineSets(nodeAffinities, pair);
-      } else if (rule.getLocality() == Locality.NODE_LOCAL) {
-        combineSets(nodeAffinities, pair);
-      }
-    }
-
-
-    for (StreamMeta stream : getAllStreams()) {
-      String source = stream.source.getOperatorMeta().getName();
-      for (InputPortMeta sink : stream.sinks) {
-        String sinkOperator = sink.getOperatorMeta().getName();
-        OperatorPair pair = new OperatorPair(source, sinkOperator);
-        if (stream.getLocality() != null && stream.getLocality().ordinal() <= Locality.NODE_LOCAL.ordinal() && hostNamesMapping.containsKey(pair.first) && hostNamesMapping.containsKey(pair.second) && !hostNamesMapping.get(pair.first).equals(hostNamesMapping.get(pair.second))) {
-          throw new ValidationException(String.format("Host Locality for operators: %s(host: %s) & %s(host: %s) conflicts with stream locality", pair.first, hostNamesMapping.get(pair.first), pair.second, hostNamesMapping.get(pair.second)));
-        }
-        if (stream.locality == Locality.CONTAINER_LOCAL) {
-          combineSets(containerAffinities, pair);
-          combineSets(nodeAffinities, pair);
-        } else if (stream.locality == Locality.NODE_LOCAL) {
-          combineSets(nodeAffinities, pair);
-        }
-        if (affinities.containsKey(pair)) {
-          // Choose the lower bound on locality
-          AffinityRule rule = affinities.get(pair);
-          if (rule.getLocality() == Locality.THREAD_LOCAL) {
-            stream.setLocality(rule.getLocality());
-            threadLocalAffinities.remove(rule);
-            affinityRules.remove(rule);
-          }
-          if (stream.locality != null && rule.getLocality().ordinal() > stream.getLocality().ordinal()) {
-            // Remove the affinity rule from attributes, as it is redundant
-            affinityRules.remove(rule);
-          }
-        }
-      }
-    }
-
-    // Validate that all Thread local affinities were for stream connected operators
-    if (!threadLocalAffinities.isEmpty()) {
-      OperatorPair pair = threadLocalAffinities.keySet().iterator().next();
-      throw new ValidationException(String.format("Affinity rule specified THREAD_LOCAL affinity for operators %s & %s which are not connected by stream", pair.first, pair.second));
-    }
-
-    for (Entry<OperatorPair, AffinityRule> ruleEntry : antiAffinities.entrySet()) {
-      OperatorPair pair = ruleEntry.getKey();
-      AffinityRule rule = ruleEntry.getValue();
-
-      if (pair.first.equals(pair.second)) {
-        continue;
-      }
-      if (rule.getLocality() == Locality.CONTAINER_LOCAL) {
-        if (containerAffinities.get(pair.first).contains(pair.second)) {
-          throw new ValidationException(String.format("Anti Affinity rule for operators %s & %s conflicts with affinity rules or Stream locality", pair.first, pair.second));
-
-        }
-      } else if (rule.getLocality() == Locality.NODE_LOCAL) {
-        if (nodeAffinities.get(pair.first).contains(pair.second)) {
-          throw new ValidationException(String.format("Anti Affinity rule for operators %s & %s conflicts with affinity rules or Stream locality", pair.first, pair.second));
-        }
-        // Check host locality for both operators
-        // Check host attribute for all operators in node local set for both
-        // anti-affinity operators
-        String firstOperatorLocality = getHostLocality(nodeAffinities, pair.first, hostNamesMapping);
-        String secondOperatorLocality = getHostLocality(nodeAffinities, pair.second, hostNamesMapping);
-        if (firstOperatorLocality != null && secondOperatorLocality != null && firstOperatorLocality == secondOperatorLocality) {
-          throw new ValidationException(String.format("Host Locality for operators: %s(host: %s) & %s(host: %s) conflict with anti-affinity rules", pair.first, firstOperatorLocality, pair.second, secondOperatorLocality));
-        }
-      }
-    }
-  }
-
-  /**
-   * Get host mapping for an operator using affinity settings and host locality specified for operator
-   * @param nodeAffinities
-   * @param operator
-   * @param hostNamesMapping
-   * @return
-   */
-  public String getHostLocality(HashMap<String, Set<String>> nodeAffinities, String operator, HashMap<String, String> hostNamesMapping)
-  {
-    if (hostNamesMapping.containsKey(operator)) {
-      return hostNamesMapping.get(operator);
-    }
-
-    for (String op : nodeAffinities.get(operator)) {
-      if (hostNamesMapping.containsKey(op)) {
-        return hostNamesMapping.get(op);
-      }
-    }
-
-    return null;
-  }
-
-  /**
-   * Combine affinity sets for operators with affinity
-   * @param containerAffinities
-   * @param pair
-   */
-  public void combineSets(HashMap<String, Set<String>> containerAffinities, OperatorPair pair)
-  {
-    Set<String> set1 = containerAffinities.get(pair.first);
-    Set<String> set2 = containerAffinities.get(pair.second);
-    set1.addAll(set2);
-    containerAffinities.put(pair.first, set1);
-    containerAffinities.put(pair.second, set1);
-  }
-
-  /**
-   * Convert regex in Affinity Rule to list of operators
-   * Regex should match at least 2 operators, otherwise rule is not applied
-   * @param operatorNames
-   * @param rule
-   */
-  public void convertRegexToList(List<String> operatorNames, AffinityRule rule)
-  {
-    List<String> operators = new LinkedList<>();
-    Pattern p = Pattern.compile(rule.getOperatorRegex());
-    for (String name : operatorNames) {
-      if (p.matcher(name).matches()) {
-        operators.add(name);
-      }
-    }
-    rule.setOperatorRegex(null);
-    if (operators.size() <= 1) {
-      LOG.warn("Regex should match at least 2 operators to add affinity rule. Ignoring rule");
-    } else {
-      rule.setOperatorsList(operators);
-    }
-  }
-
-  /**
-   * Validates that operators in Affinity Rule are valid: Checks that operator names are part of the dag and adds them to map of rules
-   * @param affinitiesMap
-   * @param rule
-   * @param operators
-   */
-  private void addToMap(HashMap<OperatorPair, AffinityRule> affinitiesMap, AffinityRule rule, OperatorPair operators)
-  {
-    OperatorMeta operator1 = getOperatorMeta(operators.first);
-    OperatorMeta operator2 = getOperatorMeta(operators.second);
-    if (operator1 == null || operator2 == null) {
-      if (operator1 == null && operator2 == null) {
-        throw new ValidationException(String.format("Operators %s & %s specified in affinity rule are not part of the dag", operators.first, operators.second));
-      }
-      throw new ValidationException(String.format("Operator %s specified in affinity rule is not part of the dag", operator1 == null ? operators.first : operators.second));
-    }
-    affinitiesMap.put(operators, rule);
-  }
-
-  private void checkAttributeValueSerializable(AttributeMap attributes, String context)
-  {
-    StringBuilder sb = new StringBuilder();
-    String delim = "";
-    // Check all attributes got operator are serializable
-    for (Entry<Attribute<?>, Object> entry : attributes.entrySet()) {
-      if (entry.getValue() != null && !(entry.getValue() instanceof Serializable)) {
-        sb.append(delim).append(entry.getKey().getSimpleName());
-        delim = ", ";
-      }
-    }
-    if (sb.length() > 0) {
-      throw new ValidationException("Attribute value(s) for " + sb.toString() + " in " + context + " are not serializable");
+    List<ComponentValidator.ValidationIssue> issues = validate2();
+    if (issues.size() > 0) {
+      throw new ValidationException("Issues found during validation " + issues);
     }
   }
 
@@ -2225,79 +1889,6 @@ public class LogicalPlan implements Serializable, DAG
     return om.oioRoot;
   }
 
-  /**
-   * Check for cycles in the graph reachable from start node n. This is done by
-   * attempting to find strongly connected components.
-   *
-   * @see <a href="http://en.wikipedia.org/wiki/Tarjan%E2%80%99s_strongly_connected_components_algorithm">http://en.wikipedia.org/wiki/Tarjan%E2%80%99s_strongly_connected_components_algorithm</a>
-   *
-   * @param om
-   * @param ctx
-   */
-  public void findStronglyConnected(OperatorMeta om, ValidationContext ctx)
-  {
-    om.nindex = ctx.nodeIndex;
-    om.lowlink = ctx.nodeIndex;
-    ctx.nodeIndex++;
-    ctx.stack.push(om);
-    ctx.path.push(om);
-
-    // depth first successors traversal
-    for (StreamMeta downStream: om.outputStreams.values()) {
-      for (InputPortMeta sink: downStream.sinks) {
-        OperatorMeta successor = sink.getOperatorMeta();
-        if (successor == null) {
-          continue;
-        }
-        // check for self referencing node
-        if (om == successor) {
-          ctx.invalidCycles.add(Collections.singleton(om));
-        }
-        if (successor.nindex == null) {
-          // not visited yet
-          findStronglyConnected(successor, ctx);
-          om.lowlink = Math.min(om.lowlink, successor.lowlink);
-        } else if (ctx.stack.contains(successor)) {
-          om.lowlink = Math.min(om.lowlink, successor.nindex);
-          boolean isDelayLoop = false;
-          for (int i = ctx.stack.size(); i > 0; i--) {
-            OperatorMeta om2 = ctx.stack.get(i - 1);
-            if (om2.getOperator() instanceof Operator.DelayOperator) {
-              isDelayLoop = true;
-            }
-            if (om2 == successor) {
-              break;
-            }
-          }
-          if (!isDelayLoop) {
-            ctx.invalidLoopAt = successor;
-          }
-        }
-      }
-    }
-
-    // pop stack for all root operators
-    if (om.lowlink.equals(om.nindex)) {
-      Set<OperatorMeta> connectedSet = new LinkedHashSet<>(ctx.stack.size());
-      while (!ctx.stack.isEmpty()) {
-        OperatorMeta n2 = ctx.stack.pop();
-        connectedSet.add(n2);
-        if (n2 == om) {
-          break; // collected all connected operators
-        }
-      }
-      // strongly connected (cycle) if more than one node in stack
-      if (connectedSet.size() > 1) {
-        ctx.stronglyConnected.add(connectedSet);
-        if (connectedSet.contains(ctx.invalidLoopAt)) {
-          ctx.invalidCycles.add(connectedSet);
-        }
-      }
-    }
-    ctx.path.pop();
-
-  }
-
   public void findInvalidDelays(OperatorMeta om, List<List<String>> invalidDelays, Stack<OperatorMeta> stack)
   {
     stack.push(om);
@@ -2349,48 +1940,6 @@ public class LogicalPlan implements Serializable, DAG
       }
     }
     return downstreams;
-  }
-
-  private void validateProcessingMode(OperatorMeta om, Set<OperatorMeta> visited)
-  {
-    for (StreamMeta is : om.getInputStreams().values()) {
-      if (!visited.contains(is.getSource().getOperatorMeta())) {
-        // process all inputs first
-        return;
-      }
-    }
-    visited.add(om);
-    Operator.ProcessingMode pm = om.getValue(OperatorContext.PROCESSING_MODE);
-    for (StreamMeta os : om.outputStreams.values()) {
-      for (InputPortMeta sink: os.sinks) {
-        OperatorMeta sinkOm = sink.getOperatorMeta();
-        Operator.ProcessingMode sinkPm = sinkOm.attributes == null ? null : sinkOm.attributes.get(OperatorContext.PROCESSING_MODE);
-        if (sinkPm == null) {
-          // If the source processing mode is AT_MOST_ONCE and a processing mode is not specified for the sink then
-          // set it to AT_MOST_ONCE as well
-          if (Operator.ProcessingMode.AT_MOST_ONCE.equals(pm)) {
-            LOG.warn("Setting processing mode for operator {} to {}", sinkOm.getName(), pm);
-            sinkOm.getAttributes().put(OperatorContext.PROCESSING_MODE, pm);
-          } else if (Operator.ProcessingMode.EXACTLY_ONCE.equals(pm)) {
-            // If the source processing mode is EXACTLY_ONCE and a processing mode is not specified for the sink then
-            // throw a validation error
-            String msg = String.format("Processing mode for %s should be AT_MOST_ONCE for source %s/%s", sinkOm.getName(), om.getName(), pm);
-            throw new ValidationException(msg);
-          }
-        } else {
-          /*
-           * If the source processing mode is AT_MOST_ONCE and the processing mode for the sink is not AT_MOST_ONCE throw a validation error
-           * If the source processing mode is EXACTLY_ONCE and the processing mode for the sink is not AT_MOST_ONCE throw a validation error
-           */
-          if ((Operator.ProcessingMode.AT_MOST_ONCE.equals(pm) && (sinkPm != pm))
-              || (Operator.ProcessingMode.EXACTLY_ONCE.equals(pm) && !Operator.ProcessingMode.AT_MOST_ONCE.equals(sinkPm))) {
-            String msg = String.format("Processing mode %s/%s not valid for source %s/%s", sinkOm.getName(), sinkPm, om.getName(), pm);
-            throw new ValidationException(msg);
-          }
-        }
-        validateProcessingMode(sinkOm, visited);
-      }
-    }
   }
 
   public static void write(DAG dag, OutputStream os) throws IOException

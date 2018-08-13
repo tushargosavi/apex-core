@@ -18,26 +18,36 @@
  */
 package com.datatorrent.stram.plan.logical.validators;
 
+import java.util.ArrayList;
+import java.util.Collection;
 import java.util.HashMap;
+import java.util.List;
 import java.util.Map;
-
-import javax.validation.ValidationException;
 
 import com.datatorrent.api.DAG;
 import com.datatorrent.api.DAG.Locality;
 import com.datatorrent.api.Operator;
-import com.datatorrent.stram.plan.logical.DAGVisitor;
 import com.datatorrent.stram.plan.logical.LogicalPlan;
 
-public class ThreadLocalValidator implements DAGVisitor
+public class ThreadLocalValidator implements ComponentValidator<LogicalPlan>
 {
-
-  Map<LogicalPlan.OperatorMeta, Integer> oioRootMap = new HashMap<>();
+  private Map<LogicalPlan.OperatorMeta, Integer> oioRootMap = new HashMap<>();
+  private List<ValidationIssue> issues = new ArrayList<>();
 
   @Override
-  public void init(LogicalPlan dag)
+  public Collection<? extends ValidationIssue> validate(LogicalPlan dag)
   {
-
+    for (LogicalPlan.OperatorMeta om : dag.getAllOperators()) {
+      for (LogicalPlan.StreamMeta sm : om.getInputStreams().values()) {
+        DAG.Locality locality = sm.getLocality();
+        if (locality == DAG.Locality.THREAD_LOCAL) {
+          if (om.getInputStreams().size() > 1) {
+            validateThreadLocal(om);
+          }
+        }
+      }
+    }
+    return issues;
   }
 
   /**
@@ -58,7 +68,7 @@ public class ThreadLocalValidator implements DAGVisitor
     switch (om.getInputStreams().size()) {
       case 1:
         LogicalPlan.StreamMeta sm = om.getInputStreams().values().stream().findFirst().get();
-        if (sm.getLocality() == Locality.THREAD_LOCAL) {
+        if (sm.getLocality() == DAG.Locality.THREAD_LOCAL) {
           oioRoot = getOioRoot(sm.getSource().getOperatorMeta());
           oioRootMap.put(om, oioRoot);
         } else {
@@ -75,13 +85,7 @@ public class ThreadLocalValidator implements DAGVisitor
     return oioRootMap.get(om);
   }
 
-  @Override
-  public boolean visit(LogicalPlan.OperatorMeta om)
-  {
-    return validateThreadLocal(om);
-  }
-
-  public boolean validateThreadLocal(LogicalPlan.OperatorMeta om)
+  private void validateThreadLocal(LogicalPlan.OperatorMeta om)
   {
   /*
    * Validates OIO constraints for operators with more than one input streams
@@ -91,12 +95,12 @@ public class ThreadLocalValidator implements DAGVisitor
    */
     // already visited and validated
     if (oioRootMap.get(om) != null) {
-      return true;
+      return;
     }
 
     if (om.getOperator() instanceof Operator.DelayOperator) {
-      String msg = String.format("Locality %s invalid for delay operator %s", Locality.THREAD_LOCAL, om);
-      throw new ValidationException(msg);
+      String msg = String.format("Locality %s invalid for delay operator %s", DAG.Locality.THREAD_LOCAL, om);
+      issues.add(new ValidationIssue(om, "THREAD_LOCAL", msg));
     }
 
     for (LogicalPlan.StreamMeta sm: om.getInputStreams().values()) {
@@ -104,12 +108,12 @@ public class ThreadLocalValidator implements DAGVisitor
       if (sm.getLocality() != Locality.THREAD_LOCAL) {
         String msg = String.format("Locality %s invalid for operator %s with multiple input streams as at least one of the input streams is not %s",
             Locality.THREAD_LOCAL, om, Locality.THREAD_LOCAL);
-        throw new ValidationException(msg);
+        issues.add(new ValidationIssue(om, "THREAD_LOCAL", msg));
       }
 
       if (sm.getSource().getOperatorMeta().getOperator() instanceof Operator.DelayOperator) {
         String msg = String.format("Locality %s invalid for delay operator %s", DAG.Locality.THREAD_LOCAL, sm.getSource().getOperatorMeta());
-        throw new ValidationException(msg);
+        issues.add(new ValidationIssue(om, "THREAD_LOCAL", msg));
       }
 
       // gets oio root for input operator for the stream
@@ -119,7 +123,7 @@ public class ThreadLocalValidator implements DAGVisitor
       if (oioRoot != null && oioStreamRoot != oioRoot) {
         String msg = String.format("Locality %s invalid for operator %s with multiple input streams as at least one of the input streams is not originating from common OIO owner node",
             Locality.THREAD_LOCAL, om, Locality.THREAD_LOCAL);
-        throw new ValidationException(msg);
+        issues.add(new ValidationIssue(om, "THREAD_LOCAL", msg));
       }
 
       // populate oioRoot with root OIO node id for first stream, then validate for subsequent streams to have same root OIO node
@@ -127,16 +131,8 @@ public class ThreadLocalValidator implements DAGVisitor
         oioRoot = oioStreamRoot;
       } else if (oioRoot.intValue() != oioStreamRoot.intValue()) {
         String msg = String.format("Locality %s invalid for operator %s with multiple input streams as they origin from different owner OIO operators", sm.getLocality(), om);
-        throw new ValidationException(msg);
+        issues.add(new ValidationIssue(om, "THREAD_LOCAL", msg));
       }
     }
-
-    return true;
-  }
-
-  @Override
-  public boolean done()
-  {
-    return false;
   }
 }
