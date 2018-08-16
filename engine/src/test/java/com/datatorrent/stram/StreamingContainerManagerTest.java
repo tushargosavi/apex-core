@@ -39,6 +39,7 @@ import org.junit.Test;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
+import org.apache.apex.engine.ClusterProviderFactory;
 import org.apache.commons.lang.StringUtils;
 import org.apache.hadoop.io.DataInputByteBuffer;
 import org.apache.hadoop.io.DataOutputByteBuffer;
@@ -106,6 +107,7 @@ public class StreamingContainerManagerTest
   @Before
   public void setup()
   {
+    System.setProperty("providerType", "LOCAL");
     dag = StramTestSupport.createDAG(testMeta);
   }
 
@@ -182,7 +184,7 @@ public class StreamingContainerManagerTest
     Assert.assertEquals("number operators", 4, dag.getAllOperators().size());
     Assert.assertEquals("number root operators", 1, dag.getRootOperators().size());
 
-    StreamingContainerManager dnm = new StreamingContainerManager(dag);
+    StreamingContainerManager dnm = ClusterProviderFactory.getProvider().getStreamingContainerManager(dag);
     Assert.assertEquals("number containers", 2, dnm.getPhysicalPlan().getContainers().size());
 
     dnm.assignContainer(new ContainerResource(0, "container1Id", "host1", 1024, 0, null), InetSocketAddress.createUnresolved("host1", 9001));
@@ -284,7 +286,7 @@ public class StreamingContainerManagerTest
     MemoryStorageAgent msa = new MemoryStorageAgent();
     dag.setAttribute(OperatorContext.STORAGE_AGENT, msa);
 
-    StreamingContainerManager dnm = new StreamingContainerManager(dag);
+    StreamingContainerManager dnm = ClusterProviderFactory.getProvider().getStreamingContainerManager(dag);
     PhysicalPlan plan = dnm.getPhysicalPlan();
 
     Assert.assertEquals("number containers", 5, plan.getContainers().size());
@@ -423,7 +425,7 @@ public class StreamingContainerManagerTest
     dag.setAttribute(Context.DAGContext.STREAMING_WINDOW_SIZE_MILLIS, 50);
     dag.setAttribute(OperatorContext.TIMEOUT_WINDOW_COUNT, 1);
 
-    StreamingContainerManager scm = new StreamingContainerManager(dag);
+    StreamingContainerManager scm = ClusterProviderFactory.getProvider().getStreamingContainerManager(dag);
 
     PhysicalPlan plan = scm.getPhysicalPlan();
 
@@ -450,7 +452,7 @@ public class StreamingContainerManagerTest
 
     dag.setAttribute(OperatorContext.STORAGE_AGENT, new MemoryStorageAgent());
 
-    StreamingContainerManager scm = new StreamingContainerManager(dag);
+    StreamingContainerManager scm = ClusterProviderFactory.getProvider().getStreamingContainerManager(dag);
     scm.containerStartRequests.poll();
     scm.containerStartRequests.poll();
 
@@ -479,7 +481,7 @@ public class StreamingContainerManagerTest
     dag.getAttributes().put(LogicalPlan.CONTAINERS_MAX_COUNT, 2);
     dag.setAttribute(OperatorContext.STORAGE_AGENT, new MemoryStorageAgent());
 
-    StreamingContainerManager scm = new StreamingContainerManager(dag);
+    StreamingContainerManager scm = ClusterProviderFactory.getProvider().getStreamingContainerManager(dag);
     Assert.assertEquals("" + scm.containerStartRequests, 2, scm.containerStartRequests.size());
     scm.containerStartRequests.clear();
 
@@ -527,7 +529,7 @@ public class StreamingContainerManagerTest
     dag.getAttributes().put(LogicalPlan.CONTAINERS_MAX_COUNT, 2);
     dag.setAttribute(OperatorContext.STORAGE_AGENT, new MemoryStorageAgent());
 
-    StreamingContainerManager scm = new StreamingContainerManager(dag);
+    StreamingContainerManager scm = ClusterProviderFactory.getProvider().getStreamingContainerManager(dag);
     PhysicalPlan plan = scm.getPhysicalPlan();
     Assert.assertEquals(2, plan.getContainers().size());
 
@@ -591,7 +593,7 @@ public class StreamingContainerManagerTest
     dag.setOperatorAttribute(o1, OperatorContext.STATS_LISTENERS, Arrays.asList(new StatsListener[]{new PartitioningTest.PartitionLoadWatch()}));
     dag.setAttribute(OperatorContext.STORAGE_AGENT, new MemoryStorageAgent());
 
-    StreamingContainerManager scm = new StreamingContainerManager(dag);
+    StreamingContainerManager scm = ClusterProviderFactory.getProvider().getStreamingContainerManager(dag);
     PhysicalPlan plan = scm.getPhysicalPlan();
     Assert.assertEquals("number required containers", 1, plan.getContainers().size());
 
@@ -742,7 +744,7 @@ public class StreamingContainerManagerTest
     dag.addStream("stream1", o1.outport1, o2.input);
 
     dag.setAttribute(OperatorContext.STORAGE_AGENT, new MemoryStorageAgent());
-    StreamingContainerManager scm = new StreamingContainerManager(dag);
+    StreamingContainerManager scm = ClusterProviderFactory.getProvider().getStreamingContainerManager(dag);
 
     PhysicalPlan physicalPlan = scm.getPhysicalPlan();
     List<PTContainer> containers = physicalPlan.getContainers();
@@ -767,7 +769,7 @@ public class StreamingContainerManagerTest
     dag.addStream("stream1", o1.outport, o2.inport1);
 
     dag.setAttribute(OperatorContext.STORAGE_AGENT, new MemoryStorageAgent());
-    StreamingContainerManager scm = new StreamingContainerManager(dag);
+    StreamingContainerManager scm = ClusterProviderFactory.getProvider().getStreamingContainerManager(dag);
 
     PhysicalPlan physicalPlan = scm.getPhysicalPlan();
     List<PTContainer> containers = physicalPlan.getContainers();
@@ -796,7 +798,7 @@ public class StreamingContainerManagerTest
     dag.addStream("stream2", o2.outport1, o3.inport1);
 
     dag.setOperatorAttribute(o2, OperatorContext.PARTITIONER, new StatelessPartitioner<GenericTestOperator>(2));
-    StreamingContainerManager scm = new StreamingContainerManager(dag);
+    StreamingContainerManager scm = ClusterProviderFactory.getProvider().getStreamingContainerManager(dag);
 
     PhysicalPlan physicalPlan = scm.getPhysicalPlan();
     Map<PTContainer, MockContainer> mockContainers = new HashMap<>();

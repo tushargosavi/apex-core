@@ -20,24 +20,19 @@ package com.datatorrent.stram.client;
 
 import java.io.IOException;
 import java.net.InetAddress;
-import java.net.InetSocketAddress;
 import java.net.UnknownHostException;
 import java.security.PrivilegedExceptionAction;
-import java.util.List;
 import java.util.Properties;
 
 import org.junit.Assert;
 import org.junit.Test;
 
 import org.apache.hadoop.conf.Configuration;
-import org.apache.hadoop.fs.CommonConfigurationKeysPublic;
 import org.apache.hadoop.fs.FileSystem;
 import org.apache.hadoop.fs.Path;
 import org.apache.hadoop.security.UserGroupInformation;
-import org.apache.hadoop.yarn.conf.YarnConfiguration;
 
 import com.datatorrent.stram.security.StramUserLogin;
-import com.datatorrent.stram.util.ConfigUtils;
 
 
 /**
@@ -97,7 +92,7 @@ public class StramClientUtilsTest
     Assert.assertEquals("1111 15129 xxx", conf.get("script.result"));
   }
 
-  private String getHostString(String host) throws UnknownHostException
+  protected String getHostString(String host) throws UnknownHostException
   {
     InetAddress address = InetAddress.getByName(host);
     if (address.isAnyLocalAddress() || address.isLoopbackAddress()) {
@@ -105,59 +100,6 @@ public class StramClientUtilsTest
     } else {
       return address.getHostName();
     }
-  }
-
-  @Test
-  public void testRMWebAddress() throws UnknownHostException
-  {
-    Configuration conf = new YarnConfiguration(new Configuration(false))
-    {
-      @Override
-      public InetSocketAddress getSocketAddr(String name, String defaultAddress, int defaultPort)
-      {
-        String rmId = get(ConfigUtils.RM_HA_ID);
-        if (rmId != null) {
-          name = name + "." + rmId;
-        }
-        return super.getSocketAddr(name, defaultAddress, defaultPort);
-      }
-    };
-
-    // basic test
-    conf.setBoolean(CommonConfigurationKeysPublic.HADOOP_SSL_ENABLED_KEY, false);
-    conf.set(YarnConfiguration.RM_WEBAPP_ADDRESS, "192.168.1.1:8032");
-    conf.set(YarnConfiguration.RM_WEBAPP_HTTPS_ADDRESS, "192.168.1.2:8032");
-    Assert.assertEquals(getHostString("192.168.1.1") + ":8032", StramClientUtils.getSocketConnectString(StramClientUtils.getRMWebAddress(conf, null)));
-    List<InetSocketAddress> addresses = StramClientUtils.getRMAddresses(conf);
-    Assert.assertEquals(1, addresses.size());
-    Assert.assertEquals(getHostString("192.168.1.1") + ":8032", StramClientUtils.getSocketConnectString(addresses.get(0)));
-
-    conf.setBoolean(CommonConfigurationKeysPublic.HADOOP_SSL_ENABLED_KEY, true);
-    Assert.assertEquals(getHostString("192.168.1.2") + ":8032", StramClientUtils.getSocketConnectString(StramClientUtils.getRMWebAddress(conf, null)));
-    addresses = StramClientUtils.getRMAddresses(conf);
-    Assert.assertEquals(1, addresses.size());
-    Assert.assertEquals(getHostString("192.168.1.2") + ":8032", StramClientUtils.getSocketConnectString(addresses.get(0)));
-
-    // set localhost if host is unknown
-    conf.set(YarnConfiguration.RM_WEBAPP_HTTPS_ADDRESS, "someunknownhost.:8032");
-
-    Assert.assertEquals(InetAddress.getLocalHost().getCanonicalHostName() + ":8032", StramClientUtils.getSocketConnectString(StramClientUtils.getRMWebAddress(conf, null)));
-
-    // set localhost
-    conf.set(YarnConfiguration.RM_WEBAPP_HTTPS_ADDRESS, "127.0.0.1:8032");
-    Assert.assertEquals(InetAddress.getLocalHost().getCanonicalHostName() + ":8032", StramClientUtils.getSocketConnectString(StramClientUtils.getRMWebAddress(conf, null)));
-
-    // test when HA is enabled
-    conf.setBoolean(ConfigUtils.RM_HA_ENABLED, true);
-    conf.set(YarnConfiguration.RM_WEBAPP_HTTPS_ADDRESS + ".rm1", "192.168.1.1:8032");
-    conf.set(YarnConfiguration.RM_WEBAPP_HTTPS_ADDRESS + ".rm2", "192.168.1.2:8032");
-    conf.set("yarn.resourcemanager.ha.rm-ids", "rm1,rm2");
-    Assert.assertEquals(getHostString("192.168.1.1") + ":8032", StramClientUtils.getSocketConnectString(StramClientUtils.getRMWebAddress(conf, "rm1")));
-    Assert.assertEquals(getHostString("192.168.1.2") + ":8032", StramClientUtils.getSocketConnectString(StramClientUtils.getRMWebAddress(conf, "rm2")));
-    addresses = StramClientUtils.getRMAddresses(conf);
-    Assert.assertEquals(2, addresses.size());
-    Assert.assertEquals(getHostString("192.168.1.1") + ":8032", StramClientUtils.getSocketConnectString(addresses.get(0)));
-    Assert.assertEquals(getHostString("192.168.1.2") + ":8032", StramClientUtils.getSocketConnectString(addresses.get(1)));
   }
 
   /**
@@ -168,7 +110,7 @@ public class StramClientUtilsTest
   @Test
   public void getApexDFSRootDirLegacy() throws IOException
   {
-    Configuration conf = new YarnConfiguration(new Configuration(false));
+    Configuration conf = new Configuration(false);
     conf.set(StramClientUtils.DT_DFS_ROOT_DIR, "/a/b/c");
     conf.setBoolean(StramUserLogin.DT_APP_PATH_IMPERSONATED, false);
 
@@ -185,7 +127,7 @@ public class StramClientUtilsTest
   @Test
   public void getApexDFSRootDirAbsPath() throws IOException
   {
-    Configuration conf = new YarnConfiguration(new Configuration(false));
+    Configuration conf = new Configuration(false);
     conf.set(StramClientUtils.APEX_APP_DFS_ROOT_DIR, "/x/y/z");
     conf.setBoolean(StramUserLogin.DT_APP_PATH_IMPERSONATED, false);
 
@@ -204,7 +146,7 @@ public class StramClientUtilsTest
   @Test
   public void getApexDFSRootDirScheme() throws IOException
   {
-    Configuration conf = new YarnConfiguration(new Configuration(false));
+    Configuration conf = new Configuration(false);
     conf.set(StramClientUtils.APEX_APP_DFS_ROOT_DIR, "file:/p/q/r");
     conf.setBoolean(StramUserLogin.DT_APP_PATH_IMPERSONATED, false);
 
@@ -224,7 +166,7 @@ public class StramClientUtilsTest
   @Test
   public void getApexDFSRootDirWithVar() throws IOException, InterruptedException
   {
-    final Configuration conf = new YarnConfiguration(new Configuration(false));
+    final Configuration conf = new Configuration(false);
     conf.set(StramClientUtils.APEX_APP_DFS_ROOT_DIR, "/x/%USER_NAME%/z");
     conf.setBoolean(StramUserLogin.DT_APP_PATH_IMPERSONATED, false);
 
@@ -254,7 +196,7 @@ public class StramClientUtilsTest
   @Test
   public void getApexDFSRootDirWithSchemeAndVar() throws IOException, InterruptedException
   {
-    final Configuration conf = new YarnConfiguration(new Configuration(false));
+    final Configuration conf = new Configuration(false);
     conf.set(StramClientUtils.APEX_APP_DFS_ROOT_DIR, "file:/x/%USER_NAME%/z");
     conf.setBoolean(StramUserLogin.DT_APP_PATH_IMPERSONATED, true);
 
@@ -284,7 +226,7 @@ public class StramClientUtilsTest
   @Test
   public void getApexDFSRootDirRelPath() throws IOException, InterruptedException
   {
-    final Configuration conf = new YarnConfiguration(new Configuration(false));
+    final Configuration conf = new Configuration(false);
     conf.set(StramClientUtils.APEX_APP_DFS_ROOT_DIR, "apex");
     conf.setBoolean(StramUserLogin.DT_APP_PATH_IMPERSONATED, false);
 
@@ -314,7 +256,7 @@ public class StramClientUtilsTest
   @Test
   public void getApexDFSRootDirAbsPathAndVar() throws IOException, InterruptedException
   {
-    final Configuration conf = new YarnConfiguration(new Configuration(false));
+    final Configuration conf = new Configuration(false);
     conf.set(StramClientUtils.APEX_APP_DFS_ROOT_DIR, "/x/%USER_NAME%/z");
     conf.setBoolean(StramUserLogin.DT_APP_PATH_IMPERSONATED, true);
 
@@ -344,7 +286,7 @@ public class StramClientUtilsTest
   @Test
   public void getApexDFSRootDirRelPathAndImpersonation() throws IOException, InterruptedException
   {
-    final Configuration conf = new YarnConfiguration(new Configuration(false));
+    final Configuration conf = new Configuration(false);
     conf.set(StramClientUtils.APEX_APP_DFS_ROOT_DIR, "apex");
     conf.setBoolean(StramUserLogin.DT_APP_PATH_IMPERSONATED, true);
 
@@ -374,7 +316,7 @@ public class StramClientUtilsTest
   @Test
   public void getApexDFSRootDirBlankPathAndImpersonation() throws IOException, InterruptedException
   {
-    final Configuration conf = new YarnConfiguration(new Configuration(false));
+    final Configuration conf = new Configuration(false);
     conf.setBoolean(StramUserLogin.DT_APP_PATH_IMPERSONATED, true);
 
     final FileSystem fs = FileSystem.newInstance(conf);
@@ -404,7 +346,7 @@ public class StramClientUtilsTest
   @Test
   public void getApexDFSRootDirRelPathVarAndImpersonation() throws IOException, InterruptedException
   {
-    final Configuration conf = new YarnConfiguration(new Configuration(false));
+    final Configuration conf = new Configuration(false);
     conf.set(StramClientUtils.APEX_APP_DFS_ROOT_DIR, "apex/%USER_NAME%/xyz");
     conf.setBoolean(StramUserLogin.DT_APP_PATH_IMPERSONATED, true);
 

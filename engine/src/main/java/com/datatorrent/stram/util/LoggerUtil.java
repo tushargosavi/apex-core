@@ -33,12 +33,12 @@ import java.util.regex.Pattern;
 import javax.annotation.Nonnull;
 import javax.annotation.Nullable;
 
+import org.apache.apex.engine.ClusterProviderFactory;
+import org.apache.apex.engine.api.ClusterProvider;
+import org.apache.apex.engine.api.Configuration;
+import org.apache.apex.engine.api.Settings;
 import org.apache.apex.log.LogFileInformation;
 
-import org.apache.hadoop.yarn.api.ApplicationConstants.Environment;
-import org.apache.hadoop.yarn.api.records.ApplicationId;
-import org.apache.hadoop.yarn.api.records.ContainerId;
-import org.apache.hadoop.yarn.util.ConverterUtils;
 import org.apache.log4j.Appender;
 import org.apache.log4j.Category;
 import org.apache.log4j.FileAppender;
@@ -550,17 +550,18 @@ public class LoggerUtil
     String value = StramClientUtils.getHostName();
     MDC.put("apex.node", value == null ? "unknown" : value);
 
-    value = System.getenv(Environment.USER.key());
+    Configuration configuration = ClusterProviderFactory.getProvider().getConfiguration();
+
+    value = configuration.get(Settings.USER);
     if (value != null) {
       MDC.put("apex.user", value);
     }
 
-    value = System.getenv(Environment.CONTAINER_ID.name());
+    value = configuration.get(Settings.CONTAINER_ID);
     if (value != null) {
-      ContainerId containerId = ConverterUtils.toContainerId(value);
-      ApplicationId applicationId = containerId.getApplicationAttemptId().getApplicationId();
-      MDC.put("apex.containerId", containerId.toString());
-      MDC.put("apex.applicationId", applicationId.toString());
+      ClusterProvider provider = ClusterProviderFactory.getProvider();
+      MDC.put("apex.containerId", provider.getContainerId(value));
+      MDC.put("apex.applicationId", provider.getApplicationId(value));
     }
 
     value = System.getProperty(APPLICATION_NAME.getLongName());

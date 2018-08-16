@@ -31,6 +31,8 @@ import org.junit.Before;
 import org.junit.Rule;
 import org.junit.Test;
 
+import org.apache.apex.engine.ClusterProviderFactory;
+
 import com.google.common.collect.Sets;
 
 import com.datatorrent.api.AffinityRule;
@@ -57,7 +59,6 @@ import com.datatorrent.stram.plan.physical.PlanModifier;
 import com.datatorrent.stram.support.StramTestSupport;
 import com.datatorrent.stram.support.StramTestSupport.TestMeta;
 
-
 public class LogicalPlanModificationTest
 {
   private LogicalPlan dag;
@@ -68,6 +69,7 @@ public class LogicalPlanModificationTest
   @Before
   public void setup()
   {
+    System.setProperty("providerType", "LOCAL");
     dag = StramTestSupport.createDAG(testMeta);
   }
 
@@ -364,7 +366,7 @@ public class LogicalPlanModificationTest
   {
     dag.setAttribute(OperatorContext.STORAGE_AGENT, agent);
 
-    StreamingContainerManager dnm = new StreamingContainerManager(dag);
+    StreamingContainerManager dnm = ClusterProviderFactory.getProvider().getStreamingContainerManager(dag);
     Assert.assertEquals("" + dnm.containerStartRequests, dnm.containerStartRequests.size(), 0);
 
 

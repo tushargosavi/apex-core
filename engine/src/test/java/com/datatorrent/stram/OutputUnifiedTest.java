@@ -26,6 +26,8 @@ import org.junit.Before;
 import org.junit.Rule;
 import org.junit.Test;
 
+import org.apache.apex.engine.ClusterProviderFactory;
+
 import com.datatorrent.api.Context.OperatorContext;
 import com.datatorrent.api.Context.PortContext;
 import com.datatorrent.api.Operator;
@@ -55,6 +57,7 @@ public class OutputUnifiedTest
   @Before
   public void setup()
   {
+    System.setProperty("providerType", "LOCAL");
     dag = StramTestSupport.createDAG(testMeta);
     dag.setAttribute(OperatorContext.STORAGE_AGENT, new MemoryStorageAgent());
   }
@@ -76,7 +79,7 @@ public class OutputUnifiedTest
     dag.addStream("s1", i1.output, op1.inport1);
     dag.addStream("s2", op1.outport1, op2.inport);
 
-    StreamingContainerManager scm = new StreamingContainerManager(dag);
+    StreamingContainerManager scm = ClusterProviderFactory.getProvider().getStreamingContainerManager(dag);
     PhysicalPlan physicalPlan = scm.getPhysicalPlan();
     List<PTContainer> containers = physicalPlan.getContainers();
     Assert.assertEquals("Number of containers", 5, containers.size());
@@ -107,7 +110,7 @@ public class OutputUnifiedTest
     dag.addStream("s1", i1.output, op1.inport1);
     dag.addStream("s2", op1.outport1, op2.inport);
 
-    StreamingContainerManager scm = new StreamingContainerManager(dag);
+    StreamingContainerManager scm = ClusterProviderFactory.getProvider().getStreamingContainerManager(dag);
     PhysicalPlan physicalPlan = scm.getPhysicalPlan();
     List<PTContainer> containers = physicalPlan.getContainers();
     Assert.assertEquals("Number of containers", 6, containers.size());
@@ -138,7 +141,7 @@ public class OutputUnifiedTest
     dag.addStream("s1", i1.output, op1.inport1);
     dag.addStream("s2", op1.outport1, op2.inport);
 
-    StreamingContainerManager scm = new StreamingContainerManager(dag);
+    StreamingContainerManager scm = ClusterProviderFactory.getProvider().getStreamingContainerManager(dag);
     PhysicalPlan physicalPlan = scm.getPhysicalPlan();
     List<PTContainer> containers = physicalPlan.getContainers();
     Assert.assertEquals("Number of containers", 5, containers.size());

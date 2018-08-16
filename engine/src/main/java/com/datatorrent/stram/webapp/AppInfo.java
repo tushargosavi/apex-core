@@ -26,8 +26,6 @@ import javax.xml.bind.annotation.XmlAccessType;
 import javax.xml.bind.annotation.XmlAccessorType;
 import javax.xml.bind.annotation.XmlRootElement;
 
-import org.apache.hadoop.yarn.util.Times;
-
 import com.datatorrent.api.Attribute;
 import com.datatorrent.api.Attribute.AttributeMap;
 import com.datatorrent.api.AutoMetric;
@@ -219,12 +217,12 @@ public class AppInfo
    */
   public AppInfo(StramAppContext context)
   {
-    this.appId = context.getApplicationID().toString();
+    this.appId = context.getApplicationID();
     this.name = context.getApplicationName();
     this.docLink = context.getApplicationDocLink();
     this.user = context.getUser().toString();
     this.startTime = context.getStartTime();
-    this.elapsedTime = Times.elapsed(this.startTime, 0);
+    this.elapsedTime = context.getElapsedTime();
     this.appPath = context.getApplicationPath();
     this.appMasterTrackingUrl = context.getAppMasterTrackingUrl();
     this.stats = context.getStats();

@@ -21,6 +21,7 @@ package com.datatorrent.stram.engine;
 import java.io.File;
 
 import org.junit.Assert;
+import org.junit.Before;
 import org.junit.Test;
 
 import com.datatorrent.api.Context;
@@ -36,6 +37,12 @@ import com.datatorrent.stram.support.StramTestSupport;
 
 public class SliderTest
 {
+  @Before
+  public void setup()
+  {
+    System.setProperty("providerType", "LOCAL");
+  }
+
   public static class Input extends BaseOperator implements InputOperator
   {
     private boolean emit;

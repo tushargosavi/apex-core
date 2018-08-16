@@ -22,9 +22,6 @@ import java.util.List;
 import java.util.Map;
 
 import org.apache.hadoop.classification.InterfaceAudience;
-import org.apache.hadoop.yarn.api.records.ApplicationAttemptId;
-import org.apache.hadoop.yarn.api.records.ApplicationId;
-import org.apache.hadoop.yarn.util.Clock;
 
 import com.datatorrent.api.Attribute.AttributeMap.AttributeInitializer;
 import com.datatorrent.api.Context;
@@ -41,15 +38,17 @@ import com.datatorrent.stram.webapp.AppInfo;
 @InterfaceAudience.Private
 public interface StramAppContext extends Context
 {
-  ApplicationId getApplicationID();
+  String getApplicationID();
 
-  ApplicationAttemptId getApplicationAttemptId();
+  int getApplicationAttemptId();
 
   String getApplicationName();
 
   String getApplicationDocLink();
 
   long getStartTime();
+
+  long getElapsedTime();
 
   String getApplicationPath();
 
@@ -62,8 +61,6 @@ public interface StramAppContext extends Context
   String getAppMasterTrackingUrl();
 
   CharSequence getUser();
-
-  Clock getClock();
 
   AppInfo.AppStats getStats();
 

@@ -45,8 +45,10 @@ import org.w3c.dom.Node;
 import org.w3c.dom.NodeList;
 import org.xml.sax.InputSource;
 
+import org.apache.apex.engine.support.GenericExceptionHandler;
+import org.apache.apex.engine.support.JAXBContextResolver;
 import org.apache.hadoop.conf.Configuration;
-import org.apache.hadoop.yarn.webapp.GenericExceptionHandler;
+//import org.apache.hadoop.yarn.webapp.GenericExceptionHandler;
 
 import com.google.inject.Guice;
 import com.google.inject.Injector;
@@ -70,7 +72,7 @@ import com.datatorrent.stram.plan.logical.requests.LogicalPlanRequest;
 import com.datatorrent.stram.plan.logical.requests.SetOperatorPropertyRequest;
 import com.datatorrent.stram.support.StramTestSupport;
 import com.datatorrent.stram.support.StramTestSupport.TestAppContext;
-import com.datatorrent.stram.webapp.StramWebApp.JAXBContextResolver;
+//import com.datatorrent.stram.webapp.StramWebApp.JAXBContextResolver;
 import com.datatorrent.stram.webapp.StramWebServicesTest.GuiceServletConfig.DummyStreamingContainerManager;
 
 import static org.junit.Assert.assertEquals;
@@ -96,6 +98,7 @@ public class StramWebServicesTest extends JerseyTest
 
   public static class GuiceServletConfig extends com.google.inject.servlet.GuiceServletContextListener
   {
+    // TODO: Make this class extend a local implementation in future
     // new instance needs to be created for each test
     public static class DummyStreamingContainerManager extends StreamingContainerManager
     {
@@ -104,6 +107,12 @@ public class StramWebServicesTest extends JerseyTest
       DummyStreamingContainerManager(LogicalPlan dag)
       {
         super(dag);
+      }
+
+      @Override
+      public ContainerInfo getAppMasterContainerInfo()
+      {
+        return null;
       }
 
       @Override
@@ -165,6 +174,7 @@ public class StramWebServicesTest extends JerseyTest
   @Override
   public void setUp() throws Exception
   {
+    System.setProperty("providerType", "LOCAL");
     super.setUp();
   }
 
@@ -424,8 +434,7 @@ public class StramWebServicesTest extends JerseyTest
       String name, long startTime, long elapsedTime)
   {
 
-    StramTestSupport.checkStringMatch("id", ctx.getApplicationID()
-        .toString(), id);
+    StramTestSupport.checkStringMatch("id", ctx.getApplicationID(), id);
     StramTestSupport.checkStringMatch("user", ctx.getUser().toString(),
         user);
     StramTestSupport.checkStringMatch("name", ctx.getApplicationName(),

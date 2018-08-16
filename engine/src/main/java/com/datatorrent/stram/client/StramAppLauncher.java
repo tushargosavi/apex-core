@@ -30,7 +30,6 @@ import java.net.URL;
 import java.net.URLClassLoader;
 import java.net.URLConnection;
 import java.util.ArrayList;
-import java.util.Arrays;
 import java.util.Collection;
 import java.util.Collections;
 import java.util.LinkedHashSet;
@@ -53,9 +52,6 @@ import org.apache.hadoop.conf.Configuration;
 import org.apache.hadoop.fs.FSDataInputStream;
 import org.apache.hadoop.fs.FileSystem;
 import org.apache.hadoop.fs.Path;
-import org.apache.hadoop.security.UserGroupInformation;
-import org.apache.hadoop.yarn.api.records.ApplicationId;
-import org.apache.hadoop.yarn.conf.YarnConfiguration;
 import org.apache.tools.ant.DirectoryScanner;
 
 import com.google.common.collect.Lists;
@@ -85,7 +81,7 @@ import com.datatorrent.stram.security.StramUserLogin;
  *
  * @since 0.3.2
  */
-public class StramAppLauncher
+public abstract class StramAppLauncher
 {
   public static final String CLASSPATH_RESOLVERS_KEY_NAME = StreamingApplication.DT_PREFIX + "classpath.resolvers";
   public static final String LIBJARS_CONF_KEY_NAME = "_apex.libjars";
@@ -99,11 +95,11 @@ public class StramAppLauncher
   private File jarFile;
   private FileSystem fs;
   private String recoveryAppName;
-  private final LogicalPlanConfiguration propertiesBuilder;
+  protected final LogicalPlanConfiguration propertiesBuilder;
   private final Configuration conf;
   private final List<AppFactory> appResourceList = new ArrayList<>();
   private LinkedHashSet<URL> launchDependencies;
-  private LinkedHashSet<File> deployJars;
+  protected LinkedHashSet<File> deployJars;
   private final StringWriter mvnBuildClasspathOutput = new StringWriter();
 
   private ClassLoader initialClassLoader;
@@ -565,7 +561,7 @@ public class StramAppLauncher
     Thread.currentThread().setContextClassLoader(initialClassLoader);
   }
 
-  private void setTokenRefreshCredentials(LogicalPlan dag, Configuration conf) throws IOException
+  protected void setTokenRefreshCredentials(LogicalPlan dag, Configuration conf) throws IOException
   {
     String principal = conf.get(StramClientUtils.TOKEN_REFRESH_PRINCIPAL, StramUserLogin.getPrincipal());
     String keytabPath = conf.get(StramClientUtils.TOKEN_REFRESH_KEYTAB, conf.get(StramClientUtils.KEY_TAB_FILE));
@@ -591,77 +587,8 @@ public class StramAppLauncher
     }
   }
 
-  /**
-   * Submit application to the cluster and return the app id.
-   * Sets the context class loader for application dependencies.
-   *
-   * @param appConfig
-   * @return ApplicationId
-   * @throws Exception
-   */
-  public ApplicationId launchApp(AppFactory appConfig) throws Exception
-  {
-    loadDependencies();
-    Configuration conf = propertiesBuilder.conf;
-    conf.setEnum(StreamingApplication.ENVIRONMENT, StreamingApplication.Environment.CLUSTER);
-    LogicalPlan dag = appConfig.createApp(propertiesBuilder);
-    if (UserGroupInformation.isSecurityEnabled()) {
-      long hdfsTokenMaxLifeTime = conf.getLong(StramClientUtils.DT_HDFS_TOKEN_MAX_LIFE_TIME, conf.getLong(StramClientUtils.HDFS_TOKEN_MAX_LIFE_TIME, StramClientUtils.DELEGATION_TOKEN_MAX_LIFETIME_DEFAULT));
-      dag.setAttribute(LogicalPlan.HDFS_TOKEN_LIFE_TIME, hdfsTokenMaxLifeTime);
-      LOG.debug("HDFS token life time {}", hdfsTokenMaxLifeTime);
-      long hdfsTokenRenewInterval = conf.getLong(StramClientUtils.DT_HDFS_TOKEN_RENEW_INTERVAL, conf.getLong(StramClientUtils.HDFS_TOKEN_RENEW_INTERVAL, StramClientUtils.DELEGATION_TOKEN_RENEW_INTERVAL_DEFAULT));
-      dag.setAttribute(LogicalPlan.HDFS_TOKEN_RENEWAL_INTERVAL, hdfsTokenRenewInterval);
-      LOG.debug("HDFS token renew interval {}", hdfsTokenRenewInterval);
-      long rmTokenMaxLifeTime = conf.getLong(StramClientUtils.DT_RM_TOKEN_MAX_LIFE_TIME, conf.getLong(YarnConfiguration.DELEGATION_TOKEN_MAX_LIFETIME_KEY, YarnConfiguration.DELEGATION_TOKEN_MAX_LIFETIME_DEFAULT));
-      dag.setAttribute(LogicalPlan.RM_TOKEN_LIFE_TIME, rmTokenMaxLifeTime);
-      LOG.debug("RM token life time {}", rmTokenMaxLifeTime);
-      long rmTokenRenewInterval = conf.getLong(StramClientUtils.DT_RM_TOKEN_RENEW_INTERVAL, conf.getLong(YarnConfiguration.DELEGATION_TOKEN_RENEW_INTERVAL_KEY, YarnConfiguration.DELEGATION_TOKEN_RENEW_INTERVAL_DEFAULT));
-      dag.setAttribute(LogicalPlan.RM_TOKEN_RENEWAL_INTERVAL, rmTokenRenewInterval);
-      LOG.debug("RM token renew interval {}", rmTokenRenewInterval);
-      setTokenRefreshCredentials(dag, conf);
-    }
-    String tokenRefreshFactor = conf.get(StramClientUtils.TOKEN_ANTICIPATORY_REFRESH_FACTOR);
-    if (tokenRefreshFactor != null && tokenRefreshFactor.trim().length() > 0) {
-      double refreshFactor = Double.parseDouble(tokenRefreshFactor);
-      dag.setAttribute(LogicalPlan.TOKEN_REFRESH_ANTICIPATORY_FACTOR, refreshFactor);
-      LOG.debug("Token refresh anticipatory factor {}", refreshFactor);
-    }
-    StramClient client = new StramClient(conf, dag);
-    try {
-      client.start();
-      LinkedHashSet<String> libjars = Sets.newLinkedHashSet();
-      String libjarsCsv = conf.get(LIBJARS_CONF_KEY_NAME);
-      if (libjarsCsv != null) {
-        String[] jars = StringUtils.splitByWholeSeparator(libjarsCsv, StramClient.LIB_JARS_SEP);
-        libjars.addAll(Arrays.asList(jars));
-      }
-      if (deployJars != null) {
-        for (File deployJar : deployJars) {
-          libjars.add(deployJar.getAbsolutePath());
-        }
-      }
-
-      client.setResources(libjars);
-      client.setFiles(conf.get(FILES_CONF_KEY_NAME));
-      client.setArchives(conf.get(ARCHIVES_CONF_KEY_NAME));
-      client.setOriginalAppId(conf.get(ORIGINAL_APP_ID));
-      client.setQueueName(conf.get(QUEUE_NAME));
-      String tags = conf.get(TAGS);
-      if (tags != null) {
-        for (String tag : tags.split(",")) {
-          client.addTag(tag.trim());
-        }
-      }
-      client.startApplication();
-      return client.getApplicationReport().getApplicationId();
-    } finally {
-      client.stop();
-    }
-  }
-
   public List<AppFactory> getBundledTopologies()
   {
     return Collections.unmodifiableList(this.appResourceList);
   }
-
 }

@@ -25,6 +25,8 @@ import org.junit.Test;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
+import org.apache.apex.engine.ClusterProviderFactory;
+
 import com.datatorrent.api.Context;
 import com.datatorrent.stram.engine.GenericTestOperator;
 import com.datatorrent.stram.plan.logical.LogicalPlan;
@@ -62,7 +64,7 @@ public class LatencyTest
 
     dag.addStream("o1.output1", o1.outport1, o3.inport1);
     dag.addStream("o2.output1", o2.outport1, o3.inport2);
-    scm = new StreamingContainerManager(dag);
+    scm = ClusterProviderFactory.getProvider().getStreamingContainerManager(dag);
     PhysicalPlan plan = scm.getPhysicalPlan();
     o1p1 = plan.getOperators(dag.getMeta(o1)).get(0);
     o2p1 = plan.getOperators(dag.getMeta(o2)).get(0);

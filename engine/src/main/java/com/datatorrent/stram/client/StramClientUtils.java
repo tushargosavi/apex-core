@@ -31,8 +31,6 @@ import java.net.URISyntaxException;
 import java.net.URL;
 import java.net.UnknownHostException;
 import java.security.PrivilegedExceptionAction;
-import java.util.ArrayList;
-import java.util.EnumSet;
 import java.util.HashMap;
 import java.util.Iterator;
 import java.util.List;
@@ -48,45 +46,24 @@ import javax.script.ScriptException;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
+import org.apache.apex.engine.ClusterProviderFactory;
+import org.apache.apex.engine.api.Settings;
 import org.apache.commons.io.FileUtils;
 import org.apache.commons.lang3.StringEscapeUtils;
 import org.apache.commons.lang3.StringUtils;
 import org.apache.commons.lang3.exception.ExceptionUtils;
 import org.apache.hadoop.conf.Configuration;
-import org.apache.hadoop.fs.CommonConfigurationKeysPublic;
 import org.apache.hadoop.fs.FileSystem;
 import org.apache.hadoop.fs.Path;
-import org.apache.hadoop.io.Text;
-import org.apache.hadoop.net.NetUtils;
-import org.apache.hadoop.security.Credentials;
-import org.apache.hadoop.security.SecurityUtil;
 import org.apache.hadoop.security.UserGroupInformation;
-import org.apache.hadoop.security.token.Token;
-import org.apache.hadoop.yarn.api.ApplicationClientProtocol;
-import org.apache.hadoop.yarn.api.ApplicationMasterProtocol;
-import org.apache.hadoop.yarn.api.records.ApplicationId;
-import org.apache.hadoop.yarn.api.records.ApplicationReport;
-import org.apache.hadoop.yarn.api.records.FinalApplicationStatus;
-import org.apache.hadoop.yarn.api.records.YarnApplicationState;
-import org.apache.hadoop.yarn.client.ClientRMProxy;
-import org.apache.hadoop.yarn.client.api.YarnClient;
-import org.apache.hadoop.yarn.conf.YarnConfiguration;
-import org.apache.hadoop.yarn.exceptions.YarnException;
-import org.apache.hadoop.yarn.ipc.YarnRPC;
-import org.apache.hadoop.yarn.security.client.RMDelegationTokenIdentifier;
-import org.apache.hadoop.yarn.util.ConverterUtils;
 
-import com.google.common.base.Joiner;
 import com.google.common.base.Preconditions;
-import com.google.common.collect.Sets;
 
 import com.datatorrent.api.Attribute;
 import com.datatorrent.api.Context;
 import com.datatorrent.api.StreamingApplication;
-import com.datatorrent.stram.StramClient;
 import com.datatorrent.stram.StramUtils;
 import com.datatorrent.stram.security.StramUserLogin;
-import com.datatorrent.stram.util.ConfigUtils;
 import com.datatorrent.stram.util.ConfigValidator;
 
 /**
@@ -101,6 +78,8 @@ import com.datatorrent.stram.util.ConfigValidator;
  */
 public class StramClientUtils
 {
+  private static final Logger LOG = LoggerFactory.getLogger(StramClientUtils.class);
+
   public static final String DT_VERSION = StreamingApplication.DT_PREFIX + "version";
   public static final String DT_DFS_ROOT_DIR = StreamingApplication.DT_PREFIX + "dfsRootDirectory";
   public static final String APEX_APP_DFS_ROOT_DIR = StreamingApplication.APEX_PREFIX + "app.dfsRootDirectory";
@@ -127,209 +106,6 @@ public class StramClientUtils
    * TBD<p>
    * <br>
    */
-  public static class YarnClientHelper
-  {
-    private static final Logger LOG = LoggerFactory.getLogger(YarnClientHelper.class);
-    // Configuration
-    private final Configuration conf;
-    // RPC to communicate to RM
-    private final YarnRPC rpc;
-
-    public YarnClientHelper(Configuration conf)
-    {
-      // Set up the configuration and RPC
-      this.conf = conf;
-      this.rpc = YarnRPC.create(conf);
-    }
-
-    public Configuration getConf()
-    {
-      return this.conf;
-    }
-
-    public YarnRPC getYarnRPC()
-    {
-      return rpc;
-    }
-
-    /**
-     * Connect to the Resource Manager/Applications Manager<p>
-     *
-     * @return Handle to communicate with the ASM
-     * @throws IOException
-     */
-    public ApplicationClientProtocol connectToASM() throws IOException
-    {
-      YarnConfiguration yarnConf = new YarnConfiguration(conf);
-      InetSocketAddress rmAddress = yarnConf.getSocketAddr(
-          YarnConfiguration.RM_ADDRESS,
-          YarnConfiguration.DEFAULT_RM_ADDRESS,
-          YarnConfiguration.DEFAULT_RM_PORT);
-      LOG.debug("Connecting to ResourceManager at " + rmAddress);
-      return ((ApplicationClientProtocol)rpc.getProxy(ApplicationClientProtocol.class, rmAddress, conf));
-    }
-
-    /**
-     * Connect to the Resource Manager<p>
-     *
-     * @return Handle to communicate with the RM
-     */
-    public ApplicationMasterProtocol connectToRM()
-    {
-      InetSocketAddress rmAddress = conf.getSocketAddr(
-          YarnConfiguration.RM_SCHEDULER_ADDRESS,
-          YarnConfiguration.DEFAULT_RM_SCHEDULER_ADDRESS,
-          YarnConfiguration.DEFAULT_RM_SCHEDULER_PORT);
-      LOG.debug("Connecting to ResourceManager at " + rmAddress);
-      return ((ApplicationMasterProtocol)rpc.getProxy(ApplicationMasterProtocol.class, rmAddress, conf));
-    }
-
-  }
-
-  /**
-   * Bunch of utilities that ease repeating interactions with {@link ClientRMProxy}<p>
-   */
-  public static class ClientRMHelper
-  {
-    private static final Logger LOG = LoggerFactory.getLogger(ClientRMHelper.class);
-
-    private static final String RM_HOSTNAME_PREFIX = YarnConfiguration.RM_PREFIX + "hostname.";
-
-    private final YarnClient clientRM;
-    private final Configuration conf;
-
-    public ClientRMHelper(YarnClient yarnClient, Configuration conf) throws IOException
-    {
-      this.clientRM = yarnClient;
-      this.conf = conf;
-    }
-
-    public interface AppStatusCallback
-    {
-      boolean exitLoop(ApplicationReport report);
-
-    }
-
-    /**
-     * Monitor the submitted application for completion. Kill application if time expires.
-     *
-     * @param appId         Application Id of application to be monitored
-     * @param callback
-     * @param timeoutMillis
-     * @return true if application completed successfully
-     * @throws YarnException
-     * @throws IOException
-     */
-    @SuppressWarnings("SleepWhileInLoop")
-    public boolean waitForCompletion(ApplicationId appId, AppStatusCallback callback, long timeoutMillis) throws YarnException, IOException
-    {
-      long startMillis = System.currentTimeMillis();
-      while (true) {
-
-        // Check app status every 1 second.
-        try {
-          Thread.sleep(1000);
-        } catch (InterruptedException e) {
-          LOG.debug("Thread sleep in monitoring loop interrupted");
-        }
-
-        ApplicationReport report = clientRM.getApplicationReport(appId);
-        if (callback.exitLoop(report) == true) {
-          return true;
-        }
-
-        YarnApplicationState state = report.getYarnApplicationState();
-        FinalApplicationStatus dsStatus = report.getFinalApplicationStatus();
-        if (YarnApplicationState.FINISHED == state) {
-          if (FinalApplicationStatus.SUCCEEDED == dsStatus) {
-            LOG.info("Application has completed successfully. Breaking monitoring loop");
-            return true;
-          } else {
-            LOG.info("Application finished unsuccessfully."
-                + " YarnState=" + state.toString() + ", DSFinalStatus=" + dsStatus.toString()
-                + ". Breaking monitoring loop");
-            return false;
-          }
-        } else if (YarnApplicationState.KILLED == state
-            || YarnApplicationState.FAILED == state) {
-          LOG.info("Application did not finish."
-              + " YarnState=" + state.toString() + ", DSFinalStatus=" + dsStatus.toString()
-              + ". Breaking monitoring loop");
-          return false;
-        }
-
-        if (System.currentTimeMillis() - startMillis > timeoutMillis) {
-          LOG.info("Reached specified timeout. Killing application");
-          clientRM.killApplication(appId);
-          return false;
-        }
-      }
-    }
-
-    // TODO: HADOOP UPGRADE - replace with YarnConfiguration constants
-    private Token<RMDelegationTokenIdentifier> getRMHAToken(org.apache.hadoop.yarn.api.records.Token rmDelegationToken)
-    {
-      // Build a list of service addresses to form the service name
-      ArrayList<String> services = new ArrayList<>();
-      for (String rmId : ConfigUtils.getRMHAIds(conf)) {
-        LOG.info("Yarn Resource Manager id: {}", rmId);
-        // Set RM_ID to get the corresponding RM_ADDRESS
-        services.add(SecurityUtil.buildTokenService(getRMHAAddress(rmId)).toString());
-      }
-      Text rmTokenService = new Text(Joiner.on(',').join(services));
-
-      return new Token<>(
-          rmDelegationToken.getIdentifier().array(),
-          rmDelegationToken.getPassword().array(),
-          new Text(rmDelegationToken.getKind()),
-          rmTokenService);
-    }
-
-    public void addRMDelegationToken(final String renewer, final Credentials credentials) throws IOException, YarnException
-    {
-      // Get the ResourceManager delegation rmToken
-      final org.apache.hadoop.yarn.api.records.Token rmDelegationToken = clientRM.getRMDelegationToken(new Text(renewer));
-
-      Token<RMDelegationTokenIdentifier> token;
-      // TODO: Use the utility method getRMDelegationTokenService in ClientRMProxy to remove the separate handling of
-      // TODO: HA and non-HA cases when hadoop dependency is changed to hadoop 2.4 or above
-      if (ConfigUtils.isRMHAEnabled(conf)) {
-        LOG.info("Yarn Resource Manager HA is enabled");
-        token = getRMHAToken(rmDelegationToken);
-      } else {
-        LOG.info("Yarn Resource Manager HA is not enabled");
-        InetSocketAddress rmAddress = conf.getSocketAddr(YarnConfiguration.RM_ADDRESS,
-            YarnConfiguration.DEFAULT_RM_ADDRESS,
-            YarnConfiguration.DEFAULT_RM_PORT);
-
-        token = ConverterUtils.convertFromYarn(rmDelegationToken, rmAddress);
-      }
-
-      LOG.info("RM dt {}", token);
-
-      credentials.addToken(token.getService(), token);
-    }
-
-    public InetSocketAddress getRMHAAddress(String rmId)
-    {
-      YarnConfiguration yarnConf = StramClientUtils.getYarnConfiguration(conf);
-      yarnConf.set(ConfigUtils.RM_HA_ID, rmId);
-      InetSocketAddress socketAddr = yarnConf.getSocketAddr(YarnConfiguration.RM_ADDRESS, YarnConfiguration.DEFAULT_RM_ADDRESS, YarnConfiguration.DEFAULT_RM_PORT);
-      yarnConf.unset(ConfigUtils.RM_HA_ID);
-      return socketAddr;
-    }
-
-  }
-
-  public static YarnClient createYarnClient(Configuration conf)
-  {
-    YarnClient client = YarnClient.createYarnClient();
-    client.init(conf);
-    client.start();
-    return client;
-  }
-
-  private static final Logger LOG = LoggerFactory.getLogger(StramClientUtils.class);
 
   public static String getHostName()
   {
@@ -449,15 +225,20 @@ public class StramClientUtils
     // We are overriding this to be 10 seconds maximum.
     //
 
-    long rmConnectMaxWait = conf.getLong(YarnConfiguration.RESOURCEMANAGER_CONNECT_MAX_WAIT_MS, YarnConfiguration.DEFAULT_RESOURCEMANAGER_CONNECT_MAX_WAIT_MS);
+    long rmConnectMaxWait = conf.getLong(Settings.Strings.RESOURCEMANAGER_CONNECT_MAX_WAIT_MS.getValue(),
+        Settings.Longs.DEFAULT_RESOURCEMANAGER_CONNECT_MAX_WAIT_MS.getValue());
     if (rmConnectMaxWait > RESOURCEMANAGER_CONNECT_MAX_WAIT_MS_OVERRIDE) {
-      LOG.info("Overriding {} assigned value of {} to {} because the assigned value is too big.", YarnConfiguration.RESOURCEMANAGER_CONNECT_MAX_WAIT_MS, rmConnectMaxWait, RESOURCEMANAGER_CONNECT_MAX_WAIT_MS_OVERRIDE);
-      conf.setLong(YarnConfiguration.RESOURCEMANAGER_CONNECT_MAX_WAIT_MS, RESOURCEMANAGER_CONNECT_MAX_WAIT_MS_OVERRIDE);
-      long rmConnectRetryInterval = conf.getLong(YarnConfiguration.RESOURCEMANAGER_CONNECT_RETRY_INTERVAL_MS, YarnConfiguration.DEFAULT_RESOURCEMANAGER_CONNECT_MAX_WAIT_MS);
+      LOG.info("Overriding {} assigned value of {} to {} because the assigned value is too big.",
+          Settings.Strings.RESOURCEMANAGER_CONNECT_MAX_WAIT_MS.getValue(),
+          rmConnectMaxWait, RESOURCEMANAGER_CONNECT_MAX_WAIT_MS_OVERRIDE);
+      conf.setLong(Settings.Strings.RESOURCEMANAGER_CONNECT_MAX_WAIT_MS.getValue(), RESOURCEMANAGER_CONNECT_MAX_WAIT_MS_OVERRIDE);
+      long rmConnectRetryInterval = conf.getLong(Settings.Strings.RESOURCEMANAGER_CONNECT_RETRY_INTERVAL_MS.getValue(),
+          Settings.Longs.DEFAULT_RESOURCEMANAGER_CONNECT_MAX_WAIT_MS.getValue());
       long defaultRetryInterval = Math.max(500, RESOURCEMANAGER_CONNECT_MAX_WAIT_MS_OVERRIDE / 5);
       if (rmConnectRetryInterval > defaultRetryInterval) {
-        LOG.info("Overriding {} assigned value of {} to {} because the assigned value is too big.", YarnConfiguration.RESOURCEMANAGER_CONNECT_RETRY_INTERVAL_MS, rmConnectRetryInterval, defaultRetryInterval);
-        conf.setLong(YarnConfiguration.RESOURCEMANAGER_CONNECT_RETRY_INTERVAL_MS, defaultRetryInterval);
+        LOG.info("Overriding {} assigned value of {} to {} because the assigned value is too big.",
+            Settings.Strings.RESOURCEMANAGER_CONNECT_RETRY_INTERVAL_MS.getValue(), rmConnectRetryInterval, defaultRetryInterval);
+        conf.setLong(Settings.Strings.RESOURCEMANAGER_CONNECT_RETRY_INTERVAL_MS.getValue(), defaultRetryInterval);
       }
     }
     LOG.info(" conf object in stramclient {}", conf);
@@ -792,84 +573,6 @@ public class StramClientUtils
     }
   }
 
-  public static ApplicationReport getStartedAppInstanceByName(YarnClient clientRMService, String appName, String user, String excludeAppId) throws YarnException, IOException
-  {
-    List<ApplicationReport> applications = clientRMService.getApplications(Sets.newHashSet(StramClient.YARN_APPLICATION_TYPE, StramClient.YARN_APPLICATION_TYPE_DEPRECATED), EnumSet.of(YarnApplicationState.RUNNING,
-        YarnApplicationState.ACCEPTED,
-        YarnApplicationState.NEW,
-        YarnApplicationState.NEW_SAVING,
-        YarnApplicationState.SUBMITTED));
-    // see whether there is an app with the app name and user name running
-    for (ApplicationReport app : applications) {
-      if (!app.getApplicationId().toString().equals(excludeAppId)
-          && app.getName().equals(appName)
-          && app.getUser().equals(user)) {
-        return app;
-      }
-    }
-    return null;
-  }
-
-  /**
-   * Return a YarnConfiguration instance from a Configuration instance
-   * @param conf The configuration instance
-   * @return The YarnConfiguration instance
-   */
-  private static YarnConfiguration getYarnConfiguration(Configuration conf)
-  {
-    YarnConfiguration yarnConf;
-    if (conf instanceof YarnConfiguration) {
-      yarnConf = (YarnConfiguration)conf;
-    } else {
-      yarnConf = new YarnConfiguration(conf);
-    }
-    return yarnConf;
-  }
-
-  public static InetSocketAddress getRMWebAddress(Configuration conf, String rmId)
-  {
-    boolean sslEnabled = conf.getBoolean(CommonConfigurationKeysPublic.HADOOP_SSL_ENABLED_KEY, CommonConfigurationKeysPublic.HADOOP_SSL_ENABLED_DEFAULT);
-    return getRMWebAddress(conf, sslEnabled, rmId);
-  }
-
-  /**
-   * Get the RM webapp address. The configuration that is passed in should not be used by other threads while this
-   * method is executing.
-   * @param conf The configuration
-   * @param sslEnabled Whether SSL is enabled or not
-   * @param rmId If HA is enabled the resource manager id
-   * @return The webapp socket address
-   */
-  public static InetSocketAddress getRMWebAddress(Configuration conf, boolean sslEnabled, String rmId)
-  {
-    boolean isHA = (rmId != null);
-    if (isHA) {
-      conf = getYarnConfiguration(conf);
-      conf.set(ConfigUtils.RM_HA_ID, rmId);
-    }
-    InetSocketAddress address;
-    if (sslEnabled) {
-      address = conf.getSocketAddr(YarnConfiguration.RM_WEBAPP_HTTPS_ADDRESS, YarnConfiguration.DEFAULT_RM_WEBAPP_HTTPS_ADDRESS, YarnConfiguration.DEFAULT_RM_WEBAPP_HTTPS_PORT);
-    } else {
-      address = conf.getSocketAddr(YarnConfiguration.RM_WEBAPP_ADDRESS, YarnConfiguration.DEFAULT_RM_WEBAPP_ADDRESS, YarnConfiguration.DEFAULT_RM_WEBAPP_PORT);
-    }
-    if (isHA) {
-      conf.unset(ConfigUtils.RM_HA_ID);
-    }
-    LOG.info("rm webapp address setting {}", address);
-    LOG.debug("rm setting sources {}", conf.getPropertySources(YarnConfiguration.RM_WEBAPP_ADDRESS));
-    InetSocketAddress resolvedSocketAddress = NetUtils.getConnectAddress(address);
-    InetAddress resolved = resolvedSocketAddress.getAddress();
-    if (resolved == null || resolved.isAnyLocalAddress() || resolved.isLoopbackAddress()) {
-      try {
-        resolvedSocketAddress = InetSocketAddress.createUnresolved(InetAddress.getLocalHost().getCanonicalHostName(), address.getPort());
-      } catch (UnknownHostException e) {
-        //Ignore and fallback.
-      }
-    }
-    return resolvedSocketAddress;
-  }
-
   public static String getSocketConnectString(InetSocketAddress socketAddress)
   {
     String host;
@@ -884,56 +587,13 @@ public class StramClientUtils
     return host + ":" + socketAddress.getPort();
   }
 
-  public static List<InetSocketAddress> getRMAddresses(Configuration conf)
-  {
-
-    List<InetSocketAddress> rmAddresses = new ArrayList<>();
-    if (ConfigUtils.isRMHAEnabled(conf)) {
-      // HA is enabled get all
-      for (String rmId : ConfigUtils.getRMHAIds(conf)) {
-        InetSocketAddress socketAddress = getRMWebAddress(conf, rmId);
-        rmAddresses.add(socketAddress);
-      }
-    } else {
-      InetSocketAddress socketAddress = getRMWebAddress(conf, null);
-      rmAddresses.add(socketAddress);
-    }
-    return rmAddresses;
-  }
-
-  public static List<ApplicationReport> cleanAppDirectories(YarnClient clientRMService, Configuration conf, FileSystem fs, long finishedBefore)
-      throws IOException, YarnException
-  {
-    List<ApplicationReport> result = new ArrayList<>();
-    List<ApplicationReport> applications = clientRMService.getApplications(Sets.newHashSet(StramClient.YARN_APPLICATION_TYPE, StramClient.YARN_APPLICATION_TYPE_DEPRECATED),
-        EnumSet.of(YarnApplicationState.FAILED, YarnApplicationState.FINISHED, YarnApplicationState.KILLED));
-    Path appsBasePath = new Path(StramClientUtils.getApexDFSRootDir(fs, conf), StramClientUtils.SUBDIR_APPS);
-    for (ApplicationReport ar : applications) {
-      long finishTime = ar.getFinishTime();
-      if (finishTime < finishedBefore) {
-        try {
-          Path appPath = new Path(appsBasePath, ar.getApplicationId().toString());
-          if (fs.isDirectory(appPath)) {
-            LOG.debug("Deleting finished application data for {}", ar.getApplicationId());
-            fs.delete(appPath, true);
-            result.add(ar);
-          }
-        } catch (Exception ex) {
-          LOG.warn("Cannot delete application data for {}", ar.getApplicationId(), ex);
-          continue;
-        }
-      }
-    }
-    return result;
-  }
-
   public static AppPackage.AppInfo jsonFileToAppInfo(File file, Configuration config)
   {
     AppPackage.AppInfo appInfo = null;
 
     try {
       StramAppLauncher.AppFactory appFactory = new StramAppLauncher.JsonFileAppFactory(file);
-      StramAppLauncher stramAppLauncher = new StramAppLauncher(file.getName(), config);
+      StramAppLauncher stramAppLauncher = ClusterProviderFactory.getProvider().getStramAppLauncher(file.getName(), config);
       stramAppLauncher.loadDependencies();
       appInfo = new AppPackage.AppInfo(appFactory.getName(), file.getName(), "json");
       appInfo.displayName = appFactory.getDisplayName();

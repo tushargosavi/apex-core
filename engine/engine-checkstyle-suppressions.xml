@@ -25,8 +25,20 @@
 
 <suppressions>
   <suppress checks="RegexpMultiline" files="ApexCli.java"/>
+  <suppress checks="RegexpMultiline" files="AliasCommand.java"/>
+  <suppress checks="RegexpMultiline" files="BeginMacroCommand.java"/>
+  <suppress checks="RegexpMultiline" files="ConnectCommand.java"/>
+  <suppress checks="RegexpMultiline" files="DumpPropertiesFileCommand.java"/>
+  <suppress checks="RegexpMultiline" files="EchoCommand.java"/>
+  <suppress checks="RegexpMultiline" files="KillContainerCommand.java"/>
+  <suppress checks="RegexpMultiline" files="LaunchCommand.java"/>
+  <suppress checks="RegexpMultiline" files="ListContainersCommand.java"/>
+  <suppress checks="RegexpMultiline" files="ShowQueueCommand.java"/>
+  <suppress checks="RegexpMultiline" files="SourceCommand.java"/>
+  <suppress checks="RegexpMultiline" files="CommandSpec.java"/>
+  <suppress checks="RegexpMultiline" files="OptionsCommandSpec.java"/>
   <suppress checks="RegexpMultiline" files="VersionInfo.java"/>
   <suppress checks="NoFinalizer" files="FSRecoveryHandler.java"/>
   <suppress checks="AnnotationLocation" files="PhysicalPlan.java"/>
-  <suppress checks="AnnotationLocation" files="ApexCli.java"/>
+  <suppress checks="AnnotationLocation" files="Tokenizer.java"/>
 </suppressions>

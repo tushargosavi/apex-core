@@ -18,8 +18,6 @@
  */
 package com.datatorrent.stram;
 
-import java.io.IOException;
-import java.util.List;
 import java.util.Map;
 
 import org.codehaus.jettison.json.JSONArray;
@@ -28,14 +26,11 @@ import org.codehaus.jettison.json.JSONObject;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
-import org.apache.hadoop.yarn.api.ApplicationConstants.Environment;
-import org.apache.hadoop.yarn.api.records.ApplicationReport;
-import org.apache.hadoop.yarn.client.api.YarnClient;
-import org.apache.hadoop.yarn.exceptions.YarnException;
+import org.apache.apex.engine.ClusterProviderFactory;
+import org.apache.apex.engine.api.Settings;
 
 import com.google.common.base.Strings;
 import com.google.common.collect.Maps;
-import com.google.common.collect.Sets;
 
 import com.datatorrent.api.Attribute;
 import com.datatorrent.api.StreamingApplication;
@@ -79,10 +74,6 @@ public abstract class StramUtils
     static {
       // set system properties so they can be used in logger configuration
       Map<String, String> envs = System.getenv();
-      String containerIdString = envs.get(Environment.CONTAINER_ID.name());
-      if (containerIdString != null) {
-        System.setProperty(StreamingApplication.DT_PREFIX + "cid", containerIdString);
-      }
 
       System.setProperty("hadoop.log.file", "apex.log");
       if (envs.get("CDH_YARN_HOME") != null) {
@@ -105,6 +96,11 @@ public abstract class StramUtils
           targetChanges.put(parts[0], parts[1]);
         }
         LoggerUtil.changeLoggersLevel(targetChanges);
+      }
+
+      String containerIdString = ClusterProviderFactory.getProvider().getConfiguration().get(Settings.CONTAINER_ID);
+      if (containerIdString != null) {
+        System.setProperty(StreamingApplication.DT_PREFIX + "cid", containerIdString);
       }
 
     }
@@ -163,10 +159,4 @@ public abstract class StramUtils
     }
     return value;
   }
-
-  public static List<ApplicationReport> getApexApplicationList(YarnClient yarnClient) throws IOException, YarnException
-  {
-    return yarnClient.getApplications(Sets.newHashSet(StramClient.YARN_APPLICATION_TYPE, StramClient.YARN_APPLICATION_TYPE_DEPRECATED));
-  }
-
 }

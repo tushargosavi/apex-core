@@ -32,8 +32,8 @@ import java.util.concurrent.ConcurrentLinkedQueue;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
-import org.apache.hadoop.yarn.api.ApplicationConstants;
-import org.apache.hadoop.yarn.conf.YarnConfiguration;
+import org.apache.apex.engine.ClusterProviderFactory;
+import org.apache.hadoop.conf.Configuration;
 
 import com.google.common.collect.Sets;
 
@@ -85,6 +85,12 @@ public class StreamingContainerAgent
     ContainerStartRequest(PTContainer container)
     {
       this.container = container;
+    }
+
+    // TODO: Allowing public access to handle refactoring, revisit in future
+    public PTContainer getContainer()
+    {
+      return container;
     }
   }
 
@@ -460,10 +466,8 @@ public class StreamingContainerAgent
     ci.startedTime = container.getStartedTime();
     ci.finishedTime = container.getFinishedTime();
     if (this.container.nodeHttpAddress != null) {
-      YarnConfiguration conf = new YarnConfiguration();
-      ci.containerLogsUrl = ConfigUtils
-          .getSchemePrefix(conf) + this.container.nodeHttpAddress + "/node/containerlogs/" + ci.id + "/" + System
-          .getenv(ApplicationConstants.Environment.USER.toString());
+      Configuration conf = ClusterProviderFactory.getProvider().getConfiguration().getNativeConfig();
+      ci.containerLogsUrl = ConfigUtils.getContainerLogsUrl(conf, this.container.nodeHttpAddress, ci.id);
       ci.rawContainerLogsUrl = ConfigUtils
           .getRawContainerLogsUrl(conf, container.nodeHttpAddress, container.getPlan().getLogicalPlan().getAttributes()
               .get(LogicalPlan.APPLICATION_ID), ci.id);

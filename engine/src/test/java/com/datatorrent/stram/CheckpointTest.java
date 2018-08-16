@@ -33,8 +33,9 @@ import org.junit.Test;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
-import org.apache.hadoop.yarn.util.Clock;
-import org.apache.hadoop.yarn.util.SystemClock;
+import org.apache.apex.engine.ClusterProviderFactory;
+import org.apache.apex.engine.SystemClock;
+import org.apache.apex.engine.api.Clock;
 
 import com.google.common.collect.Maps;
 import com.google.common.collect.Sets;
@@ -122,6 +123,7 @@ public class CheckpointTest
   @Before
   public void setup()
   {
+    System.setProperty("providerType", "LOCAL");
     dag = StramTestSupport.createDAG(testMeta);
   }
 
@@ -199,7 +201,7 @@ public class CheckpointTest
     dag.addStream("o1.output1", o1.outport1, o2.inport1);
     dag.addStream("o2.output1", o2.outport1, o3SL.inport1);
 
-    StreamingContainerManager dnm = new StreamingContainerManager(dag);
+    StreamingContainerManager dnm = ClusterProviderFactory.getProvider().getStreamingContainerManager(dag);
     PhysicalPlan plan = dnm.getPhysicalPlan();
 
     for (PTOperator oper : plan.getAllOperators().values()) {
@@ -307,7 +309,7 @@ public class CheckpointTest
     dag.setOperatorAttribute(o3, Context.OperatorContext.PARTITIONER, new StatelessPartitioner<Operator>(2));
 
     dag.validate();
-    StreamingContainerManager dnm = new StreamingContainerManager(dag);
+    StreamingContainerManager dnm = ClusterProviderFactory.getProvider().getStreamingContainerManager(dag);
     PhysicalPlan plan = dnm.getPhysicalPlan();
 
     for (PTOperator oper : plan.getAllOperators().values()) {
@@ -352,7 +354,7 @@ public class CheckpointTest
     dag.addStream("o1.outport1", o1.outport1, o2SL.inport1);
     dag.addStream("o2SL.outport1", o2SL.outport1, o3SL.inport1, o4.inport1);
 
-    StreamingContainerManager dnm = new StreamingContainerManager(dag, clock);
+    StreamingContainerManager dnm = ClusterProviderFactory.getProvider().getStreamingContainerManager(dag, clock);
     PhysicalPlan plan = dnm.getPhysicalPlan();
 
     for (PTOperator oper : plan.getAllOperators().values()) {
@@ -412,7 +414,7 @@ public class CheckpointTest
 
     dag.addStream("o1.outport1", o1.outport1, o2.inport1);
 
-    StreamingContainerManager dnm = new StreamingContainerManager(dag);
+    StreamingContainerManager dnm = ClusterProviderFactory.getProvider().getStreamingContainerManager(dag);
     PhysicalPlan plan = dnm.getPhysicalPlan();
 
     // set all operators as active to enable recovery window id update
@@ -491,7 +493,7 @@ public class CheckpointTest
 
     dag.addStream("o1.outport1", o1.outport1, o2.inport1);
 
-    StreamingContainerManager scm = new StreamingContainerManager(dag, false, clock);
+    StreamingContainerManager scm = ClusterProviderFactory.getProvider().getStreamingContainerManager(dag, false, clock);
     PhysicalPlan plan = scm.getPhysicalPlan();
 
     List<PTContainer> containers = plan.getContainers();

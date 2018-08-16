@@ -25,10 +25,11 @@ import java.util.Collection;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
+import org.apache.apex.engine.ClusterProviderFactory;
+import org.apache.apex.engine.api.Settings;
 import org.apache.hadoop.conf.Configuration;
 import org.apache.hadoop.http.HttpConfig;
 import org.apache.hadoop.security.UserGroupInformation;
-import org.apache.hadoop.yarn.conf.YarnConfiguration;
 
 /**
  * <p>
@@ -39,7 +40,7 @@ import org.apache.hadoop.yarn.conf.YarnConfiguration;
 public class ConfigUtils
 {
   // TODO: HADOOP UPGRADE - replace with YarnConfiguration constants
-  private static final String RM_HA_PREFIX = YarnConfiguration.RM_PREFIX + "ha.";
+  private static final String RM_HA_PREFIX = Settings.Strings.RM_PREFIX.getValue() + "ha.";
   public static final String RM_HA_ENABLED = RM_HA_PREFIX + "enabled";
   public static final String RM_HA_IDS = RM_HA_PREFIX + "rm-ids";
   public static final String RM_HA_ID = RM_HA_PREFIX + "id";
@@ -48,18 +49,18 @@ public class ConfigUtils
   private static String yarnLogDir;
   private static final Logger LOG = LoggerFactory.getLogger(ConfigUtils.class);
 
-  public static InetSocketAddress getRMAddress(YarnConfiguration conf)
+  public static InetSocketAddress getRMAddress(Configuration conf)
   {
-    return conf.getSocketAddr(YarnConfiguration.RM_ADDRESS,
-        YarnConfiguration.DEFAULT_RM_ADDRESS,
-        YarnConfiguration.DEFAULT_RM_PORT);
+    return conf.getSocketAddr(Settings.Strings.RM_ADDRESS.getValue(),
+        Settings.Strings.DEFAULT_RM_ADDRESS.getValue(),
+        Settings.Integers.DEFAULT_RM_PORT.getValue());
   }
 
   public static String getRMUsername(Configuration conf)
   {
     String principal = null;
     if (UserGroupInformation.isSecurityEnabled()) {
-      principal = conf.get(YarnConfiguration.RM_PRINCIPAL);
+      principal = conf.get(Settings.Strings.RM_PRINCIPAL.getValue());
       int sindex = -1;
       if ((principal != null) && ((sindex = principal.indexOf('/')) != -1)) {
         principal = principal.substring(0, sindex);
@@ -70,8 +71,9 @@ public class ConfigUtils
 
   public static boolean isSSLEnabled(Configuration conf)
   {
-    if (HttpConfig.Policy.HTTPS_ONLY == HttpConfig.Policy.fromString(
-        conf.get(YarnConfiguration.YARN_HTTP_POLICY_KEY, YarnConfiguration.YARN_HTTP_POLICY_DEFAULT))) {
+    if (HttpConfig.Policy.HTTPS_ONLY == HttpConfig.Policy.fromString(conf.get(
+        Settings.Strings.HTTP_POLICY_KEY.getValue(),
+        Settings.Strings.HTTP_POLICY_DEFAULT.getValue()))) {
       return true;
     }
     return false;
@@ -84,12 +86,6 @@ public class ConfigUtils
     } else {
       return "http://";
     }
-  }
-
-  @Deprecated
-  public static String getSchemePrefix(YarnConfiguration conf)
-  {
-    return getSchemePrefix((Configuration)conf);
   }
 
   public static String getYarnLogDir()
@@ -135,9 +131,14 @@ public class ConfigUtils
 
   private static boolean rawContainerLogWarningPrinted = false;
 
-  public static String getRawContainerLogsUrl(YarnConfiguration conf, String nodeHttpAddress, String appId, String containerId)
+  public static String getContainerLogsUrl(Configuration conf, String nodeHttpAddress, String containerId)
   {
-    String logDirs = conf.get(YarnConfiguration.NM_LOG_DIRS);
+    return getSchemePrefix(conf) + nodeHttpAddress + "/node/containerlogs/" + containerId + "/" + ClusterProviderFactory.getProvider().getConfiguration().get(Settings.USER);
+  }
+
+  public static String getRawContainerLogsUrl(Configuration conf, String nodeHttpAddress, String appId, String containerId)
+  {
+    String logDirs = conf.get(Settings.Strings.NM_LOG_DIRS.getValue());
     if (logDirs.startsWith("${yarn.log.dir}")) {
       return ConfigUtils.getSchemePrefix(conf) + nodeHttpAddress + "/logs" + logDirs.substring("${yarn.log.dir}".length()) + "/" + appId + "/" + containerId;
     } else {

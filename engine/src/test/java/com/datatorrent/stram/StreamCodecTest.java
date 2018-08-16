@@ -31,6 +31,8 @@ import org.junit.Before;
 import org.junit.Rule;
 import org.junit.Test;
 
+import org.apache.apex.engine.ClusterProviderFactory;
+
 import com.google.common.collect.Lists;
 
 import com.datatorrent.api.Context;
@@ -79,7 +81,7 @@ public class StreamCodecTest
     StramTestSupport.MemoryStorageAgent msa = new StramTestSupport.MemoryStorageAgent();
     dag.setAttribute(Context.OperatorContext.STORAGE_AGENT, msa);
 
-    StreamingContainerManager dnm = new StreamingContainerManager(dag);
+    StreamingContainerManager dnm = ClusterProviderFactory.getProvider().getStreamingContainerManager(dag);
     PhysicalPlan plan = dnm.getPhysicalPlan();
 
     List<PTContainer> containers = plan.getContainers();
@@ -146,7 +148,7 @@ public class StreamCodecTest
     StramTestSupport.MemoryStorageAgent msa = new StramTestSupport.MemoryStorageAgent();
     dag.setAttribute(Context.OperatorContext.STORAGE_AGENT, msa);
 
-    StreamingContainerManager dnm = new StreamingContainerManager(dag);
+    StreamingContainerManager dnm = ClusterProviderFactory.getProvider().getStreamingContainerManager(dag);
     PhysicalPlan plan = dnm.getPhysicalPlan();
 
     List<PTContainer> containers = plan.getContainers();
@@ -180,7 +182,7 @@ public class StreamCodecTest
     StramTestSupport.MemoryStorageAgent msa = new StramTestSupport.MemoryStorageAgent();
     dag.setAttribute(Context.OperatorContext.STORAGE_AGENT, msa);
 
-    StreamingContainerManager dnm = new StreamingContainerManager(dag);
+    StreamingContainerManager dnm = ClusterProviderFactory.getProvider().getStreamingContainerManager(dag);
     PhysicalPlan plan = dnm.getPhysicalPlan();
 
     List<PTContainer> containers = plan.getContainers();
@@ -236,7 +238,7 @@ public class StreamCodecTest
     StramTestSupport.MemoryStorageAgent msa = new StramTestSupport.MemoryStorageAgent();
     dag.setAttribute(Context.OperatorContext.STORAGE_AGENT, msa);
 
-    StreamingContainerManager dnm = new StreamingContainerManager(dag);
+    StreamingContainerManager dnm = ClusterProviderFactory.getProvider().getStreamingContainerManager(dag);
     PhysicalPlan plan = dnm.getPhysicalPlan();
 
     List<PTContainer> containers = plan.getContainers();
@@ -285,7 +287,7 @@ public class StreamCodecTest
     StramTestSupport.MemoryStorageAgent msa = new StramTestSupport.MemoryStorageAgent();
     dag.setAttribute(Context.OperatorContext.STORAGE_AGENT, msa);
 
-    StreamingContainerManager dnm = new StreamingContainerManager(dag);
+    StreamingContainerManager dnm = ClusterProviderFactory.getProvider().getStreamingContainerManager(dag);
     PhysicalPlan plan = dnm.getPhysicalPlan();
 
     List<PTContainer> containers = plan.getContainers();
@@ -353,7 +355,7 @@ public class StreamCodecTest
     StramTestSupport.MemoryStorageAgent msa = new StramTestSupport.MemoryStorageAgent();
     dag.setAttribute(Context.OperatorContext.STORAGE_AGENT, msa);
 
-    StreamingContainerManager dnm = new StreamingContainerManager(dag);
+    StreamingContainerManager dnm = ClusterProviderFactory.getProvider().getStreamingContainerManager(dag);
     PhysicalPlan plan = dnm.getPhysicalPlan();
 
     List<PTContainer> containers = plan.getContainers();
@@ -436,7 +438,7 @@ public class StreamCodecTest
     StramTestSupport.MemoryStorageAgent msa = new StramTestSupport.MemoryStorageAgent();
     dag.setAttribute(Context.OperatorContext.STORAGE_AGENT, msa);
 
-    StreamingContainerManager dnm = new StreamingContainerManager(dag);
+    StreamingContainerManager dnm = ClusterProviderFactory.getProvider().getStreamingContainerManager(dag);
     PhysicalPlan plan = dnm.getPhysicalPlan();
 
     List<PTContainer> containers = plan.getContainers();
@@ -489,7 +491,7 @@ public class StreamCodecTest
     StramTestSupport.MemoryStorageAgent msa = new StramTestSupport.MemoryStorageAgent();
     dag.setAttribute(Context.OperatorContext.STORAGE_AGENT, msa);
 
-    StreamingContainerManager dnm = new StreamingContainerManager(dag);
+    StreamingContainerManager dnm = ClusterProviderFactory.getProvider().getStreamingContainerManager(dag);
     PhysicalPlan plan = dnm.getPhysicalPlan();
 
     List<PTContainer> containers = plan.getContainers();
@@ -565,7 +567,7 @@ public class StreamCodecTest
     StramTestSupport.MemoryStorageAgent msa = new StramTestSupport.MemoryStorageAgent();
     dag.setAttribute(Context.OperatorContext.STORAGE_AGENT, msa);
 
-    StreamingContainerManager dnm = new StreamingContainerManager(dag);
+    StreamingContainerManager dnm = ClusterProviderFactory.getProvider().getStreamingContainerManager(dag);
     PhysicalPlan plan = dnm.getPhysicalPlan();
 
     List<PTContainer> containers = plan.getContainers();
@@ -620,7 +622,7 @@ public class StreamCodecTest
     StramTestSupport.MemoryStorageAgent msa = new StramTestSupport.MemoryStorageAgent();
     dag.setAttribute(Context.OperatorContext.STORAGE_AGENT, msa);
 
-    StreamingContainerManager dnm = new StreamingContainerManager(dag);
+    StreamingContainerManager dnm = ClusterProviderFactory.getProvider().getStreamingContainerManager(dag);
     PhysicalPlan plan = dnm.getPhysicalPlan();
 
     List<PTContainer> containers = plan.getContainers();
@@ -705,7 +707,7 @@ public class StreamCodecTest
     StramTestSupport.MemoryStorageAgent msa = new StramTestSupport.MemoryStorageAgent();
     dag.setAttribute(Context.OperatorContext.STORAGE_AGENT, msa);
 
-    StreamingContainerManager dnm = new StreamingContainerManager(dag);
+    StreamingContainerManager dnm = ClusterProviderFactory.getProvider().getStreamingContainerManager(dag);
     PhysicalPlan plan = dnm.getPhysicalPlan();
 
     List<PTContainer> containers = plan.getContainers();
@@ -803,7 +805,7 @@ public class StreamCodecTest
     StramTestSupport.MemoryStorageAgent msa = new StramTestSupport.MemoryStorageAgent();
     dag.setAttribute(Context.OperatorContext.STORAGE_AGENT, msa);
 
-    StreamingContainerManager dnm = new StreamingContainerManager(dag);
+    StreamingContainerManager dnm = ClusterProviderFactory.getProvider().getStreamingContainerManager(dag);
     PhysicalPlan plan = dnm.getPhysicalPlan();
 
     List<PTContainer> containers = plan.getContainers();
@@ -885,7 +887,7 @@ public class StreamCodecTest
     StramTestSupport.MemoryStorageAgent msa = new StramTestSupport.MemoryStorageAgent();
     dag.setAttribute(Context.OperatorContext.STORAGE_AGENT, msa);
 
-    StreamingContainerManager dnm = new StreamingContainerManager(dag);
+    StreamingContainerManager dnm = ClusterProviderFactory.getProvider().getStreamingContainerManager(dag);
     PhysicalPlan plan = dnm.getPhysicalPlan();
 
     List<PTContainer> containers = plan.getContainers();
@@ -973,7 +975,7 @@ public class StreamCodecTest
     StramTestSupport.MemoryStorageAgent msa = new StramTestSupport.MemoryStorageAgent();
     dag.setAttribute(Context.OperatorContext.STORAGE_AGENT, msa);
 
-    StreamingContainerManager dnm = new StreamingContainerManager(dag);
+    StreamingContainerManager dnm = ClusterProviderFactory.getProvider().getStreamingContainerManager(dag);
     PhysicalPlan plan = dnm.getPhysicalPlan();
 
     List<PTContainer> containers = plan.getContainers();

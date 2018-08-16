@@ -23,7 +23,6 @@ import java.util.Collection;
 import java.util.List;
 
 import com.datatorrent.stram.plan.logical.LogicalPlan;
-import com.datatorrent.stram.plan.logical.Operators;
 
 public class OperatorPortValidations implements ComponentValidator<LogicalPlan.OperatorMeta>
 {
