@@ -3,6 +3,7 @@
 .project
 .settings/
 .metadata/
+.metals/
 target/
 node_modules/
 /malhar
